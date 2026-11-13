@@ -49,7 +49,7 @@ adb shell am start -n $PKG/.MainActivity
 sleep 6; shot 00_home
 
 # b) each test image, outline-only and with medium shading
-for img in astronaut coffee chelsea cartoon toy_grass rocket; do
+for img in elf astronaut coffee chelsea cartoon toy_grass rocket; do
   for cfg in "outline:none" "shading:medium"; do
     shading=${cfg#*:}
     run_gen "$img $cfg" "${img}_${cfg//:/-}" \

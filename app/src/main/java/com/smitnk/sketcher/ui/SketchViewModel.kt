@@ -409,10 +409,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    init {
-        refreshInstalledModels()
-        autoSelectAccelOnFirstLaunch()
-    }
 
     override fun onCleared() {
         // Best-effort final save: snapshot now (main thread), write on a scope that outlives viewModelScope.
@@ -555,10 +551,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private val repo = ProjectRepository(app)
     private val saveMutex = Mutex()
 
-    init {
-        refreshRecent()
-    }
-
     var currentProjectId: String? = null
         private set
 
@@ -567,6 +559,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     var recentProjects by mutableStateOf<List<RecentProjectUi>>(emptyList())
         private set
+
 
     private var dirty = false
     private var debounceJob: Job? = null
@@ -1542,5 +1535,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun toast(msg: String) {
         Toast.makeText(app, msg, Toast.LENGTH_LONG).show()
+    }
+
+    // Startup work runs LAST so every property above is initialised first
+    // (Kotlin runs initializers in declaration order; Main.immediate coroutines execute synchronously).
+    init {
+        refreshInstalledModels()
+        autoSelectAccelOnFirstLaunch()
+        refreshRecent()
     }
 }
