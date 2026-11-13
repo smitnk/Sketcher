@@ -21,6 +21,11 @@ adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez autoexport true
 sleep 25; shot 07_export
 adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez autovideo true
 sleep 70; shot 08_video_export
+adb shell am start -n $PKG/.MainActivity --ez autodemo true --es demo color --es mode color
+sleep 6; shot 09_color_mid
+sleep 18; shot 10_color_done
+adb shell am start -n $PKG/.MainActivity --ez autodemo true --es demo color --es mode outline
+sleep 20; shot 11_color_outline_only
 mkdir -p $OUT/files
 adb pull /sdcard/Pictures/Sketcher $OUT/files/pictures >/dev/null 2>&1
 adb pull /sdcard/Movies/Sketcher $OUT/files/movies >/dev/null 2>&1

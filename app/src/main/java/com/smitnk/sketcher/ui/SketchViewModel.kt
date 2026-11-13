@@ -18,6 +18,7 @@ import com.smitnk.sketcher.export.Exporter
 import com.smitnk.sketcher.export.GifExporter
 import com.smitnk.sketcher.export.VideoExporter
 import com.smitnk.sketcher.image.ColorStrokeGenerator
+import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.DrawMode
 import com.smitnk.sketcher.image.GeneratedDrawing
 import com.smitnk.sketcher.image.GeneratorSettings
@@ -81,6 +82,28 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var tool by mutableStateOf(Tool.BRUSH)
     var brushColor by mutableIntStateOf(0xFF000000.toInt())
     var brushSize by mutableFloatStateOf(4f)
+    var brushType by mutableStateOf(BrushType.PEN)
+        private set
+    var brushAlpha by mutableFloatStateOf(1f)
+
+    /** Selects a brush and resets opacity to that brush's default. */
+    fun selectBrush(type: BrushType) {
+        brushType = type
+        brushAlpha = type.defaultAlpha
+        tool = Tool.BRUSH
+    }
+
+    /** Adds "Shading (manual)" directly above Outline, selects it, soft grey brush. */
+    fun addShadingLayer() {
+        val layer = project.newLayer("Shading (manual)")
+        val o = project.layers.indexOfFirst { it.name == "Outline" }
+        val at = if (o >= 0) o + 1 else (project.selectedIndex + 1).coerceIn(0, project.layers.size)
+        project.layers.add(at, layer)
+        project.selectedIndex = at
+        selectBrush(BrushType.SOFT)
+        brushColor = 0xFF555555.toInt()
+        brushSize = 14f
+    }
 
     var canUndo by mutableStateOf(false)
         private set
@@ -139,10 +162,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Loads assets/demo.png and generates + animates it like an imported photo. */
-    fun runDemo() {
+    /** Loads an asset (default assets/demo.png) and generates + animates it like an imported photo. */
+    fun runDemo(asset: String = "demo.png") {
         viewModelScope.launch {
-            val bmp = withContext(Dispatchers.IO) { ImageLoader.loadAsset(app, "demo.png", settings.maxSide) }
+            val bmp = withContext(Dispatchers.IO) { ImageLoader.loadAsset(app, asset, settings.maxSide) }
             if (bmp == null) {
                 toast("Could not open demo image")
                 return@launch
@@ -153,11 +176,23 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Called from MainActivity with the launch intent extras. */
-    fun handleIntentFlags(autodemo: Boolean, showLayers: Boolean, autoExport: Boolean, autoVideo: Boolean = false) {
+    fun handleIntentFlags(
+        autodemo: Boolean,
+        showLayers: Boolean,
+        autoExport: Boolean,
+        autoVideo: Boolean = false,
+        demo: String? = null,
+        mode: String? = null,
+    ) {
         if (autoVideo) pendingAutoVideo = true
         if (showLayers) pendingShowLayers = true
         if (autoExport) pendingAutoExport = true
-        if (autodemo) runDemo()
+        when (mode?.lowercase()) {
+            "outline" -> settings = settings.copy(mode = DrawMode.OUTLINE)
+            "shading" -> settings = settings.copy(mode = DrawMode.OUTLINE_SHADING)
+            "color" -> settings = settings.copy(mode = DrawMode.COLOUR_FILL)
+        }
+        if (autodemo) runDemo(if (demo == "color") "demo_color.png" else "demo.png")
     }
 
     private fun resetProject() {
@@ -333,7 +368,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     livePoints[3] = livePoints[1]
                     liveCount = 2
                 }
-                val stroke = Stroke(livePoints.copyOf(liveCount * 2), brushColor, brushSize)
+                val stroke = Stroke(livePoints.copyOf(liveCount * 2), brushColor, brushSize, brushType, brushAlpha)
                 layer.strokes.add(stroke)
                 pushUndo(AddStrokeAction(layer, stroke))
             }
@@ -354,7 +389,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         } else {
             livePoints.copyOf(liveCount * 2)
         }
-        return Stroke(pts, brushColor, brushSize)
+        return Stroke(pts, brushColor, brushSize, brushType, brushAlpha)
     }
 
     val liveLayerId: Long get() = liveLayer?.id ?: -1L

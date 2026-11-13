@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import com.smitnk.sketcher.image.BrushType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
@@ -49,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -232,6 +234,7 @@ private fun BottomPanel(vm: SketchViewModel, onLayers: () -> Unit) {
         Column(Modifier.navigationBarsPadding().padding(horizontal = 8.dp, vertical = 4.dp)) {
             AnimationRow(vm)
             ToolRow(vm, onLayers)
+            BrushRow(vm)
             SwatchRow(vm)
             SizeRow(vm)
             val layer = vm.project.selectedLayer
@@ -318,9 +321,29 @@ private fun SwatchRow(vm: SketchViewModel) {
 }
 
 @Composable
+private fun BrushRow(vm: SketchViewModel) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        item { TextButton(onClick = { vm.addShadingLayer() }) { Text("+ Shading layer") } }
+        items(BrushType.values().toList()) { type ->
+            FilterChip(
+                selected = vm.tool == Tool.BRUSH && vm.brushType == type,
+                onClick = { vm.selectBrush(type) },
+                label = { Text(type.label) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun SizeRow(vm: SketchViewModel) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text("Size ${vm.brushSize.roundToInt()}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(56.dp))
         Slider(value = vm.brushSize, onValueChange = { vm.brushSize = it }, valueRange = 1f..40f, modifier = Modifier.weight(1f))
+        Text("Op ${(vm.brushAlpha * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(56.dp).padding(start = 4.dp))
+        Slider(value = vm.brushAlpha, onValueChange = { vm.brushAlpha = it }, valueRange = 0.05f..1f, modifier = Modifier.weight(1f))
     }
 }

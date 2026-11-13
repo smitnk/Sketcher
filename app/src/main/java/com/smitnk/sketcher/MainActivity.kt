@@ -40,6 +40,8 @@ class MainActivity : ComponentActivity() {
             showLayers = intent.getBooleanExtra("showlayers", false),
             autoExport = intent.getBooleanExtra("autoexport", false),
             autoVideo = intent.getBooleanExtra("autovideo", false),
+            demo = intent.getStringExtra("demo"),
+            mode = intent.getStringExtra("mode"),
         )
     }
 }

@@ -16,7 +16,21 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /** One pen stroke. [points] holds x,y pairs in image pixel coordinates. */
-data class Stroke(val points: FloatArray, val color: Int, val width: Float) {
+enum class BrushType(val label: String, val defaultAlpha: Float) {
+    PEN("Pen", 1f),
+    PENCIL("Pencil", 0.75f),
+    MARKER("Marker", 0.35f),
+    SOFT("Soft", 0.25f),
+    HATCH("Hatch", 1f),
+}
+
+data class Stroke(
+    val points: FloatArray,
+    val color: Int,
+    val width: Float,
+    val brush: BrushType = BrushType.PEN,
+    val alpha: Float = 1f,
+) {
     /** Total polyline length, computed once. */
     val length: Float by lazy(LazyThreadSafetyMode.NONE) {
         var total = 0f
