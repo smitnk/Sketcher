@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.DrawTimelineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:52:48" hostname="runnervmccnms" time="0.037">
+<testsuite name="com.smitnk.sketcher.anim.DrawTimelineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:49" hostname="ip-10-0-128-194" time="0.036">
   <properties/>
-  <testcase name="shadingFasterThanOutline" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.006"/>
-  <testcase name="pauseBetweenStrokesHoldsLength" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.001"/>
-  <testcase name="layerPauseLongerThanLift" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.017"/>
+  <testcase name="shadingFasterThanOutline" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.012"/>
+  <testcase name="pauseBetweenStrokesHoldsLength" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.003"/>
+  <testcase name="layerPauseLongerThanLift" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.013"/>
   <testcase name="longJumpPausesLongerButCapped" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.0"/>
   <testcase name="monotonicAndLayerOrder" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.005"/>
   <testcase name="endpointsAreExact" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.0"/>
   <testcase name="easeInOutWithinStroke" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.0"/>
-  <testcase name="emptyAndZeroLength" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.004"/>
+  <testcase name="emptyAndZeroLength" classname="com.smitnk.sketcher.anim.DrawTimelineTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

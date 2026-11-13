@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:52:50" hostname="runnervmccnms" time="0.134">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:52" hostname="ip-10-0-128-194" time="0.139">
   <properties/>
-  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.134"/>
+  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.139"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

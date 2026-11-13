@@ -1,0 +1,4 @@
+--------- beginning of main
+11-13 12:47:56.402  9400  9400 I SketcherGen: GEN_DONE ms=6412 outline=385 shading=0 fill=0 size=734x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-13 12:47:58.233  9400  9426 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/elf_informative_ai_pencil
+11-13 12:48:08.641  9400  9400 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
