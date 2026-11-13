@@ -15,27 +15,27 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:javaPreCompileDebug
-> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:compressDebugAssets
-> Task :app:processDebugResources
 > Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeLibDexDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugNativeLibs
+> Task :app:mergeLibDexDebug
+> Task :app:processDebugResources
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libonnxruntime.so, libonnxruntime4j_jni.so.
+
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
 > Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest
-
-> Task :app:stripDebugDebugSymbols
-Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libonnxruntime.so, libonnxruntime4j_jni.so.
-
 > Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugKotlin
@@ -47,8 +47,8 @@ w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketc
 > Task :app:mergeDebugGlobalSynthetics
 > Task :app:processDebugJavaRes
 > Task :app:bundleDebugClassesToRuntimeJar
-> Task :app:mergeProjectDexDebug
 > Task :app:bundleDebugClassesToCompileJar
+> Task :app:mergeProjectDexDebug
 > Task :app:mergeDebugJavaResource
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
@@ -57,7 +57,7 @@ w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketc
 > Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
 > Task :app:processDebugUnitTestJavaRes
 > Task :app:testDebugUnitTest
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794554373966.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794555726520.json
 
-BUILD SUCCESSFUL in 42s
+BUILD SUCCESSFUL in 49s
 41 actionable tasks: 41 executed
