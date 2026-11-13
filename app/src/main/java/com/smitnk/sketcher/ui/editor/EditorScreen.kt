@@ -18,18 +18,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +47,7 @@ import com.smitnk.sketcher.ui.Tool
 import com.smitnk.sketcher.ui.canvas.SketchCanvas
 import com.smitnk.sketcher.ui.export.ExportDialog
 import com.smitnk.sketcher.ui.export.ExportProgressDialog
-import com.smitnk.sketcher.ui.generate.StyleSettingsDialog
+import com.smitnk.sketcher.ui.generate.StylePickerSheet
 import com.smitnk.sketcher.ui.layers.LayersPanel
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlinx.coroutines.withTimeoutOrNull
@@ -82,6 +78,14 @@ fun EditorScreen(
         // Granted or not, export; Exporter falls back to the app folder when denied.
         pendingExport?.invoke()
         pendingExport = null
+    }
+
+    // A freshly imported photo opens the style picker so the user chooses outline / shading / colour first.
+    LaunchedEffect(vm.styleSheetRequest) {
+        if (vm.styleSheetRequest) {
+            vm.styleSheetRequest = false
+            showSettings = true
+        }
     }
 
     LaunchedEffect(vm.generationCount) {
@@ -154,10 +158,6 @@ fun EditorScreen(
                 modifier = Modifier.align(Alignment.Center),
             )
         }
-        if (vm.generating) {
-            GeneratingIndicator(Modifier.align(Alignment.Center))
-        }
-
         AnimatedVisibility(
             visible = chromeVisible,
             enter = fadeIn(tween(SketcherTokens.MotionShort)),
@@ -196,63 +196,44 @@ fun EditorScreen(
                 enter = fadeIn(tween(SketcherTokens.MotionMedium)),
                 exit = fadeOut(tween(200)),
             ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = colors.floatingSurface,
-                    contentColor = colors.onFloatingSurface,
-                    shadowElevation = SketcherTokens.elevationFloating,
-                ) {
-                    Column(
-                        Modifier
-                            .heightIn(max = 300.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = SketcherTokens.space12, vertical = SketcherTokens.space8),
-                    ) {
-                        ToolDock(
-                            tool = vm.tool,
-                            onToolChange = { vm.tool = it },
-                            brushType = vm.brushType,
-                            onSelectBrush = { vm.selectBrush(it) },
-                            brushColor = vm.brushColor,
-                            onColorSelected = {
-                                vm.brushColor = it
-                                vm.tool = Tool.BRUSH
-                            },
-                            brushSize = vm.brushSize,
-                            onBrushSizeChange = { vm.brushSize = it },
-                            brushAlpha = vm.brushAlpha,
-                            onBrushAlphaChange = { vm.brushAlpha = it },
-                            canUndo = vm.canUndo,
-                            canRedo = vm.canRedo,
-                            onUndo = { vm.undo() },
-                            onRedo = { vm.redo() },
-                            onLayers = { showLayers = true },
-                            onAddShadingLayer = { vm.addShadingLayer() },
-                            selectedLayer = vm.project.selectedLayer,
-                        )
-                    }
-                }
+                ToolDock(
+                    tool = vm.tool,
+                    onToolChange = { vm.tool = it },
+                    brushType = vm.brushType,
+                    onSelectBrush = { vm.selectBrush(it) },
+                    brushColor = vm.brushColor,
+                    onColorSelected = {
+                        vm.brushColor = it
+                        vm.tool = Tool.BRUSH
+                    },
+                    brushSize = vm.brushSize,
+                    onBrushSizeChange = { vm.brushSize = it },
+                    brushAlpha = vm.brushAlpha,
+                    onBrushAlphaChange = { vm.brushAlpha = it },
+                    canUndo = vm.canUndo,
+                    canRedo = vm.canRedo,
+                    onUndo = { vm.undo() },
+                    onRedo = { vm.redo() },
+                    onLayers = { showLayers = true },
+                    onAddShadingLayer = { vm.addShadingLayer() },
+                    selectedLayer = vm.project.selectedLayer,
+                )
             }
             AnimatedVisibility(
                 visible = chromeVisible,
                 enter = fadeIn(tween(SketcherTokens.MotionShort)),
                 exit = fadeOut(tween(200)),
             ) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = colors.floatingSurface,
-                    contentColor = colors.onFloatingSurface,
-                    shadowElevation = SketcherTokens.elevationFloating,
-                ) {
-                    Column(Modifier.padding(horizontal = SketcherTokens.space8, vertical = SketcherTokens.space4)) {
-                        PlaybackBar(
-                            durationSec = anim.durationSec,
-                            onDurationChange = { anim.durationSec = it },
-                            onRestart = { anim.restart() },
-                            onShowFinished = { anim.showFinished() },
-                        )
-                    }
-                }
+                PlaybackBar(
+                    durationSec = anim.durationSec,
+                    onDurationChange = { anim.durationSec = it },
+                    onRestart = { anim.restart() },
+                    onShowFinished = { anim.showFinished() },
+                    playing = anim.playing,
+                    onTogglePlay = { anim.togglePlay() },
+                    progress = anim.progress,
+                    onSeek = { anim.seek(it) },
+                )
             }
         }
 
@@ -274,6 +255,14 @@ fun EditorScreen(
                 }
             }
         }
+
+        // Last child so the dimming overlay covers the canvas and chrome and blocks touches.
+        if (vm.generating) {
+            GeneratingIndicator(
+                stage = vm.generationStage,
+                fraction = vm.generationProgress,
+            )
+        }
     }
 
     if (showLayers) {
@@ -288,14 +277,15 @@ fun EditorScreen(
     }
 
     if (showSettings) {
-        StyleSettingsDialog(
-            current = vm.settings,
-            onDismiss = { showSettings = false },
-            onApply = {
-                vm.settings = it
+        StylePickerSheet(
+            settings = vm.pipelineSettings,
+            onSettingsChange = { vm.updatePipelineSettings(it) },
+            onGenerate = {
                 showSettings = false
                 vm.generate()
             },
+            onDismiss = { showSettings = false },
+            sourceThumbnail = vm.sourceThumbnail,
         )
     }
 
@@ -314,6 +304,12 @@ fun EditorScreen(
         ExportDialog(
             selectedLayerName = vm.project.selectedLayer?.name ?: "layer",
             onDismiss = { showExport = false },
+            durationSec = anim.durationSec,
+            resolutionNote = "${vm.project.width} x ${vm.project.height} px",
+            onExportLayersSeparately = { scale, format, transparent ->
+                showExport = false
+                runWithPermission { vm.exportLayersSeparately(scale, format, transparent) }
+            },
             onExport = { scale, format, transparent, layerOnly ->
                 showExport = false
                 runWithPermission { vm.export(scale, format, transparent, layerOnly) }
@@ -326,6 +322,16 @@ fun EditorScreen(
     }
 
     vm.exportLabel?.let { label ->
-        ExportProgressDialog(label, vm.exportProgress, onCancel = { vm.cancelExport() })
+        val saved = vm.lastSaved
+        ExportProgressDialog(
+            label = label,
+            progress = vm.exportProgress,
+            onCancel = { vm.cancelExport() },
+            done = vm.exportDone,
+            savedPath = saved?.path,
+            savedUri = saved?.uri,
+            savedMime = saved?.mime ?: "image/*",
+            onDone = { vm.dismissExport() },
+        )
     }
 }

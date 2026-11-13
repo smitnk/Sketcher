@@ -2,13 +2,18 @@ package com.smitnk.sketcher.ui
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.content.ContentUris
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.smitnk.sketcher.anim.AnimationController
@@ -40,6 +45,9 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 enum class Tool { BRUSH, ERASER }
+
+/** Result of the last successful export. [uri] is null when it cannot be shared (legacy storage / several files). */
+class SavedExport(val path: String, val uri: Uri?, val mime: String)
 
 private interface EditAction {
     fun undo()
@@ -196,7 +204,27 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var pendingAutoExport by mutableStateOf(false)
     private var pendingAutoVideo = false
 
-    /** Non-null while an MP4/GIF export runs (shown in a progress dialog). */
+    /** Set when a NEW photo was imported: the editor opens the style sheet, then clears it. */
+    var styleSheetRequest by mutableStateOf(false)
+
+    /** Small preview of the imported photo for the style sheet; computed once per source. */
+    var sourceThumbnail by mutableStateOf<ImageBitmap?>(null)
+        private set
+
+    /** Last successful export (shown in the progress dialog once [exportDone]). */
+    var lastSaved by mutableStateOf<SavedExport?>(null)
+        private set
+    var exportDone by mutableStateOf(false)
+        private set
+
+    /** Closes the export progress/result dialog. */
+    fun dismissExport() {
+        exportLabel = null
+        exportDone = false
+        lastSaved = null
+    }
+
+    /** Non-null while an export runs or its result is shown (shown in a progress dialog). */
     var exportLabel by mutableStateOf<String?>(null)
         private set
     var exportProgress by mutableFloatStateOf(0f)
@@ -229,7 +257,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             resetProject()
             setSource(bmp)
-            toast("Photo loaded - tap Generate")
+            styleSheetRequest = true
         }
     }
 
@@ -241,9 +269,22 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 toast("Could not open demo image")
                 return@launch
             }
+            resetProject()
             setSource(bmp)
             generate()
         }
+    }
+
+    /** Starts an empty project (no photo, one blank layer). */
+    fun newProject() {
+        resetProject()
+        sourceBitmap = null
+        sourceThumbnail = null
+        hasProject = false
+        styleSheetRequest = false
+        project.background = null
+        project.width = 1024
+        project.height = 1024
     }
 
     /** Called from MainActivity with the launch intent extras. */
@@ -286,6 +327,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun setSource(bmp: Bitmap) {
         sourceBitmap = bmp
+        sourceThumbnail = try {
+            val m = max(bmp.width, bmp.height).coerceAtLeast(1)
+            val k = 320f / m
+            if (k >= 1f) bmp.asImageBitmap()
+            else Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true).asImageBitmap()
+        } catch (t: Throwable) {
+            null
+        }
         hasProject = true
         project.width = bmp.width
         project.height = bmp.height
@@ -582,23 +631,118 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
         }
 
+    private fun mimeFor(path: String) = when (path.substringAfterLast('.').lowercase()) {
+        "mp4" -> "video/mp4"
+        "gif" -> "image/gif"
+        "jpg", "jpeg" -> "image/jpeg"
+        else -> "image/png"
+    }
+
+    /** Looks up the MediaStore uri of a file saved under Pictures/ or Movies/ (API 29+); null otherwise. */
+    private fun resolveSavedUri(path: String, mime: String): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || path.startsWith("/")) return null
+        return try {
+            val collection = if (mime.startsWith("video")) MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            app.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+                arrayOf(path.substringAfterLast('/'), path.substringBeforeLast('/') + "/"),
+                null,
+            )?.use { c -> if (c.moveToFirst()) ContentUris.withAppendedId(collection, c.getLong(0)) else null }
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    private fun finishExport(saved: SavedExport) {
+        lastSaved = saved
+        exportProgress = 1f
+        exportDone = true
+    }
+
     private fun exportSnapshot(layers: List<Layer>, w: Int, h: Int, scale: Int, fmt: ExportFormat, transparent: Boolean, ignoreState: Boolean, name: String) {
-        viewModelScope.launch {
-            val where = try {
-                withContext(Dispatchers.Default) {
+        if (exportJob?.isActive == true) return
+        exportDone = false
+        lastSaved = null
+        exportProgress = 0f
+        exportLabel = "Saving image..."
+        exportJob = viewModelScope.launch {
+            var ok = false
+            try {
+                val saved = withContext(Dispatchers.Default) {
                     val bmp = Exporter.render(w, h, layers, scale, transparent, ignoreState)
-                    try {
+                    val where = try {
                         Exporter.save(app, bmp, fmt, name)
                     } finally {
                         bmp.recycle()
                     }
+                    where?.let { SavedExport(it, resolveSavedUri(it, fmt.mime), fmt.mime) }
+                }
+                if (saved != null) {
+                    finishExport(saved)
+                    ok = true
+                } else {
+                    toast("Export failed")
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
-                null
+                toast("Export failed")
+            } finally {
+                if (!ok) exportLabel = null
             }
-            toast(if (where != null) "Saved: $where" else "Export failed")
+        }
+    }
+
+    /** One file per visible layer (transparent PNG each, ignoring opacity), saved in sequence. */
+    fun exportLayersSeparately(scale: Int, format: ExportFormat, transparent: Boolean) {
+        if (exportJob?.isActive == true) return
+        val layers = project.layers.filter { it.visible && it.strokes.isNotEmpty() }
+        if (layers.isEmpty()) {
+            toast("Nothing to export yet")
+            return
+        }
+        val snaps = layers.map { snapshotLayers(it).first() }
+        val w = project.width
+        val h = project.height
+        exportDone = false
+        lastSaved = null
+        exportProgress = 0f
+        exportLabel = "Saving layers..."
+        exportJob = viewModelScope.launch {
+            var ok = false
+            try {
+                val results = withContext(Dispatchers.Default) {
+                    val out = ArrayList<SavedExport>()
+                    for ((i, l) in snaps.withIndex()) {
+                        ensureActive()
+                        val bmp = Exporter.render(w, h, listOf(l), scale, true, true)
+                        val where = try {
+                            Exporter.save(app, bmp, ExportFormat.PNG, l.name)
+                        } finally {
+                            bmp.recycle()
+                        }
+                        if (where != null) out.add(SavedExport(where, null, ExportFormat.PNG.mime))
+                        exportProgress = (i + 1f) / snaps.size
+                    }
+                    out
+                }
+                if (results.isNotEmpty()) {
+                    val dir = results.last().path.substringBeforeLast('/')
+                    finishExport(SavedExport("${results.size} layers in $dir", null, ExportFormat.PNG.mime))
+                    ok = true
+                } else {
+                    toast("Export failed")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                toast("Export failed")
+            } finally {
+                if (!ok) exportLabel = null
+            }
         }
     }
 
@@ -619,7 +763,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val outline = project.layers.firstOrNull { it.name == "Outline" }
         export(1, ExportFormat.PNG, false, false)
         if (outline != null) {
-            exportSnapshot(snapshotLayers(outline), project.width, project.height, 1, ExportFormat.PNG, true, true, "Outline")
+            val layers = snapshotLayers(outline)
+            val w = project.width
+            val h = project.height
+            viewModelScope.launch {
+                exportJob?.join()
+                exportSnapshot(layers, w, h, 1, ExportFormat.PNG, true, true, "Outline")
+            }
         }
     }
 
@@ -645,7 +795,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val duration = anim.durationSec
         exportProgress = 0f
         exportLabel = "Preparing..."
+        exportDone = false
+        lastSaved = null
         exportJob = viewModelScope.launch {
+            var animOk = false
             try {
                 val saved = withContext(Dispatchers.Default) {
                     val results = ArrayList<String>()
@@ -665,14 +818,21 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     }
                     results
                 }
-                toast(if (saved.isNotEmpty()) "Saved: " + saved.joinToString(", ") else "Export failed")
+                if (saved.isNotEmpty()) {
+                    val last = saved.last()
+                    val mime = mimeFor(last)
+                    finishExport(SavedExport(saved.joinToString("\n"), resolveSavedUri(last, mime), mime))
+                    animOk = true
+                } else {
+                    toast("Export failed")
+                }
             } catch (e: CancellationException) {
                 toast("Export cancelled")
                 throw e
             } catch (t: Throwable) {
                 toast("Export failed: ${t.message}")
             } finally {
-                exportLabel = null
+                if (!animOk) exportLabel = null
             }
         }
     }

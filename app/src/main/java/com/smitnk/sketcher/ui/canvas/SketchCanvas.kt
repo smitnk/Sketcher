@@ -1,7 +1,6 @@
 package com.smitnk.sketcher.ui.canvas
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -16,14 +15,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.export.Renderer
 import com.smitnk.sketcher.ui.SketchViewModel
+import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.min
 
 /** View transform: zoom 1 = drawing fits the screen, pan in screen pixels. */
@@ -49,16 +53,14 @@ private class ViewTransform {
 fun SketchCanvas(vm: SketchViewModel, modifier: Modifier = Modifier) {
     val project = vm.project
     val vt = remember { ViewTransform() }
-    val paperPaint = remember {
-        android.graphics.Paint().apply { color = android.graphics.Color.WHITE }
-    }
+    val paperPaint = remember { android.graphics.Paint() }
+    val paperColor = SketcherTokens.colors.paper.toArgb()
 
     LaunchedEffect(project.width, project.height) { vt.reset() }
 
     Canvas(
         modifier = modifier
             .clipToBounds()
-            .background(Color(0xFFCFD8DC))
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -119,6 +121,20 @@ fun SketchCanvas(vm: SketchViewModel, modifier: Modifier = Modifier) {
         val allowances = vm.anim.allowances(project.layers)
         val live = vm.liveStroke()
         val liveLayerId = vm.liveLayerId
+
+        // Soft shadow under the sheet (stacked translucent rounded rects; works on every API level).
+        val sheetSize = Size(pw * s, ph * s)
+        val steps = 8
+        for (i in steps downTo 1) {
+            val g = i * 1.5.dp.toPx()
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.028f),
+                topLeft = Offset(o.x - g, o.y - g + 3.dp.toPx()),
+                size = Size(sheetSize.width + 2 * g, sheetSize.height + 2 * g),
+                cornerRadius = CornerRadius(g + 2.dp.toPx()),
+            )
+        }
+        paperPaint.color = paperColor
 
         drawIntoCanvas { canvas ->
             val c = canvas.nativeCanvas

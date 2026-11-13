@@ -51,16 +51,15 @@ fun AppNavigation(
             onImportPhoto = { launchPicker(false) },
             onImportPose = { launchPicker(true) },
             onTryDemo = {
-                vm.runDemo()
+                vm.runDemo() // starts a fresh project (resets layers, then generates)
                 screen = Screen.EDITOR
             },
             onOpenProject = { screen = Screen.EDITOR },
             recentProjects = emptyList(),
         )
         Screen.EDITOR -> {
-            // EditorScreen/TopBar do not expose onBack yet; system back returns Home meanwhile.
             BackHandler { screen = Screen.HOME }
-            SketchScreen(vm)
+            SketchScreen(vm, onBack = { screen = Screen.HOME })
         }
     }
 }

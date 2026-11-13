@@ -20,7 +20,7 @@ object LineArtVectorizer {
     fun vectorize(ink: FloatArray, w: Int, h: Int, detail: Float, lineWidth: Float, maxStrokes: Int): List<Stroke> {
         if (w < 8 || h < 8 || ink.size < w * h || maxStrokes <= 0) return emptyList()
         val d = detail.coerceIn(0f, 1f)
-        val sc = (max(w, h) / 768f).coerceIn(0.5f, 3f)
+        val sc = (max(w, h) / 768f).coerceIn(1f, 3f)
 
                 val lo = 0.22f - 0.12f * d
         val hi = 0.46f - 0.20f * d
