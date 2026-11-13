@@ -1,5 +1,6 @@
 package com.smitnk.sketcher.export
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -8,6 +9,8 @@ import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.Stroke
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.Project
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -16,12 +19,25 @@ import kotlin.math.sqrt
 /** Draws layers with android.graphics. Used by both the on-screen canvas and the exporter. */
 object Renderer {
 
+    /** Per-thread scratch objects so draw loops allocate nothing (exports may run off the UI thread). */
+    private class Scratch {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val path = Path()
+        val rect = RectF()
+        val bgPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    }
+
+    private val scratchTl = object : ThreadLocal<Scratch>() {
+        override fun initialValue() = Scratch()
+    }
+
     fun drawBackground(canvas: Canvas, project: Project) {
         val bmp = project.background ?: return
         if (!project.backgroundVisible) return
-        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        paint.alpha = (project.backgroundOpacity * 255f).roundToInt().coerceIn(0, 255)
-        canvas.drawBitmap(bmp, null, RectF(0f, 0f, project.width.toFloat(), project.height.toFloat()), paint)
+        val sc = scratchTl.get()!!
+        sc.bgPaint.alpha = (project.backgroundOpacity * 255f).roundToInt().coerceIn(0, 255)
+        sc.rect.set(0f, 0f, project.width.toFloat(), project.height.toFloat())
+        canvas.drawBitmap(bmp, null, sc.rect, sc.bgPaint)
     }
 
     /**
@@ -38,14 +54,29 @@ object Renderer {
         live: Stroke? = null,
         liveLayerId: Long = -1L,
         ignoreLayerState: Boolean = false,
+    ) = drawLayerRange(canvas, width, height, layers, 0, layers.size, allowances, live, liveLayerId, ignoreLayerState)
+
+    internal fun drawLayerRange(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        layers: List<Layer>,
+        from: Int,
+        to: Int,
+        allowances: Map<Long, Float>?,
+        live: Stroke?,
+        liveLayerId: Long,
+        ignoreLayerState: Boolean = false,
     ) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val sc = scratchTl.get()!!
+        val paint = sc.paint
+        val path = sc.path
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
         paint.strokeJoin = Paint.Join.ROUND
-        val path = Path()
 
-        for (layer in layers) {
+        for (li in from until to) {
+            val layer = layers[li]
             if (!ignoreLayerState && !layer.visible) continue
             val alpha = if (ignoreLayerState) 255 else (layer.opacity * 255f).roundToInt().coerceIn(0, 255)
             if (alpha == 0) continue
@@ -56,8 +87,10 @@ object Renderer {
             } else {
                 -1
             }
-            for (stroke in layer.strokes) {
+            val strokes = layer.strokes
+            for (i in 0 until strokes.size) {
                 if (budget <= 0f) break
+                val stroke = strokes[i]
                 drawStroke(canvas, paint, path, stroke, budget)
                 budget -= stroke.length
             }
@@ -65,6 +98,178 @@ object Renderer {
                 drawStroke(canvas, paint, path, live, Float.MAX_VALUE)
             }
             if (saved >= 0) canvas.restoreToCount(saved)
+        }
+    }
+
+    /**
+     * Screen-side cache of the committed (fully revealed) bottom layers as a bitmap at screen scale.
+     * Per frame only the in-progress stroke, partially animated layers and layers above them are drawn.
+     * Invalidated by a cheap exact signature (layer ids, stroke counts, first/last stroke identity,
+     * visibility, opacity, scale); a stroke appended to the top cached layer is drawn incrementally.
+     * Not thread-safe: use from the UI thread only. Call [release] when the editor goes away.
+     */
+    class LayerCache {
+        private var bmp: Bitmap? = null
+        private val bmpCanvas = Canvas()
+        private val bmpPaint = Paint()
+        private var cachedS = 0f
+        private var cachedK = -1
+        private var sig = LongArray(0)
+        private var tmp = LongArray(0)
+
+        fun release() {
+            bmp?.recycle(); bmp = null; cachedK = -1
+        }
+
+        /**
+         * [canvas] must already be translated so (0,0) is the sheet's top-left in device pixels
+         * (use an integer translation); [s] is device pixels per image pixel. Draws the layers only
+         * (paper/background first, in the caller).
+         */
+        fun draw(
+            canvas: Canvas,
+            s: Float,
+            pw: Int,
+            ph: Int,
+            layers: List<Layer>,
+            allowances: Map<Long, Float>?,
+            live: Stroke?,
+            liveLayerId: Long,
+        ) {
+            val n = layers.size
+            var k = n
+            if (allowances != null) {
+                for (i in 0 until n) {
+                    val l = layers[i]
+                    if (!l.visible) continue
+                    val a = allowances[l.id]
+                    if (a != null && a < l.totalLength()) { k = i; break }
+                }
+            }
+            var liveIdx = -1
+            if (live != null) {
+                var lastVisible = -1
+                for (i in 0 until n) {
+                    if (layers[i].id == liveLayerId) liveIdx = i
+                    if (layers[i].visible) lastVisible = i
+                }
+                if (liveIdx >= 0) k = min(k, if (liveIdx >= lastVisible) n else liveIdx)
+            }
+
+            val bw = ceil(pw * s).toInt()
+            val bh = ceil(ph * s).toInt()
+            val usable = k > 0 && bw > 0 && bh > 0 && bw <= MAX_SIDE && bh <= MAX_SIDE &&
+                bw.toLong() * bh <= MAX_PIXELS && ensure(k, s, bw, bh, pw, ph, layers)
+
+            val sc = canvas.save()
+            if (usable) {
+                canvas.clipRect(0f, 0f, pw * s, ph * s)
+                canvas.drawBitmap(bmp!!, 0f, 0f, bmpPaint)
+                canvas.scale(s, s)
+                if (live != null && liveIdx in 0 until k) {
+                    val l = layers[liveIdx]
+                    val alpha = (l.opacity * 255f).roundToInt().coerceIn(0, 255)
+                    val sv = if (alpha < 255) canvas.saveLayerAlpha(0f, 0f, pw.toFloat(), ph.toFloat(), alpha) else -1
+                    val sk = scratchTl.get()!!
+                    drawStroke(canvas, sk.paint, sk.path, live, Float.MAX_VALUE)
+                    if (sv >= 0) canvas.restoreToCount(sv)
+                }
+                drawLayerRange(canvas, pw, ph, layers, k, n, allowances, live, liveLayerId)
+            } else {
+                canvas.scale(s, s)
+                canvas.clipRect(0f, 0f, pw.toFloat(), ph.toFloat())
+                drawLayerRange(canvas, pw, ph, layers, 0, n, allowances, live, liveLayerId)
+            }
+            canvas.restoreToCount(sc)
+        }
+
+        private fun fillSig(k: Int, pw: Int, ph: Int, layers: List<Layer>) {
+            val need = HEADER + REC * k
+            if (tmp.size < need) tmp = LongArray(need + REC * 4)
+            tmp[0] = pw.toLong(); tmp[1] = ph.toLong(); tmp[2] = k.toLong()
+            for (i in 0 until k) {
+                val l = layers[i]
+                val st = l.strokes
+                val o = HEADER + REC * i
+                val sz = st.size
+                tmp[o] = l.id
+                tmp[o + 1] = sz.toLong()
+                tmp[o + 2] = (if (l.visible) 1L shl 32 else 0L) or (l.opacity.toBits().toLong() and 0xFFFFFFFFL)
+                tmp[o + 3] = if (sz > 0) System.identityHashCode(st[0]).toLong() else 0L
+                tmp[o + 4] = if (sz > 0) System.identityHashCode(st[sz - 1]).toLong() else 0L
+            }
+        }
+
+        private fun ensure(k: Int, s: Float, bw: Int, bh: Int, pw: Int, ph: Int, layers: List<Layer>): Boolean {
+            fillSig(k, pw, ph, layers)
+            val need = HEADER + REC * k
+            val scaleOk = bmp != null && cachedK == k && abs(s - cachedS) <= cachedS * 0.002f
+            if (scaleOk) {
+                var same = true
+                var i = 0
+                while (i < need) { if (tmp[i] != sig[i]) { same = false; break }; i++ }
+                if (same) return true
+                if (appendOnly(k, s, layers, need)) { swapSig(); return true }
+            }
+            // Full rebuild.
+            val b = ensureBitmap(bw, bh) ?: return false
+            b.eraseColor(0)
+            bmpCanvas.setBitmap(b)
+            bmpCanvas.save()
+            bmpCanvas.scale(s, s)
+            drawLayerRange(bmpCanvas, pw, ph, layers, 0, k, null, null, -1L)
+            bmpCanvas.restore()
+            cachedS = s
+            cachedK = k
+            swapSig()
+            return true
+        }
+
+        /** True if only strokes were appended to layer k-1 (opaque, visible); draws them into the bitmap. */
+        private fun appendOnly(k: Int, s: Float, layers: List<Layer>, need: Int): Boolean {
+            val top = HEADER + REC * (k - 1)
+            for (i in 0 until top) if (tmp[i] != sig[i]) return false
+            if (tmp[top] != sig[top] || tmp[top + 2] != sig[top + 2] || tmp[top + 3] != sig[top + 3]) return false
+            val l = layers[k - 1]
+            val oldSize = sig[top + 1].toInt()
+            val st = l.strokes
+            if (!l.visible || (l.opacity * 255f).roundToInt() < 255 || oldSize <= 0 || st.size <= oldSize) return false
+            if (System.identityHashCode(st[oldSize - 1]).toLong() != sig[top + 4]) return false
+            val sc = scratchTl.get()!!
+            sc.paint.style = Paint.Style.STROKE
+            bmpCanvas.setBitmap(bmp)
+            bmpCanvas.save()
+            bmpCanvas.scale(s, s)
+            for (i in oldSize until st.size) drawStroke(bmpCanvas, sc.paint, sc.path, st[i], Float.MAX_VALUE)
+            bmpCanvas.restore()
+            return true
+        }
+
+        private fun swapSig() { val t = sig; sig = tmp; tmp = t }
+
+        private fun ensureBitmap(w: Int, h: Int): Bitmap? {
+            var b = bmp
+            if (b != null && !b.isRecycled && b.allocationByteCount >= w * h * 4) {
+                b.reconfigure(w, h, Bitmap.Config.ARGB_8888)
+                return b
+            }
+            b?.recycle()
+            b = try {
+                Bitmap.createBitmap((w * 1.15f).toInt() + 1, (h * 1.15f).toInt() + 1, Bitmap.Config.ARGB_8888)
+                    .also { it.reconfigure(w, h, Bitmap.Config.ARGB_8888) }
+            } catch (_: OutOfMemoryError) {
+                bmp = null; cachedK = -1
+                return null
+            }
+            bmp = b
+            return b
+        }
+
+        private companion object {
+            const val HEADER = 3
+            const val REC = 5
+            const val MAX_SIDE = 4096
+            const val MAX_PIXELS = 10_000_000L
         }
     }
 

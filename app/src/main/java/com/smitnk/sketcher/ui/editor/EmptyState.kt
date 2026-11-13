@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -217,6 +218,7 @@ fun GeneratingIndicator(
     Box(
         modifier
             .fillMaxSize()
+            .testTag("generating_overlay")
             .background(SketcherTokens.colors.scrim)
             .pointerInput(Unit) { detectTapGestures { } },
         contentAlignment = Alignment.Center,

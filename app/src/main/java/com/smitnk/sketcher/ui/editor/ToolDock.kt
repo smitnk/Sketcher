@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Texture
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -204,9 +203,6 @@ fun ToolDock(
                     border = null,
                     modifier = Modifier.semantics { contentDescription = "Add shading layer" },
                 )
-                IconButton(onClick = onLayers) {
-                    Icon(Icons.Default.Layers, contentDescription = "Layers")
-                }
             }
 
             AnimatedVisibility(

@@ -16,7 +16,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
@@ -130,10 +130,11 @@ fun PlaybackBar(
                     ),
                 )
                 Text(
-                    "${formatTime(p * durationSec)} / ${formatTime(durationSec)}",
+                    formatTime(p * durationSec),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                        .semantics { contentDescription = "Elapsed ${formatTime(p * durationSec)} of ${formatTime(durationSec)}" },
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -141,7 +142,7 @@ fun PlaybackBar(
                     selected = menuOpen,
                     onClick = { menuOpen = true },
                     label = { Text("${durationSec.roundToInt()}s", fontWeight = FontWeight.Bold) },
-                    leadingIcon = { Icon(Icons.Default.Speed, contentDescription = "Animation duration", modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(Icons.Default.Timer, contentDescription = "Animation length", modifier = Modifier.size(18.dp)) },
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
                 )

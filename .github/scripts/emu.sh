@@ -5,7 +5,16 @@ set +e
 set -x
 OUT=emu; mkdir -p $OUT
 PKG=com.smitnk.sketcher
-adb install -r apk/*.apk > $OUT/install.txt 2>&1
+APP_APK=$(find apk -name '*.apk' ! -name '*androidTest*' | head -n 1)
+TEST_APK=$(find apk -name '*androidTest*.apk' | head -n 1)
+adb install -r "$APP_APK" > $OUT/install.txt 2>&1
+if [ -n "$TEST_APK" ]; then
+  adb install -r "$TEST_APK" >> $OUT/install.txt 2>&1
+  adb shell am instrument -w -r com.smitnk.sketcher.test/androidx.test.runner.AndroidJUnitRunner > $OUT/instrumented.txt 2>&1
+  adb shell am force-stop $PKG
+else
+  echo "no androidTest apk found" > $OUT/instrumented.txt
+fi
 adb logcat -c
 shot() { adb exec-out screencap -p > $OUT/$1.png; }
 : > $OUT/gen_times.txt

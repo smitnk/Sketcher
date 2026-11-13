@@ -21,6 +21,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
@@ -122,6 +129,10 @@ fun EditorScreen(
     }
 
     var chromeVisible by remember { mutableStateOf(true) }
+    // Measured chrome heights: the paper is fitted between the top bar and the dock + playback bar.
+    var topBarPx by remember { mutableIntStateOf(0) }
+    var bottomBasePx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     val colors = SketcherTokens.colors
     val tapSlop = LocalViewConfiguration.current.touchSlop
     BackHandler(enabled = !chromeVisible) { chromeVisible = true }
@@ -156,7 +167,12 @@ fun EditorScreen(
                     }
                 },
         ) {
-            SketchCanvas(vm, Modifier.fillMaxSize())
+            SketchCanvas(
+                vm,
+                Modifier.fillMaxSize(),
+                insetTopPx = if (chromeVisible) topBarPx.toFloat() else 0f,
+                insetBottomPx = if (chromeVisible) bottomBasePx.toFloat() else 0f,
+            )
         }
 
         if (!vm.hasProject && !vm.generating) {
@@ -187,9 +203,35 @@ fun EditorScreen(
                 onGenerate = { vm.generate() },
                 onSettings = onOpenSettings,
                 modifier = Modifier
+                    .onSizeChanged { topBarPx = it.height }
                     .statusBarsPadding()
                     .padding(horizontal = SketcherTokens.space12, vertical = SketcherTokens.space8),
             )
+        }
+
+        // Which engine drew the lines (AI / Cartoon / Classic), shown under the top bar after a generation.
+        val engine = remember(vm.generationCount, vm.generating) {
+            when (SketchPipeline.lastLineSource) {
+                "AI" -> "AI line art"
+                "CARTOON" -> "Cartoon lines"
+                "CLASSIC" -> "Classic edges"
+                else -> null
+            }
+        }
+        if (chromeVisible && vm.hasProject && !vm.generating && vm.generationCount > 0 && engine != null) {
+            Row(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(
+                        top = with(density) { topBarPx.toDp() },
+                        start = SketcherTokens.space16,
+                    ),
+            ) {
+                AssistChip(
+                    onClick = { showSettings = true },
+                    label = { Text("Lines: $engine", style = MaterialTheme.typography.labelMedium) },
+                )
+            }
         }
 
         renameText?.let { text ->
@@ -219,6 +261,12 @@ fun EditorScreen(
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
+                .onSizeChanged { h ->
+                    // Track the collapsed height only (panels open/close, dock hides while playing).
+                    if (chromeVisible && !anim.playing && h.height > 0) {
+                        bottomBasePx = if (bottomBasePx == 0) h.height else minOf(bottomBasePx, h.height)
+                    }
+                }
                 .navigationBarsPadding()
                 .padding(horizontal = SketcherTokens.space12, vertical = SketcherTokens.space8),
             verticalArrangement = Arrangement.spacedBy(SketcherTokens.space8),

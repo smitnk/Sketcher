@@ -1,6 +1,16 @@
 package com.smitnk.sketcher.ui.editor
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 
 /**
- * Floating pill top bar: back, project title, Style, Layers, Play, Export and an overflow menu
+ * Floating pill top bar: back, project title, labelled Style / Layers / Export actions (play lives in the playback bar) and an overflow menu
  * (Import / Demo / Regenerate / optional Settings). The title is hidden on narrow screens.
  */
 @Composable
@@ -70,7 +80,7 @@ fun TopBar(
             color = colors.floatingSurface,
             contentColor = colors.onFloatingSurface,
             shadowElevation = SketcherTokens.elevationFloating,
-            modifier = Modifier.height(SketcherTokens.minTouchTarget + 8.dp).fillMaxWidth(),
+            modifier = Modifier.height(64.dp).fillMaxWidth(),
         ) {
             Row(
                 Modifier.padding(horizontal = SketcherTokens.space4),
@@ -91,31 +101,38 @@ fun TopBar(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
-                IconButton(onClick = onStyle) {
-                    Icon(Icons.Default.Palette, contentDescription = "Style")
-                }
-                IconButton(onClick = onLayers) {
-                    Icon(Icons.Default.Layers, contentDescription = "Layers")
-                }
-                IconButton(onClick = onTogglePlay) {
-                    Icon(
-                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (playing) "Pause" else "Play drawing animation",
-                    )
-                }
-                IconButton(
-                    onClick = onExport,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                ) {
-                    Icon(Icons.Default.FileDownload, contentDescription = "Export")
-                }
+                TopAction(Icons.Default.Palette, "Style", onStyle)
+                TopAction(Icons.Default.Layers, "Layers", onLayers)
+                TopAction(Icons.Default.FileDownload, "Export", onExport, primary = true)
                 Spacer(Modifier.width(SketcherTokens.space2))
                 OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename)
             }
         }
+    }
+}
+
+/** Icon over an always-visible 11sp label, so nobody has to guess what a bare icon does. */
+@Composable
+private fun TopAction(icon: ImageVector, label: String, onClick: () -> Unit, primary: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        Modifier
+            .padding(horizontal = SketcherTokens.space2)
+            .defaultMinSize(minWidth = 56.dp, minHeight = SketcherTokens.minTouchTarget)
+            .clip(MaterialTheme.shapes.large)
+            .background(if (primary) scheme.primary else Color.Transparent)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = SketcherTokens.space8, vertical = SketcherTokens.space4),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = if (primary) scheme.onPrimary else LocalContentColor.current)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (primary) scheme.onPrimary else scheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
 }
 

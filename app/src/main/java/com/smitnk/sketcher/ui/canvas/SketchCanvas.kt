@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -35,10 +36,19 @@ private class ViewTransform {
     var zoom by mutableFloatStateOf(1f)
     var pan by mutableStateOf(Offset.Zero)
 
-    fun scale(cw: Float, ch: Float, pw: Int, ph: Int): Float = min(cw / pw, ch / ph) * zoom
+    /** Space reserved for floating chrome (px); the paper is fitted and centred in what remains. */
+    var insetTop by mutableFloatStateOf(0f)
+    var insetBottom by mutableFloatStateOf(0f)
+    var margin by mutableFloatStateOf(0f)
+
+    fun scale(cw: Float, ch: Float, pw: Int, ph: Int): Float =
+        min(
+            ((cw - 2f * margin) / pw).coerceAtLeast(0.01f),
+            ((ch - insetTop - insetBottom - 2f * margin) / ph).coerceAtLeast(0.01f),
+        ) * zoom
 
     fun base(cw: Float, ch: Float, pw: Int, ph: Int, s: Float): Offset =
-        Offset((cw - pw * s) / 2f, (ch - ph * s) / 2f)
+        Offset((cw - pw * s) / 2f, insetTop + (ch - insetTop - insetBottom - ph * s) / 2f)
 
     /** Screen position of image point (0,0). */
     fun origin(cw: Float, ch: Float, pw: Int, ph: Int, s: Float): Offset = base(cw, ch, pw, ph, s) + pan
@@ -50,11 +60,21 @@ private class ViewTransform {
 }
 
 @Composable
-fun SketchCanvas(vm: SketchViewModel, modifier: Modifier = Modifier) {
+fun SketchCanvas(
+    vm: SketchViewModel,
+    modifier: Modifier = Modifier,
+    insetTopPx: Float = 0f,
+    insetBottomPx: Float = 0f,
+) {
     val project = vm.project
     val vt = remember { ViewTransform() }
+    vt.insetTop = insetTopPx
+    vt.insetBottom = insetBottomPx
+    vt.margin = with(androidx.compose.ui.platform.LocalDensity.current) { SketcherTokens.space12.toPx() }
     val paperPaint = remember { android.graphics.Paint() }
     val paperColor = SketcherTokens.colors.paper.toArgb()
+    val layerCache = remember { Renderer.LayerCache() }
+    DisposableEffect(layerCache) { onDispose { layerCache.release() } }
 
     LaunchedEffect(project.width, project.height) { vt.reset() }
 
@@ -138,13 +158,18 @@ fun SketchCanvas(vm: SketchViewModel, modifier: Modifier = Modifier) {
 
         drawIntoCanvas { canvas ->
             val c = canvas.nativeCanvas
+            // Integer sheet origin so the cached layer bitmap maps 1:1 to device pixels.
+            val ox = Math.round(o.x).toFloat()
+            val oy = Math.round(o.y).toFloat()
             c.save()
-            c.translate(o.x, o.y)
+            c.translate(ox, oy)
+            c.save()
             c.scale(s, s)
             c.drawRect(0f, 0f, pw.toFloat(), ph.toFloat(), paperPaint)
             c.clipRect(0f, 0f, pw.toFloat(), ph.toFloat())
             Renderer.drawBackground(c, project)
-            Renderer.drawLayers(c, pw, ph, project.layers, allowances, live, liveLayerId)
+            c.restore()
+            layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId)
             c.restore()
         }
     }
