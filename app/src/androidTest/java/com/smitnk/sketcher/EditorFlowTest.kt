@@ -50,8 +50,14 @@ class EditorFlowTest {
     private fun hasDesc(desc: String, substring: Boolean = false) =
         rule.onAllNodesWithContentDescription(desc, substring = substring).fetchSemanticsNodes().isNotEmpty()
 
+    // TopBar actions are a clickable Column (merged) with a text label; the icon has no contentDescription.
+    private fun clickTopAction(label: String) {
+        rule.waitUntil(TIMEOUT) { has(label) }
+        rule.onAllNodesWithText(label).onFirst().performClick()
+    }
+
     private fun openLayers() {
-        rule.onAllNodesWithContentDescription("Layers").onFirst().performClick()
+        clickTopAction("Layers")
         rule.waitUntil(TIMEOUT) { hasDesc("Layer: Outline", substring = true) }
     }
 
@@ -75,7 +81,7 @@ class EditorFlowTest {
     @Test
     fun outlinePlusShadingCreatesShadingLayer() {
         openEditorWithDemo()
-        rule.onNodeWithContentDescription("Style").performClick()
+        clickTopAction("Style")
         rule.waitUntil(TIMEOUT) { has("Outline + Shading") }
         rule.onNodeWithText("Outline + Shading").performClick()
         rule.onNodeWithText("Draw it").performClick()
@@ -108,7 +114,7 @@ class EditorFlowTest {
     @Test
     fun exportSheetShowsVideoOption() {
         openEditorWithDemo()
-        rule.onNodeWithContentDescription("Export").performClick()
+        clickTopAction("Export")
         rule.waitUntil(TIMEOUT) { has("Video") }
         rule.onNodeWithText("Video").assertExists()
     }
