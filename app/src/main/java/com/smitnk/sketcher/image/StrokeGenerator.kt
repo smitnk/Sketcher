@@ -364,7 +364,6 @@ object StrokeGenerator {
         coh /= n
         ratio /= n
         val relax = 1.25f - 0.5f * detail
-        if (System.getenv("B5DBG") != null) System.err.println("CH ${c[0].toInt()} ${c[1].toInt()} len=${len.toInt()} curv=${curv} dens=${dens} coh=${coh} ratio=${ratio}")
         // 1) squiggles: tight turning for their length
         val closed = false
         if (!closed && ratio < 2.9f && curv > 0.30f && len < 70f) return true
@@ -452,7 +451,7 @@ object StrokeGenerator {
         val half = mag.size / 2
         while (median < 2047 && acc + hist[median] < half) acc += hist[median++]
 
-        val high = min(320f, max(125f - 100f * detail, 2.4f * median))
+        val high = min(320f, max(140f - 105f * detail, 2.9f * median))
         val low = max(high * 0.38f, 1.4f * median)
 
         val nms = FloatArray(w * h)

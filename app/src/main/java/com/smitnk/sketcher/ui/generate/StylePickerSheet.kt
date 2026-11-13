@@ -4,6 +4,7 @@ package com.smitnk.sketcher.ui.generate
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -173,7 +174,6 @@ fun StylePickerSheet(
                             onClick = { onSettingsChange(settings.copy(lineSource = source)) },
                             shape = SegmentedButtonDefaults.itemShape(index, engines.size),
                             icon = {},
-                            contentPadding = PaddingValues(horizontal = 4.dp),
                             modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
                         ) {
                             Text(

@@ -24,26 +24,24 @@ object LineArtVectorizer {
 
                 val lo = 0.22f - 0.12f * d
         val hi = 0.46f - 0.20f * d
-        var T=System.nanoTime(); fun tick(n:String){val t=System.nanoTime();System.err.println(n+" "+(t-T)/1000000);T=t}
         val mask = dilate(hysteresis(ink, w, h, lo, hi, (6 * sc * sc).toInt().coerceAtLeast(4)), w, h)
         // clear border so neighbour access never goes out of range
         for (x in 0 until w) { mask[x] = false; mask[(h - 1) * w + x] = false }
         for (y in 0 until h) { mask[y * w] = false; mask[y * w + w - 1] = false }
-        tick("hyst"); thin(mask, w, h); tick("thin")
+        thin(mask, w, h)
 
         // prune spurs & tiny fragments, bridge gaps, rebuild
         val spurLen = (7f * sc).toInt()
         val minLen = (10f * sc).toInt()
         var g = Graph.build(mask, w, h)
-        tick("graph1"); g.prune(mask, spurLen, minLen)
+        g.prune(mask, spurLen, minLen)
         bridge(mask, ink, w, h, (6f + 7f * d) * sc, lo)
-        tick("bridge"); g = Graph.build(mask, w, h)
-        tick("graph2"); val chains = g.strokes()
-        tick("strokes")
+        g = Graph.build(mask, w, h)
+        val chains = g.strokes()
 
         // ---- chains -> smooth strokes
         val cands = ArrayList<Cand>(chains.size)
-        val eps = 0.55f
+        val eps = 0.65f
         val minScore = (16f - 11f * d) * sc
         for (c in chains) {
             val n = c.size
@@ -53,7 +51,7 @@ object LineArtVectorizer {
             val mean = sum / n
             var pts = FloatArray(n * 2)
             for (i in 0 until n) { pts[i * 2] = (c[i] % w) + 0.5f; pts[i * 2 + 1] = (c[i] / w) + 0.5f }
-            pts = movingAverage(pts, 3)
+            pts = movingAverage(movingAverage(pts, 3), 2)
             pts = rdp(pts, eps)
             pts = chaikin(chaikin(pts))
             val len = polyLen(pts)
@@ -62,11 +60,11 @@ object LineArtVectorizer {
             if (score < minScore || mean < 0.20f - 0.06f * d) continue
             cands.add(Cand(pts, len, mean, score))
         }
-        tick("smooth"); var kept: List<Cand> = cands
+        var kept: List<Cand> = cands
         if (kept.size > maxStrokes) kept = kept.sortedByDescending { it.score }.take(maxStrokes)
 
         val ordered = order(kept)
-        tick("order"); val out = ArrayList<Stroke>(ordered.size)
+        val out = ArrayList<Stroke>(ordered.size)
         for (c in ordered) {
             val s = ((c.mean - 0.15f) / 0.4f).coerceIn(0f, 1f)
             out.add(Stroke(c.pts, 0xFF000000.toInt(), lineWidth * (0.6f + 1.0f * s), BrushType.PEN, 1f))
@@ -144,40 +142,46 @@ object LineArtVectorizer {
 
     private fun thin(img: BooleanArray, w: Int, h: Int) {
         var buf = IntArray(8192)
+        // active pixel list: only set pixels are visited, shrinking every pass
+        var pix = IntArray(8192)
+        var np = 0
+        for (y in 1 until h - 1) {
+            var i = y * w + 1
+            for (x in 1 until w - 1) {
+                if (img[i]) { if (np == pix.size) pix = pix.copyOf(np * 2); pix[np++] = i }
+                i++
+            }
+        }
         var changed = true
         while (changed) {
             changed = false
             for (step in 0..1) {
                 var n = 0
-                for (y in 1 until h - 1) {
-                    var i = y * w + 1
-                    for (x in 1 until w - 1) {
-                        if (img[i]) {
-                            val p2 = img[i - w]; val p3 = img[i - w + 1]; val p4 = img[i + 1]; val p5 = img[i + w + 1]
-                            val p6 = img[i + w]; val p7 = img[i + w - 1]; val p8 = img[i - 1]; val p9 = img[i - w - 1]
-                            var b = 0
-                            if (p2) b++; if (p3) b++; if (p4) b++; if (p5) b++
-                            if (p6) b++; if (p7) b++; if (p8) b++; if (p9) b++
-                            if (b in 2..6) {
-                                var a = 0
-                                if (!p2 && p3) a++; if (!p3 && p4) a++; if (!p4 && p5) a++; if (!p5 && p6) a++
-                                if (!p6 && p7) a++; if (!p7 && p8) a++; if (!p8 && p9) a++; if (!p9 && p2) a++
-                                if (a == 1) {
-                                    val ok = if (step == 0) !(p2 && p4 && p6) && !(p4 && p6 && p8)
-                                    else !(p2 && p4 && p8) && !(p2 && p6 && p8)
-                                    if (ok) {
-                                        if (n == buf.size) buf = buf.copyOf(n * 2)
-                                        buf[n++] = i
-                                    }
-                                }
-                            }
-                        }
-                        i++
+                for (k in 0 until np) {
+                    val i = pix[k]
+                    val p2 = img[i - w]; val p3 = img[i - w + 1]; val p4 = img[i + 1]; val p5 = img[i + w + 1]
+                    val p6 = img[i + w]; val p7 = img[i + w - 1]; val p8 = img[i - 1]; val p9 = img[i - w - 1]
+                    var b = 0
+                    if (p2) b++; if (p3) b++; if (p4) b++; if (p5) b++
+                    if (p6) b++; if (p7) b++; if (p8) b++; if (p9) b++
+                    if (b < 2 || b > 6) continue
+                    var a = 0
+                    if (!p2 && p3) a++; if (!p3 && p4) a++; if (!p4 && p5) a++; if (!p5 && p6) a++
+                    if (!p6 && p7) a++; if (!p7 && p8) a++; if (!p8 && p9) a++; if (!p9 && p2) a++
+                    if (a != 1) continue
+                    val ok = if (step == 0) !(p2 && p4 && p6) && !(p4 && p6 && p8)
+                    else !(p2 && p4 && p8) && !(p2 && p6 && p8)
+                    if (ok) {
+                        if (n == buf.size) buf = buf.copyOf(n * 2)
+                        buf[n++] = i
                     }
                 }
                 if (n > 0) {
                     changed = true
                     for (k in 0 until n) img[buf[k]] = false
+                    var m = 0
+                    for (k in 0 until np) { val i = pix[k]; if (img[i]) pix[m++] = i }
+                    np = m
                 }
             }
         }
@@ -419,7 +423,7 @@ object LineArtVectorizer {
             val dn = sqrt(dx * dx + dy * dy)
             if (dn < 1e-3f) continue
             dx /= dn; dy /= dn
-            var best = -1; var bestScore = Float.MAX_VALUE
+            var best = -1; var bestScore = Float.MAX_VALUE; var bestDist = 0f
             for (yy in max(1, ey - gi)..min(h - 2, ey + gi)) for (xx in max(1, ex - gi)..min(w - 2, ex + gi)) {
                 val p = yy * w + xx
                 if (!img[p]) continue
@@ -432,7 +436,7 @@ object LineArtVectorizer {
                 for (t in 0 until nOwn) if (own[t] == p) { isOwn = true; break }
                 if (isOwn) continue
                 val s = dist * (1.6f - cos)
-                if (s < bestScore) { bestScore = s; best = p }
+                if (s < bestScore) { bestScore = s; best = p; bestDist = dist }
             }
             if (best < 0) continue
             // ink support along the bridge
@@ -443,7 +447,7 @@ object LineArtVectorizer {
                 val t = s.toFloat() / steps
                 sum += ink[((ey + (by - ey) * t).toInt()) * w + (ex + (bx - ex) * t).toInt()]
             }
-            if (sum / (steps + 1) < lo * 0.45f) continue
+            if (bestDist > gap * 0.5f && sum / (steps + 1) < lo * 0.45f) continue
             for (s in 1 until steps) {
                 val t = s.toFloat() / steps
                 lines.add(((ey + Math.round((by - ey) * t))) * w + (ex + Math.round((bx - ex) * t)))
