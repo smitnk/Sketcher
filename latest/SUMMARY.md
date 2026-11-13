@@ -1,4 +1,4 @@
-commit: 6d6a4c3a97fe56a562c4964c02e76c09a940611f
-run: https://github.com/smitnk/Sketcher/actions/runs/43390225972
-build: success
-emulator: success
+commit: d03ec2baf8d0f1a186f0207f37b987f0ad822cbe
+run: https://github.com/smitnk/Sketcher/actions/runs/43393504198
+build: failure
+emulator: skipped
