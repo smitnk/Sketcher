@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T07:18:19" hostname="runnervmwuk1x" time="0.482">
+<testsuite name="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T07:20:12" hostname="runnervmwuk1x" time="0.288">
   <properties/>
-  <testcase name="heavierLevelMeansMoreStrokes" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.176"/>
-  <testcase name="shadesDarkSubjectOnly" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.044"/>
-  <testcase name="styleAndColour" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.104"/>
-  <testcase name="deterministicAndCapped" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.132"/>
+  <testcase name="heavierLevelMeansMoreStrokes" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.08"/>
+  <testcase name="shadesDarkSubjectOnly" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.028"/>
+  <testcase name="styleAndColour" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.065"/>
+  <testcase name="deterministicAndCapped" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.092"/>
   <testcase name="noneGivesNothing" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.002"/>
-  <testcase name="flatImageGetsNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.023"/>
+  <testcase name="flatImageGetsNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.021"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
