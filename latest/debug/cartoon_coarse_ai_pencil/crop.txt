@@ -2,8 +2,8 @@ crop: x0=0 y0=26 x1=745 y1=958 of 745x1024 bgFraction=0.60853493
 lineSource=AI
 model=coarse
 accelActive=NPU (NNAPI) fallback=null
-inferenceMs=3437 (wrapped=3438) genMs=6231
-ink: min=0.0 mean=0.04235699175555 max=0.9985852 (614x768)
-strokes: outline=342 shading=0 fill=0
+inferenceMs=3822 (wrapped=4266) genMs=6772
+ink: min=0.0 mean=0.042338305889687046 max=0.9994597 (614x768)
+strokes: outline=452 shading=0 fill=0
 inkW=745 inkH=1024 drawing=745x1024 revealWidth=11.0
 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)

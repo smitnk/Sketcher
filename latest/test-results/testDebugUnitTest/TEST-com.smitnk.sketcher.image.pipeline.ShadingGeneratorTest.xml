@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:51" hostname="ip-10-0-128-194" time="0.542">
+<testsuite name="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:56:14" hostname="runnervmwuk1x" time="0.572">
   <properties/>
-  <testcase name="cartoonFlatColourGivesNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.042"/>
-  <testcase name="heavierLevelMeansMoreStrokes" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.229"/>
-  <testcase name="shadesDarkSubjectOnly" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.056"/>
-  <testcase name="styleAndColour" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.067"/>
-  <testcase name="deterministicAndCapped" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.097"/>
+  <testcase name="cartoonFlatColourGivesNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.039"/>
+  <testcase name="heavierLevelMeansMoreStrokes" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.212"/>
+  <testcase name="shadesDarkSubjectOnly" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.057"/>
+  <testcase name="styleAndColour" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.083"/>
+  <testcase name="deterministicAndCapped" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.106"/>
   <testcase name="noneGivesNothing" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.002"/>
-  <testcase name="cartoonCelShadowIsShaded" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.027"/>
-  <testcase name="flatImageGetsNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.02"/>
+  <testcase name="cartoonCelShadowIsShaded" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.038"/>
+  <testcase name="flatImageGetsNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.034"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

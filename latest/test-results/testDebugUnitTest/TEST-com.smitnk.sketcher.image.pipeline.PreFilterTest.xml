@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.PreFilterTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:51" hostname="ip-10-0-128-194" time="0.439">
+<testsuite name="com.smitnk.sketcher.image.pipeline.PreFilterTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:56:14" hostname="runnervmwuk1x" time="0.488">
   <properties/>
-  <testcase name="noiseTextureIsSmoothedButStepEdgeKept" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.038"/>
-  <testcase name="fastEnough" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.4"/>
-  <testcase name="zeroStrengthReturnsInput" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.001"/>
+  <testcase name="noiseTextureIsSmoothedButStepEdgeKept" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.055"/>
+  <testcase name="fastEnough" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.433"/>
+  <testcase name="zeroStrengthReturnsInput" classname="com.smitnk.sketcher.image.pipeline.PreFilterTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

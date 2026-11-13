@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.LayerReconcileTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:52" hostname="ip-10-0-128-194" time="0.01">
+<testsuite name="com.smitnk.sketcher.ui.LayerReconcileTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:56:15" hostname="runnervmwuk1x" time="0.015">
   <properties/>
-  <testcase name="differentSourceDropsAuto" classname="com.smitnk.sketcher.ui.LayerReconcileTest" time="0.01"/>
+  <testcase name="differentSourceDropsAuto" classname="com.smitnk.sketcher.ui.LayerReconcileTest" time="0.015"/>
   <testcase name="sameSourceKeepsAll" classname="com.smitnk.sketcher.ui.LayerReconcileTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

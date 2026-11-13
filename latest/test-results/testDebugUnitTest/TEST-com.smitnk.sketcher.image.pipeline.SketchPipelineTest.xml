@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:39:52" hostname="ip-10-0-128-194" time="0.139">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T12:56:15" hostname="runnervmwuk1x" time="0.266">
   <properties/>
-  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.139"/>
+  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.131"/>
+  <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="autoCutAndStrongInkGuard" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.132"/>
+  <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
