@@ -21,6 +21,7 @@ import com.smitnk.sketcher.image.Stroke
 import com.smitnk.sketcher.image.StrokeGenerator
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.Project
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -117,6 +118,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 toast("Could not open that image")
                 return@launch
             }
+            resetProject()
             setSource(bmp)
             toast("Photo loaded - tap Generate")
         }
@@ -142,6 +144,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (autodemo) runDemo()
     }
 
+    private fun resetProject() {
+        project.layers.clear()
+        project.layers.add(project.newLayer("Layer 1"))
+        project.selectedIndex = 0
+        clearHistory()
+        anim.showFinished()
+    }
+
     private fun setSource(bmp: Bitmap) {
         sourceBitmap = bmp
         hasProject = true
@@ -163,27 +173,38 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         anim.showFinished()
         viewModelScope.launch {
             try {
-                val w = bmp.width
-                val h = bmp.height
-                val pixels = IntArray(w * h)
-                bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                val drawing = StrokeGenerator.generate(pixels, w, h, settings)
-                applyDrawing(drawing, bmp)
+                val (drawing, scaledBg) = withContext(Dispatchers.Default) {
+                    val w = bmp.width
+                    val h = bmp.height
+                    val pixels = IntArray(w * h)
+                    bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+                    val d = StrokeGenerator.generate(pixels, w, h, settings)
+                    val bg = if (w != d.width || h != d.height) {
+                        Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
+                    } else {
+                        null
+                    }
+                    d to bg
+                }
+                applyDrawing(drawing, scaledBg)
                 generationCount++
-            } catch (e: Exception) {
-                toast("Generation failed: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                toast(
+                    if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
+                    else "Generation failed: ${t.message}",
+                )
             } finally {
                 generating = false
             }
         }
     }
 
-    private fun applyDrawing(drawing: GeneratedDrawing, source: Bitmap) {
+    private fun applyDrawing(drawing: GeneratedDrawing, scaledBackground: Bitmap?) {
         project.width = drawing.width
         project.height = drawing.height
-        if (source.width != drawing.width || source.height != drawing.height) {
-            project.background = Bitmap.createScaledBitmap(source, drawing.width, drawing.height, true)
-        }
+        if (scaledBackground != null) project.background = scaledBackground
         val outline = project.newLayer("Outline")
         outline.strokes.addAll(drawing.outline)
         val shading = project.newLayer("Shading")
@@ -260,7 +281,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val layer = liveLayer ?: return
         if (tool == Tool.BRUSH) {
             if (!cancel && liveCount > 0) {
-                if (liveCount == 1) addLivePoint(livePoints[0] + 0.01f, livePoints[1])
+                if (liveCount == 1) {
+                    // Tap: add a second point directly (bypasses the dedupe) so a dot is drawn.
+                    livePoints[2] = livePoints[0] + 0.01f
+                    livePoints[3] = livePoints[1]
+                    liveCount = 2
+                }
                 val stroke = Stroke(livePoints.copyOf(liveCount * 2), brushColor, brushSize)
                 layer.strokes.add(stroke)
                 pushUndo(AddStrokeAction(layer, stroke))
@@ -374,22 +400,46 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ export
 
-    fun export(scale: Int, format: ExportFormat, transparent: Boolean, selectedLayerOnly: Boolean) {
-        val layer = if (selectedLayerOnly) project.selectedLayer else null
-        if (selectedLayerOnly && layer == null) return
+    /** Copies layers and their strokes so background rendering can't race with edits. */
+    private fun snapshotLayers(only: Layer?): List<Layer> =
+        (if (only != null) listOf(only) else project.layers.toList()).map { src ->
+            Layer(src.id, src.name).also {
+                it.visible = src.visible
+                it.opacity = src.opacity
+                it.strokes.addAll(src.strokes.toList())
+            }
+        }
+
+    private fun exportSnapshot(layers: List<Layer>, w: Int, h: Int, scale: Int, fmt: ExportFormat, transparent: Boolean, ignoreState: Boolean, name: String) {
         viewModelScope.launch {
-            val where = withContext(Dispatchers.Default) {
-                val isLayer = layer != null
-                val fmt = if (isLayer) ExportFormat.PNG else format
-                val bmp = Exporter.render(project, scale, transparent = isLayer || (fmt == ExportFormat.PNG && transparent), onlyLayer = layer)
-                try {
-                    Exporter.save(app, bmp, fmt, layer?.name ?: "drawing")
-                } finally {
-                    bmp.recycle()
+            val where = try {
+                withContext(Dispatchers.Default) {
+                    val bmp = Exporter.render(w, h, layers, scale, transparent, ignoreState)
+                    try {
+                        Exporter.save(app, bmp, fmt, name)
+                    } finally {
+                        bmp.recycle()
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                null
             }
             toast(if (where != null) "Saved: $where" else "Export failed")
         }
+    }
+
+    fun export(scale: Int, format: ExportFormat, transparent: Boolean, selectedLayerOnly: Boolean) {
+        val layer = if (selectedLayerOnly) project.selectedLayer else null
+        if (selectedLayerOnly && layer == null) return
+        val isLayer = layer != null
+        val fmt = if (isLayer) ExportFormat.PNG else format
+        exportSnapshot(
+            snapshotLayers(layer), project.width, project.height, scale, fmt,
+            transparent = isLayer || (fmt == ExportFormat.PNG && transparent),
+            ignoreState = isLayer, name = layer?.name ?: "drawing",
+        )
     }
 
     /** Exports all visible layers as PNG, then the Outline layer alone as transparent PNG. */
@@ -397,17 +447,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val outline = project.layers.firstOrNull { it.name == "Outline" }
         export(1, ExportFormat.PNG, false, false)
         if (outline != null) {
-            viewModelScope.launch {
-                val where = withContext(Dispatchers.Default) {
-                    val bmp = Exporter.render(project, 1, transparent = true, onlyLayer = outline)
-                    try {
-                        Exporter.save(app, bmp, ExportFormat.PNG, "Outline")
-                    } finally {
-                        bmp.recycle()
-                    }
-                }
-                toast(if (where != null) "Saved: $where" else "Export failed")
-            }
+            exportSnapshot(snapshotLayers(outline), project.width, project.height, 1, ExportFormat.PNG, true, true, "Outline")
         }
     }
 

@@ -1,7 +1,10 @@
 package com.smitnk.sketcher.export
 
 import android.content.ContentValues
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,7 +12,6 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import com.smitnk.sketcher.model.Layer
-import com.smitnk.sketcher.model.Project
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -24,20 +26,27 @@ enum class ExportFormat(val mime: String, val extension: String) {
 object Exporter {
 
     /**
-     * Renders visible layers (or only [onlyLayer], ignoring its visibility/opacity) to a bitmap.
-     * The reference photo is never included.
+     * Renders [layers] (a snapshot taken on the main thread) to a bitmap. With [ignoreLayerState],
+     * hidden layers are drawn and opacity ignored. The reference photo is never included.
      */
-    fun render(project: Project, scale: Int, transparent: Boolean, onlyLayer: Layer? = null): Bitmap {
-        val bmp = Bitmap.createBitmap(project.width * scale, project.height * scale, Bitmap.Config.ARGB_8888)
+    fun render(
+        width: Int,
+        height: Int,
+        layers: List<Layer>,
+        scale: Int,
+        transparent: Boolean,
+        ignoreLayerState: Boolean = false,
+    ): Bitmap {
+        val bmp = Bitmap.createBitmap(width * scale, height * scale, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         if (!transparent) canvas.drawColor(Color.WHITE)
         canvas.scale(scale.toFloat(), scale.toFloat())
         Renderer.drawLayers(
             canvas = canvas,
-            width = project.width,
-            height = project.height,
-            layers = if (onlyLayer != null) listOf(onlyLayer) else project.layers.toList(),
-            ignoreLayerState = onlyLayer != null,
+            width = width,
+            height = height,
+            layers = layers,
+            ignoreLayerState = ignoreLayerState,
         )
         return bmp
     }
@@ -70,11 +79,20 @@ object Exporter {
                 resolver.update(uri, values, null, null)
                 "Pictures/Sketcher/$fileName"
             } else {
-                // Android 8/9: no storage permission requested, so use the app's own picture folder.
-                val dir = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: return null
+                val legacyOk = context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                    PackageManager.PERMISSION_GRANTED
+                val publicDir = if (legacyOk) {
+                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Sketcher")
+                        .takeIf { it.isDirectory || it.mkdirs() }
+                } else {
+                    null
+                }
+                val dir = publicDir ?: context.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: return null
                 val file = File(dir, fileName)
                 val ok = FileOutputStream(file).use { bitmap.compress(compressFormat, quality, it) }
-                if (ok) file.absolutePath else null
+                if (!ok) return null
+                if (publicDir != null) MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), arrayOf(format.mime), null)
+                file.absolutePath
             }
         } catch (e: Exception) {
             null

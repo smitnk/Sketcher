@@ -2,6 +2,9 @@
 
 package com.smitnk.sketcher.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.roundToInt
@@ -76,6 +80,14 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.loadImage(uri)
+    }
+
+    val context = LocalContext.current
+    var pendingExport by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        // Granted or not, export; Exporter falls back to the app folder when denied.
+        pendingExport?.invoke()
+        pendingExport = null
     }
 
     LaunchedEffect(vm.generationCount) {
@@ -184,7 +196,15 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
             onDismiss = { showExport = false },
             onExport = { scale, format, transparent, layerOnly ->
                 showExport = false
-                vm.export(scale, format, transparent, layerOnly)
+                val run = { vm.export(scale, format, transparent, layerOnly) }
+                val needsPerm = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                    context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                if (needsPerm) {
+                    pendingExport = run
+                    permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                } else {
+                    run()
+                }
             },
         )
     }
