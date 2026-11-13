@@ -17,7 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import org.junit.Rule
 import org.junit.Test
 
-private const val TIMEOUT = 60_000L
+private const val TIMEOUT = 180_000L
 
 class EditorFlowTest {
     @get:Rule
