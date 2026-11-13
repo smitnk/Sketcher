@@ -1,9 +1,9 @@
 /sdcard/Pictures:
 total 8
-drwxrws--- 2 u0_a136 media_rw 4096 2026-11-13 06:22 Sketcher
+drwxrws--- 2 u0_a142 media_rw 4096 2026-11-13 06:30 Sketcher
 
 /sdcard/Pictures/Sketcher:
 total 1660
--rwxrwx--- 1 u0_a136 media_rw   40277 2026-11-13 06:21 Sketcher_Outline_20261113_062122.png
--rwxrwx--- 1 u0_a136 media_rw 1559794 2026-11-13 06:22 Sketcher_animation_20261113_062204.gif
--rwxrwx--- 1 u0_a136 media_rw   82317 2026-11-13 06:21 Sketcher_drawing_20261113_062122.png
+-rwxrwx--- 1 u0_a142 media_rw   40277 2026-11-13 06:30 Sketcher_Outline_20261113_063002.png
+-rwxrwx--- 1 u0_a142 media_rw 1559794 2026-11-13 06:30 Sketcher_animation_20261113_063049.gif
+-rwxrwx--- 1 u0_a142 media_rw   82317 2026-11-13 06:30 Sketcher_drawing_20261113_063002.png
