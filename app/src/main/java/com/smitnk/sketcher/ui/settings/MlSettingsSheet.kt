@@ -60,6 +60,10 @@ fun MlSettingsSheet(
     activeAccelLabel: String?,
     fallbackReason: String?,
     onDismiss: () -> Unit,
+    /** Non-null while the "NNAPI may crash your phone" warning must be shown. */
+    nnapiWarningPending: Boolean = false,
+    onConfirmNnapi: () -> Unit = {},
+    onDismissNnapi: () -> Unit = {},
     /** Per-stage ms of the last drawing (SketchPipeline.lastTimings); "total" is the whole run. */
     stageTimings: Map<String, Long> = SketchPipeline.lastTimings,
 ) {
@@ -72,6 +76,23 @@ fun MlSettingsSheet(
     val scheme = MaterialTheme.colorScheme
     val maxMs = results.values.filterNotNull().maxOrNull()?.coerceAtLeast(1L) ?: 1L
     val bestMs = results.values.filterNotNull().minOrNull()
+
+    if (nnapiWarningPending) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDismissNnapi,
+            title = { Text("Use NNAPI anyway?") },
+            text = {
+                Text(
+                    "NNAPI hands the AI to your phone's GPU/NPU driver. On some phones (for example MediaTek " +
+                        "chips) this can freeze or crash the whole system, not just this app, and the large " +
+                        "downloaded models are never run on NNAPI. CPU + XNNPACK is the safe default. " +
+                        "Only continue if you want to experiment.",
+                )
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = onConfirmNnapi) { Text("Use anyway") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = onDismissNnapi) { Text("Keep CPU") } },
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -193,7 +214,7 @@ fun MlSettingsSheet(
                 )
             }
             Text(
-                "NNAPI lets Android choose the GPU, NPU or CPU for you, and may fall back to CPU if your phone doesn't support it, so it can run at the same speed as CPU. Auto picks the fastest option that works.",
+                "NNAPI lets Android choose the GPU, NPU or CPU for you, and may fall back to CPU if your phone doesn't support it, so it can run at the same speed as CPU. Auto picks the faster of CPU and CPU + XNNPACK after you run the speed test. Speed tests use the built-in model only.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
             )

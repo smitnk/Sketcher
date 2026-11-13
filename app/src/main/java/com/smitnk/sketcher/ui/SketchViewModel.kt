@@ -39,6 +39,8 @@ import com.smitnk.sketcher.image.models.ModelManager
 import com.smitnk.sketcher.image.models.ModelSpec
 import com.smitnk.sketcher.image.models.ModelSpecs
 import com.smitnk.sketcher.image.pipeline.Accel
+import com.smitnk.sketcher.image.pipeline.LineArtModel
+import com.smitnk.sketcher.image.pipeline.MlLog
 import com.smitnk.sketcher.image.pipeline.OnnxLineArtModel
 import com.smitnk.sketcher.image.pipeline.PipelineSettings
 import com.smitnk.sketcher.image.pipeline.ShadingLevel
@@ -117,7 +119,7 @@ private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
 private const val AUTOSAVE_DELAY_MS = 2000L
 private const val KEY_MODEL_ID = "model_id"
 private const val KEY_ACCEL_CHOICE = "accel_choice"
-private const val KEY_AUTO_DONE = "auto_accel_done"
+private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
 
 class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -161,10 +163,65 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var generationProgress by mutableFloatStateOf(0f)
         private set
 
+    /** Seconds since the current generation stage began (ticks while generating). */
+    private var stageElapsedSec by mutableIntStateOf(0)
+    private var stageStartMs = 0L
+    private var genStartMs = 0L
+
+    private val aiStage get() = generationStage.startsWith("Running AI")
+
+    /** Stage text for the overlay: while the AI model runs, show its name and elapsed seconds instead of a frozen %. */
+    val generationStageLabel: String
+        get() = if (aiStage) "AI (${aiModelName()}) running\u2026 ${stageElapsedSec}s" else generationStage
+
+    /** Null (indeterminate) while the AI model runs: its progress is unknowable. */
+    val generationDisplayProgress: Float? get() = if (aiStage) null else generationProgress
+
+    private fun aiModelName(): String =
+        (lineArtModel?.specName ?: (ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE).name)
+
+    private fun onStage(stage: String, fraction: Float) {
+        if (stage != generationStage) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            stageStartMs = now
+            stageElapsedSec = 0
+            MlLog.i("stage \"$stage\" at ${now - genStartMs} ms (progress ${(fraction * 100).toInt()}%)")
+        }
+        generationStage = stage
+        generationProgress = fraction
+    }
+
+    /**
+     * Wraps the live model: if it throws (session failure, timeout, OOM-ish error), switch to the bundled
+     * informative model, toast the reason, and finish the run with it instead of hanging.
+     */
+    private fun withFallback(primary: OnnxLineArtModel): LineArtModel = LineArtModel { argb, w, h ->
+        try {
+            primary.infer(argb, w, h)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            if (primary.specId == ModelSpecs.DEFAULT_ID) throw t
+            val why = (t.message ?: t.javaClass.simpleName).take(120)
+            MlLog.w("model ${primary.specId} failed, falling back to informative", t)
+            viewModelScope.launch(Dispatchers.Main) {
+                toast("${primary.specName} model failed ($why). Using the built-in model instead.")
+            }
+            val fb = OnnxLineArtModel(app, ModelSpecs.INFORMATIVE, null, longSide = primary.longSide)
+            val old = lineArtModel
+            lineArtModel = fb
+            selectedLineModelId = ModelSpecs.DEFAULT_ID
+            closeInBackground(old)
+            fb.infer(argb, w, h)
+        }
+    }
+
     // ------------------------------------------------------------------ line-art models / processing
 
     private val models = ModelManager(app)
-    private val mlPrefs = app.getSharedPreferences(OnnxLineArtModel.PREFS, Context.MODE_PRIVATE)
+    private val mlPrefs = app.getSharedPreferences(OnnxLineArtModel.PREFS, Context.MODE_PRIVATE).also {
+        OnnxLineArtModel.migratePrefs(app) // v2: drop auto-selected NNAPI choices
+    }
     private var lineArtModel: OnnxLineArtModel? = null
 
     /** Id of the line model in use (persisted). Falls back to the bundled model when the file is missing. */
@@ -286,7 +343,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     // Accelerator choice: "auto" | "cpu" | "xnnpack" | "nnapi_gpu" | "nnapi_npu".
-    var selectedAccel by mutableStateOf(mlPrefs.getString(KEY_ACCEL_CHOICE, null) ?: "auto")
+    var selectedAccel by mutableStateOf(mlPrefs.getString(KEY_ACCEL_CHOICE, null) ?: "xnnpack")
         private set
 
     var benchmarking by mutableStateOf(false)
@@ -308,7 +365,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         private set
 
     val accelOptions: List<Pair<String, String>> = listOf(
-        "auto" to "Auto (fastest)",
+        "auto" to "Auto (fastest CPU)",
         "cpu" to "CPU",
         "xnnpack" to "CPU + XNNPACK",
         "nnapi_gpu" to "GPU (NNAPI)",
@@ -324,20 +381,36 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun accelLabel(a: Accel) = accelOptions.first { it.first == accelId(a) }.second
 
-    /** Concrete provider for a choice id; "auto" = fastest saved benchmark result, else XNNPACK. */
+    private fun isNnapiId(id: String) = id.startsWith("nnapi")
+
+    /** Concrete provider for a choice id; "auto" = fastest saved CPU/XNNPACK benchmark (never NNAPI), else XNNPACK. */
     private fun resolveAccel(id: String): Accel =
         Accel.values().firstOrNull { accelId(it) == id }
-            ?: Accel.values()
+            ?: listOf(Accel.CPU, Accel.XNNPACK)
                 .mapNotNull { a -> OnnxLineArtModel.savedBenchmarkMs(app, a)?.let { a to it } }
                 .minByOrNull { it.second }?.first
             ?: Accel.XNNPACK
 
+    /** NNAPI is opt-in: the first pick shows a warning dialog; only "Use anyway" applies it. */
+    var nnapiWarningPending by mutableStateOf<String?>(null)
+        private set
+
     fun selectAccel(id: String) {
         if (accelOptions.none { it.first == id }) return
+        if (isNnapiId(id) && !mlPrefs.getBoolean(KEY_NNAPI_ACK, false)) { nnapiWarningPending = id; return }
         selectedAccel = id
         mlPrefs.edit().putString(KEY_ACCEL_CHOICE, id).apply()
         applyAccelInBackground()
     }
+
+    fun confirmNnapiWarning() {
+        val id = nnapiWarningPending ?: return
+        nnapiWarningPending = null
+        mlPrefs.edit().putBoolean(KEY_NNAPI_ACK, true).apply()
+        selectAccel(id)
+    }
+
+    fun dismissNnapiWarning() { nnapiWarningPending = null }
 
     /** Applies the chosen accelerator to the live model. The setter waits for a running inference, so use IO. */
     private fun applyAccelInBackground() {
@@ -361,17 +434,22 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Times every provider on a private model instance (so generation is never blocked by the model lock),
-     * stores the results, and applies the fastest if the choice is "auto".
+     * Times CPU and CPU+XNNPACK (NNAPI only if the user accepted the warning) on the bundled model. Runs only when
+     * the user taps "Test speed"; never at launch. Mutually exclusive with generation (and, inside
+     * OnnxLineArtModel, with every other session via the global lock).
      */
     fun runBenchmark() {
         if (benchmarking) return
+        if (generating) { toast("Wait for the current drawing to finish"); return }
         benchmarking = true
-        val spec = ModelSpecs.byId(selectedLineModelId)?.takeIf { models.isAvailable(it.id) } ?: ModelSpecs.INFORMATIVE
+        val withNnapi = mlPrefs.getBoolean(KEY_NNAPI_ACK, false) && isNnapiId(selectedAccel)
         viewModelScope.launch {
             try {
-                val res = withContext(Dispatchers.Default) { benchmarkOnPrivateModel(spec) }
-                benchmarkResults = Accel.values().associate { accelId(it) to res[it] }
+                val res = withContext(Dispatchers.Default) {
+                    val m = OnnxLineArtModel(app, ModelSpecs.INFORMATIVE, null)
+                    try { m.benchmark(includeNnapi = withNnapi) } finally { m.close() }
+                }
+                benchmarkResults = Accel.values().filter { it in res }.associate { accelId(it) to res[it] }
                 if (selectedAccel == "auto") applyAccelInBackground()
             } catch (e: CancellationException) {
                 throw e
@@ -382,33 +460,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
         }
     }
-
-    private fun benchmarkOnPrivateModel(spec: ModelSpec): Map<Accel, Long> {
-        val m = OnnxLineArtModel(app, spec, models.file(spec.id))
-        try {
-            return m.benchmark()
-        } finally {
-            m.close()
-        }
-    }
-
-    /** First launch only: benchmark once in the background (never touches the live model's lock), then persist. */
-    private fun autoSelectAccelOnFirstLaunch() {
-        if (mlPrefs.getBoolean(KEY_AUTO_DONE, false)) return
-        viewModelScope.launch {
-            try {
-                val res = withContext(Dispatchers.Default) { benchmarkOnPrivateModel(ModelSpecs.INFORMATIVE) }
-                mlPrefs.edit().putBoolean(KEY_AUTO_DONE, true).apply()
-                benchmarkResults = Accel.values().associate { accelId(it) to res[it] }
-                if (selectedAccel == "auto") applyAccelInBackground()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (t: Throwable) {
-                android.util.Log.w("SketcherModel", "first-launch benchmark failed", t)
-            }
-        }
-    }
-
 
     override fun onCleared() {
         // Best-effort final save: snapshot now (main thread), write on a scope that outlives viewModelScope.
@@ -983,24 +1034,31 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val m = model()
                 m.detail = ps.detail
                 m.longSide = SketchPipeline.modelSide(ps.detail)
+                genStartMs = genStart
+                stageStartMs = genStart
+                stageElapsedSec = 0
                 generationStage = "Starting"
                 generationProgress = 0f
-                val (drawing, scaledBg) = withContext(Dispatchers.Default) {
+                MlLog.i("generate begin model=${selectedLineModelId} accel=$selectedAccel src=${bmp.width}x${bmp.height}")
+                val ticker = launch {
+                    while (true) {
+                        kotlinx.coroutines.delay(1000)
+                        stageElapsedSec = ((android.os.SystemClock.elapsedRealtime() - stageStartMs) / 1000).toInt()
+                    }
+                }
+                val (drawing, scaledBg) = try { withContext(Dispatchers.Default) {
                     val w = bmp.width
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, m)) { stage, fraction ->
-                        generationStage = stage
-                        generationProgress = fraction
-                    }
+                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m)), ::onStage)
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {
                         null
                     }
                     d to bg
-                }
+                } } finally { ticker.cancel() }
                 if (gen != projectGen) return@launch // another project was opened meanwhile
                 lastAppliedSettings = ps
                 refreshMlStatus()
@@ -1020,6 +1078,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                         DebugDump.afterGeneration(app, drawing, bmp, ps, snap, mid, a, fb, inf, genMs, SketchPipeline.lastLineSource)
                     }
                 }
+                MlLog.i("generate done in ${android.os.SystemClock.elapsedRealtime() - genStart} ms source=${SketchPipeline.lastLineSource} timings=${SketchPipeline.lastTimings}")
                 generationCount++
                 markDirty()
                 if (pendingAutoVideo) {
@@ -1030,6 +1089,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (t: Throwable) {
                 android.util.Log.e("SketcherGen", "GEN_FAIL", t)
+                MlLog.w("generate failed", t)
                 toast(
                     if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
                     else "Generation failed: ${t.message}",
@@ -1583,7 +1643,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     // (Kotlin runs initializers in declaration order; Main.immediate coroutines execute synchronously).
     init {
         refreshInstalledModels()
-        autoSelectAccelOnFirstLaunch()
         refreshRecent()
     }
 }

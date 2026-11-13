@@ -472,7 +472,8 @@ private fun LineModelCard(
                     Text(model.sizeLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                 }
                 else -> Text(
-                    if (selected) "In use  \u00B7  ${model.sizeLabel}" else "Installed  \u00B7  ${model.sizeLabel}",
+                    // Exactly one status: Built-in / In use / Installed (the size only appears on the Download button).
+                    if (selected) "In use" else if (model.sizeLabel == "Built-in") "Built-in" else "Installed",
                     style = MaterialTheme.typography.labelMedium,
                     color = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
                 )

@@ -32,6 +32,10 @@ data class ModelSpec(
     val downloadUrl: String? = null,
     val sha256: String? = null,
     val sizeBytes: Long? = null,
+    /** Hard cap on model input pixels (tw*th); keeps peak memory bounded on phones. */
+    val maxPixels: Int = 768 * 768,
+    /** fp16 weights: CPU only, never XNNPACK/NNAPI, lighter graph optimisation. */
+    val fp16: Boolean = false,
 ) {
     init {
         require(sizeMultiple > 0) { "sizeMultiple" }
@@ -59,8 +63,20 @@ data class ModelSpec(
     fun targetSize(w: Int, h: Int, longSide: Int): Pair<Int, Int> {
         require(w > 0 && h > 0 && longSide > 0)
         val long = max(w, h)
-        return alignUp(w.toDouble() * longSide / long) to alignUp(h.toDouble() * longSide / long)
+        val step = max(sizeMultiple, 32).toDouble()
+        var ls = longSide.toDouble()
+        while (true) {
+            val sw = w.toDouble() * ls / long
+            val sh = h.toDouble() * ls / long
+            val up = alignUp(sw) to alignUp(sh)
+            if (up.first.toLong() * up.second <= maxPixels) return up
+            val near = alignNearest(sw) to alignNearest(sh)
+            if (near.first.toLong() * near.second <= maxPixels || ls <= sizeMultiple) return near
+            ls = max(sizeMultiple.toDouble(), ls - step)
+        }
     }
+
+    private fun alignNearest(v: Double): Int = max(1, (v / sizeMultiple).roundToInt()) * sizeMultiple
 
     private fun alignUp(v: Double): Int {
         val m = sizeMultiple
@@ -93,6 +109,7 @@ object ModelSpecs {
         inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
         inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 8,
         downloadUrl = "$BASE/lineart_realistic_fp16.onnx",
+        fp16 = true,
     )
     val COARSE = ModelSpec(
         id = "coarse", name = "Coarse",
@@ -101,6 +118,7 @@ object ModelSpecs {
         inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
         inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 8,
         downloadUrl = "$BASE/lineart_coarse_fp16.onnx",
+        fp16 = true,
     )
     val ANIME = ModelSpec(
         id = "anime", name = "Anime",
@@ -109,6 +127,7 @@ object ModelSpecs {
         inputNorm = InputNorm.MINUS_ONE_ONE, outputRange = OutputRange.MINUS_ONE_ONE,
         inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 256,
         downloadUrl = "https://github.com/smitnk/Sketcher/releases/download/models-v1/lineart_anime_fp16.onnx",
+        fp16 = true, maxPixels = 512 * 768,
     )
 
     val ALL: List<ModelSpec> = listOf(INFORMATIVE, REALISTIC, COARSE, ANIME)

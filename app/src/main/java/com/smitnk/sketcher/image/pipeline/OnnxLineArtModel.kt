@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.providers.NNAPIFlags
 import android.content.Context
+import android.os.Debug
 import android.util.Log
 import com.smitnk.sketcher.image.models.ModelSpec
 import com.smitnk.sketcher.image.models.ModelSpecs
@@ -13,6 +14,13 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.EnumSet
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -31,16 +39,39 @@ enum class Accel(val label: String) {
 /** Honest name for the NNAPI provider: which hardware actually runs it is up to the phone's driver. */
 const val NNAPI_LABEL = "NNAPI accelerator (GPU/NPU)"
 
+/** Stage/timing/memory log under one tag ("SketcherML") so a bug report contains real numbers. */
+object MlLog {
+    const val TAG = "SketcherML"
+
+    fun mem(): String {
+        val rt = Runtime.getRuntime()
+        val used = (rt.totalMemory() - rt.freeMemory()) shr 20
+        return "java=${used}/${rt.maxMemory() shr 20}MB native=${Debug.getNativeHeapAllocatedSize() shr 20}MB"
+    }
+
+    fun i(msg: String) { Log.i(TAG, "$msg [${mem()}]") }
+    fun w(msg: String, t: Throwable? = null) { if (t != null) Log.w(TAG, "$msg [${mem()}]", t) else Log.w(TAG, "$msg [${mem()}]") }
+}
+
+/** The AI step did not finish in time (hung driver / far too slow); callers fall back to the bundled model. */
+class InferenceTimeoutException(message: String) : RuntimeException(message)
+
 /**
  * ONNX Runtime line-art model driven by a [ModelSpec] (normalisation, output polarity, size multiple).
  * [infer] returns an ink map (1 = ink). Weights come from [modelFile] if given, else the spec's bundled asset.
- * Throws on failure so the pipeline can fall back.
+ * Throws on failure so the caller can fall back.
+ *
+ * Safety rules (a phone-level UI crash was traced to GPU/NNAPI + fp16 + big inputs + several sessions):
+ *  - at most ONE OrtSession exists process-wide (a global lock; creating one evicts the previous owner's);
+ *  - NNAPI is never used for fp16 models or for inputs above [NNAPI_MAX_PIXELS];
+ *  - every inference runs on a dedicated thread with a [TIMEOUT_MS] watchdog;
+ *  - input size is capped by [ModelSpec.maxPixels] and never padded to a square.
  */
 class OnnxLineArtModel(
     context: Context,
     private val spec: ModelSpec = ModelSpecs.INFORMATIVE,
     private val modelFile: File? = null,
-    /** Inference long side (768 default; 1024 allowed). Rounded to the spec's size multiple. */
+    /** Inference long side (768 default; 1024 allowed). Rounded to the spec's size multiple and capped by maxPixels. */
     @Volatile var longSide: Int = DEFAULT_LONG_SIDE,
     /** Null = last persisted choice, else XNNPACK. */
     accel: Accel? = null,
@@ -48,18 +79,21 @@ class OnnxLineArtModel(
 
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val lock = Any()
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
-    private var modelBytes: ByteArray? = null
     private val failedAtRuntime = EnumSet.noneOf(Accel::class.java)
+    @Volatile private var runOptions: OrtSession.RunOptions? = null
+
+    val specId: String get() = spec.id
+    val specName: String get() = spec.name
+    val isBundled: Boolean get() = spec.isBundled
 
     /** Requested provider. Changing it drops the current session; the next infer rebuilds it. */
     @Volatile var accel: Accel = accel ?: savedAccel(appContext) ?: Accel.XNNPACK
         set(value) {
             if (value == field) return
             field = value
-            synchronized(lock) { failedAtRuntime.clear(); closeSession() }
+            locked { failedAtRuntime.clear(); closeSession() }
         }
 
     /** Provider actually running (null until a session exists). */
@@ -96,39 +130,49 @@ class OnnxLineArtModel(
 
     private fun threads() = min(4, max(1, Runtime.getRuntime().availableProcessors()))
 
-    private fun loadBytes(): ByteArray = modelBytes ?: run {
-        val b = when {
-            modelFile != null -> modelFile.readBytes()
-            spec.assetPath != null -> appContext.assets.open(spec.assetPath).use { it.readBytes() }
-            else -> throw IllegalStateException("model ${spec.id} has no file")
+    private inline fun <T> locked(waitMs: Long = LOCK_WAIT_MS, block: () -> T): T {
+        if (!GLOBAL.tryLock(waitMs, TimeUnit.MILLISECONDS)) {
+            throw IllegalStateException("AI engine busy (a previous run is stuck)")
         }
-        modelBytes = b
-        b
+        try { return block() } finally { GLOBAL.unlock() }
     }
 
-    /** Strict: throws if [a] cannot be created. */
-    private fun buildSession(e: OrtEnvironment, bytes: ByteArray, a: Accel): OrtSession {
+    /** Strict: throws if [a] cannot be created. Model weights are only held while the session is created. */
+    private fun buildSession(e: OrtEnvironment, a: Accel): OrtSession {
         val opts = OrtSession.SessionOptions()
         try {
             val t = threads()
             opts.setIntraOpNumThreads(t)
-            opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            opts.setInterOpNumThreads(1)
+            // fp16 graphs: skip the extended fusions/layout rewrites (copies = peak memory).
+            opts.setOptimizationLevel(
+                if (spec.fp16) OrtSession.SessionOptions.OptLevel.BASIC_OPT else OrtSession.SessionOptions.OptLevel.ALL_OPT,
+            )
+            // Lower peak memory: no pre-planned memory pattern, no caching arena.
+            opts.setMemoryPatternOptimization(false)
+            opts.setCPUArenaAllocator(false)
             when (a) {
                 Accel.CPU -> Unit
                 Accel.XNNPACK -> opts.addXnnpack(mapOf("intra_op_num_threads" to t.toString()))
                 Accel.NNAPI_GPU -> opts.addNnapi(EnumSet.of(NNAPIFlags.USE_FP16, NNAPIFlags.CPU_DISABLED))
                 Accel.NNAPI_NPU -> opts.addNnapi(EnumSet.of(NNAPIFlags.USE_NCHW, NNAPIFlags.CPU_DISABLED))
             }
-            return e.createSession(bytes, opts)
+            return when {
+                modelFile != null -> e.createSession(modelFile.absolutePath, opts)
+                spec.assetPath != null -> e.createSession(appContext.assets.open(spec.assetPath).use { it.readBytes() }, opts)
+                else -> throw IllegalStateException("model ${spec.id} has no file")
+            }
         } finally {
             opts.close()
         }
     }
 
-    private fun chain(): List<Accel> {
-        val order = when (accel) {
-            Accel.CPU -> listOf(Accel.CPU)
-            Accel.XNNPACK -> listOf(Accel.XNNPACK, Accel.CPU)
+    private fun chain(skipNnapi: Boolean): List<Accel> {
+        val order = when {
+            spec.fp16 -> listOf(Accel.CPU) // fp16: plain CPU only, never XNNPACK/NNAPI
+            accel == Accel.CPU -> listOf(Accel.CPU)
+            accel == Accel.XNNPACK -> listOf(Accel.XNNPACK, Accel.CPU)
+            skipNnapi -> listOf(Accel.XNNPACK, Accel.CPU)
             else -> listOf(accel, Accel.XNNPACK, Accel.CPU)
         }
         return order.filter { it == Accel.CPU || it !in failedAtRuntime }
@@ -138,26 +182,34 @@ class OnnxLineArtModel(
         try { session?.close() } catch (_: Throwable) {}
         session = null
         activeAccel = null
+        if (owner === this) owner = null
     }
 
-    /** Caller holds [lock]. */
-    private fun ensureSession(): Pair<OrtEnvironment, OrtSession> {
+    /** Caller holds the global lock. */
+    private fun ensureSession(skipNnapi: Boolean = false): Pair<OrtEnvironment, OrtSession> {
         val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
-        session?.let { return e to it }
+        val cur = session
+        if (cur != null) {
+            val nn = activeAccel == Accel.NNAPI_GPU || activeAccel == Accel.NNAPI_NPU
+            if (!(nn && skipNnapi)) return e to cur
+            closeSession() // large input: leave NNAPI for this run
+        }
+        owner?.takeIf { it !== this }?.let { MlLog.i("closing session of ${it.spec.id} before creating ${spec.id}"); it.closeSession() }
         val t0 = System.nanoTime()
-        val bytes = loadBytes()
         var firstError: String? = null
-        for (a in chain()) {
+        for (a in chain(skipNnapi)) {
             try {
-                val s = buildSession(e, bytes, a)
+                MlLog.i("session create ${spec.id} accel=$a")
+                val s = buildSession(e, a)
                 session = s
                 activeAccel = a
+                owner = this
                 lastFallbackReason = if (a == accel) null else firstError
-                Log.i(TAG, "session ${spec.id} accel=$a (wanted $accel) in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                MlLog.i("session ready ${spec.id} accel=$a (wanted $accel) in ${(System.nanoTime() - t0) / 1_000_000} ms")
                 return e to s
             } catch (t: Throwable) {
                 val msg = "$a failed: ${t.javaClass.simpleName}: ${t.message}"
-                Log.w(TAG, msg)
+                MlLog.w(msg)
                 if (firstError == null) firstError = msg
             }
         }
@@ -165,16 +217,43 @@ class OnnxLineArtModel(
         throw IllegalStateException("could not create ONNX session: $firstError")
     }
 
+    /** Runs [block] on the shared inference thread; abandons it (and asks ORT to terminate) after [timeoutMs]. */
+    private fun <T> guarded(timeoutMs: Long, what: String, block: () -> T): T {
+        val ex = exec
+        val fut = ex.submit(Callable { block() })
+        try {
+            return fut.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            MlLog.w("WATCHDOG $what ${spec.id} timed out after ${timeoutMs / 1000}s")
+            terminateRun()
+            fut.cancel(true)
+            replaceExecutor(ex)
+            throw InferenceTimeoutException("${spec.name} model timed out after ${timeoutMs / 1000}s")
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        } catch (e: InterruptedException) {
+            terminateRun()
+            fut.cancel(true)
+            throw e
+        }
+    }
+
+    private fun terminateRun() {
+        val ro = runOptions ?: return
+        try { ro.javaClass.getMethod("setTerminate", Boolean::class.javaPrimitiveType).invoke(ro, true) } catch (_: Throwable) {}
+    }
+
     /**
      * Creates the session and runs a tiny dummy inference on a background thread so the first real
-     * generation does not pay model load + kernel init. Safe to call repeatedly; never throws.
+     * generation does not pay model load + kernel init. Skipped for fp16 models (heavy; built on demand).
+     * Safe to call repeatedly; never throws.
      */
     fun warmUp() {
-        if (warming || session != null) return
+        if (warming || session != null || spec.fp16) return
         warming = true
         Thread({
             try {
-                synchronized(lock) {
+                locked {
                     val (env, session) = ensureSession()
                     val name = session.inputNames.iterator().next()
                     val side = max(64, spec.sizeMultiple)
@@ -191,78 +270,84 @@ class OnnxLineArtModel(
         }, "onnx-warmup").apply { isDaemon = true; priority = Thread.MIN_PRIORITY }.start()
     }
 
-    override fun infer(argb: IntArray, w: Int, h: Int): FloatArray = synchronized(lock) {
+    override fun infer(argb: IntArray, w: Int, h: Int): FloatArray =
+        guarded(TIMEOUT_MS, "infer") { locked { inferLocked(argb, w, h) } }
+
+    private fun inferLocked(argb: IntArray, w: Int, h: Int): FloatArray {
         require(w > 0 && h > 0 && argb.size >= w * h) { "bad image" }
         val tStart = System.nanoTime()
         val (tw, th) = spec.targetSize(w, h, longSide)
-        // NNAPI only accelerates fixed shapes: letterbox (white) into a square canvas so the shape never varies.
-        // Fallback providers reuse the same canvas, which is harmless (white paper = no ink).
-        val square = accel == Accel.NNAPI_GPU || accel == Accel.NNAPI_NPU
-        val cw = if (square) max(tw, th) else tw
-        val ch = if (square) max(tw, th) else th
-        val ox = (cw - tw) / 2
-        val oy = (ch - th) / 2
-        val fb = fillInput(argb, w, h, tw, th, cw, ch, ox, oy)
+        MlLog.i("infer start ${spec.id} ${w}x$h -> ${tw}x$th (${tw.toLong() * th} px, cap ${spec.maxPixels}) fp16=${spec.fp16}")
+        val skipNnapi = spec.fp16 || tw.toLong() * th > NNAPI_MAX_PIXELS
+        val fb = fillInput(argb, w, h, tw, th)
         val tPre = System.nanoTime()
-        val raw = FloatArray(cw * ch)
+        MlLog.i("infer preprocessed in ${(tPre - tStart) / 1_000_000} ms")
+        val raw = FloatArray(tw * th)
         var attempts = 0
         while (true) {
-            val (env, session) = ensureSession()
+            val (env, session) = ensureSession(skipNnapi)
             try {
-                runInto(env, session, fb, cw, ch, raw)
+                MlLog.i("run begin ${spec.id} accel=$activeAccel")
+                runInto(env, session, fb, tw, th, raw)
                 break
             } catch (t: Throwable) {
                 val a = activeAccel
                 // A provider that built fine but fails to run: block it and rebuild down the chain.
-                if (a == null || a == Accel.CPU || ++attempts > 3) throw t
+                if (a == null || a == Accel.CPU || t is InterruptedException || ++attempts > 3) throw t
                 val msg = "$a run failed: ${t.javaClass.simpleName}: ${t.message}"
-                Log.w(TAG, msg)
+                MlLog.w(msg)
                 failedAtRuntime.add(a)
                 closeSession()
                 lastFallbackReason = msg
             }
         }
         val tRun = System.nanoTime()
-        // Crop the content window out of the (possibly padded) output and convert to ink.
+        inBuf = null // release the native input buffer between runs
         val out = FloatArray(tw * th)
-        for (y in 0 until th) {
-            val src = (y + oy) * cw + ox
-            val dst = y * tw
-            for (x in 0 until tw) out[dst + x] = spec.inkFromOutput(raw[src + x])
-        }
+        for (i in out.indices) out[i] = spec.inkFromOutput(raw[i])
         val res = if (tw == w && th == h) out else upsample(out, tw, th, w, h)
         val totalMs = (System.nanoTime() - tStart) / 1_000_000
         lastInferenceMs = totalMs
         lastRunMs = (tRun - tPre) / 1_000_000
-        Log.i(
-            TAG,
-            "infer ${spec.id} ${w}x$h -> ${tw}x$th (canvas ${cw}x$ch) accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +
-                "run=${(tRun - tPre) / 1_000_000}ms post=${(System.nanoTime() - tRun) / 1_000_000}ms",
+        MlLog.i(
+            "infer done ${spec.id} ${w}x$h -> ${tw}x$th accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +
+                "run=${(tRun - tPre) / 1_000_000}ms post=${(System.nanoTime() - tRun) / 1_000_000}ms total=${totalMs}ms",
         )
-        res
+        return res
     }
 
     private fun runInto(env: OrtEnvironment, session: OrtSession, fb: FloatBuffer, tw: Int, th: Int, out: FloatArray) {
         val inputName = session.inputNames.iterator().next()
         fb.position(0)
-        OnnxTensor.createTensor(env, fb, longArrayOf(1, 3, th.toLong(), tw.toLong())).use { tensor ->
-            session.run(mapOf(inputName to tensor)).use { result ->
-                val ot = result.get(0) as OnnxTensor
-                val ofb = ot.floatBuffer
-                check(ofb.remaining() >= out.size) { "unexpected model output size ${ofb.remaining()}" }
-                ofb.get(out, 0, out.size)
+        OrtSession.RunOptions().use { ro ->
+            runOptions = ro
+            try {
+                OnnxTensor.createTensor(env, fb, longArrayOf(1, 3, th.toLong(), tw.toLong())).use { tensor ->
+                    session.run(mapOf(inputName to tensor), ro).use { result ->
+                        val ot = result.get(0) as OnnxTensor
+                        val ofb = ot.floatBuffer
+                        check(ofb.remaining() >= out.size) { "unexpected model output size ${ofb.remaining()}" }
+                        ofb.get(out, 0, out.size)
+                    }
+                }
+            } finally {
+                runOptions = null
             }
         }
     }
 
     /**
-     * Times every [Accel] on a flat gray [side]x[side] input: session creation must succeed, the first run
-     * is a warm-up, and the second run's milliseconds are reported. Failing providers are skipped.
-     * Blocking (seconds); call off the main thread. Does not touch the active session.
+     * Times CPU and CPU+XNNPACK (plus NNAPI only if [includeNnapi], never for fp16) on a flat gray [side]x[side]
+     * input, one session at a time: creation must succeed, the first run is a warm-up, the second is timed.
+     * Blocking; call off the main thread. Evicts any live session first (single-session rule).
      */
-    fun benchmark(side: Int = 512): Map<Accel, Long> = synchronized(lock) {
+    fun benchmark(side: Int = 384, includeNnapi: Boolean = false): Map<Accel, Long> =
+        guarded(BENCH_TIMEOUT_MS, "benchmark") { locked { benchmarkLocked(side, includeNnapi) } }
+
+    private fun benchmarkLocked(side: Int, includeNnapi: Boolean): Map<Accel, Long> {
         val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
-        val bytes = loadBytes()
+        owner?.closeSession()
+        closeSession()
         val m = spec.sizeMultiple
         val s = max(m, (side + m - 1) / m * m)
         val plane = s * s
@@ -270,45 +355,48 @@ class OnnxLineArtModel(
         for (i in 0 until 3 * plane) fb.put(i, 0.5f)
         val out = FloatArray(plane)
         val results = LinkedHashMap<Accel, Long>()
-        for (a in Accel.values()) {
+        val candidates = when {
+            spec.fp16 -> listOf(Accel.CPU)
+            includeNnapi -> Accel.values().toList()
+            else -> listOf(Accel.CPU, Accel.XNNPACK)
+        }
+        for (a in candidates) {
             try {
-                buildSession(e, bytes, a).use { sess ->
+                MlLog.i("benchmark ${spec.id} $a begin")
+                buildSession(e, a).use { sess ->
                     runInto(e, sess, fb, s, s, out)
                     val t0 = System.nanoTime()
                     runInto(e, sess, fb, s, s, out)
                     val ms = (System.nanoTime() - t0) / 1_000_000
                     results[a] = ms
-                    Log.i(TAG, "benchmark ${spec.id} $a ${s}px: $ms ms")
+                    MlLog.i("benchmark ${spec.id} $a ${s}px: $ms ms")
                 }
             } catch (t: Throwable) {
-                Log.w(TAG, "benchmark $a skipped: ${t.javaClass.simpleName}: ${t.message}")
+                MlLog.w("benchmark $a skipped: ${t.javaClass.simpleName}: ${t.message}")
             }
         }
-        for ((a, ms) in results) prefs.edit().putLong(KEY_BENCH_PREFIX + a.name, ms).apply()
-        results
+        val ed = prefs.edit()
+        for ((a, ms) in results) ed.putLong(KEY_BENCH_PREFIX + a.name, ms)
+        ed.apply()
+        return results
     }
 
-    /** Runs [benchmark], selects (and persists) the fastest provider, returns it (null if none ran). */
-    fun autoSelectAccel(): Accel? {
-        val best = benchmark().minByOrNull { it.value }?.key ?: return null
-        selectAccel(best)
-        return best
+    override fun close() {
+        try {
+            locked(CLOSE_WAIT_MS) {
+                closeSession()
+                inBuf = null
+                // OrtEnvironment is a process-wide singleton; leave it open.
+                env = null
+            }
+        } catch (t: IllegalStateException) {
+            MlLog.w("close skipped: ${t.message}")
+        }
     }
 
-    override fun close() = synchronized(lock) {
-        closeSession()
-        inBuf = null
-        modelBytes = null
-        // OrtEnvironment is a process-wide singleton; leave it open.
-        env = null
-    }
-
-    /**
-     * Bilinear resize of [src] to [tw]x[th] + NCHW split into a reused direct buffer, placed at ([ox],[oy]) of a
-     * [cw]x[ch] canvas. Canvas area outside the content is white (paper).
-     */
-    private fun fillInput(src: IntArray, w: Int, h: Int, tw: Int, th: Int, cw: Int, ch: Int, ox: Int, oy: Int): FloatBuffer {
-        val plane = cw * ch
+    /** Bilinear resize of [src] to [tw]x[th] + NCHW split into a direct buffer (exactly the model input size). */
+    private fun fillInput(src: IntArray, w: Int, h: Int, tw: Int, th: Int): FloatBuffer {
+        val plane = tw * th
         val bytes = 3 * plane * 4
         var bb = inBuf
         if (bb == null || bb.capacity() < bytes) {
@@ -318,10 +406,6 @@ class OnnxLineArtModel(
         bb.clear()
         val fb = bb.asFloatBuffer()
         fb.limit(3 * plane)
-        if (cw != tw || ch != th) {
-            val white = 255f * spec.inputScale + spec.inputOffset
-            for (i in 0 until 3 * plane) fb.put(i, white)
-        }
 
         if (xi0.size < tw) { xi0 = IntArray(tw); xi1 = IntArray(tw); xw = FloatArray(tw) }
         val sx = w.toFloat() / tw
@@ -341,7 +425,7 @@ class OnnxLineArtModel(
             val ay = fy - y0
             val r0 = y0 * w
             val r1 = min(h - 1, y0 + 1) * w
-            val row = (y + oy) * cw + ox
+            val row = y * tw
             for (x in 0 until tw) {
                 val ax = xw[x]
                 val a0 = r0 + xi0[x]; val a1 = r0 + xi1[x]
@@ -368,7 +452,50 @@ class OnnxLineArtModel(
         const val PREFS = "sketcher_ml"
         private const val KEY_ACCEL = "accel"
         private const val KEY_BENCH_PREFIX = "bench_ms_"
-        private const val TAG = "SketcherML"
+        private const val KEY_PREFS_VERSION = "prefs_version"
+        private const val PREFS_VERSION = 2
+
+        /** Inference watchdog (session creation + run). */
+        const val TIMEOUT_MS = 45_000L
+        private const val BENCH_TIMEOUT_MS = 60_000L
+        private const val LOCK_WAIT_MS = 8_000L
+        private const val CLOSE_WAIT_MS = 10_000L
+
+        /** NNAPI (opt-in only) is skipped for inputs larger than this. */
+        const val NNAPI_MAX_PIXELS = 512 * 512
+
+        /** Process-wide: one ORT session at a time, one inference at a time. */
+        private val GLOBAL = ReentrantLock()
+        @Volatile private var owner: OnnxLineArtModel? = null
+        @Volatile private var exec: ExecutorService = newExec()
+
+        private fun newExec(): ExecutorService = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "onnx-infer").apply { isDaemon = true }
+        }
+
+        private fun replaceExecutor(old: ExecutorService) {
+            synchronized(this) {
+                if (exec === old) {
+                    old.shutdownNow()
+                    exec = newExec()
+                }
+            }
+        }
+
+        /**
+         * v2: NNAPI used to be auto-selected by a first-launch benchmark and crashed the system UI on fp16
+         * models. Reset any stored NNAPI/auto choice to XNNPACK and drop old NNAPI timings. Idempotent.
+         */
+        fun migratePrefs(context: Context) {
+            val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            if (p.getInt(KEY_PREFS_VERSION, 0) >= PREFS_VERSION) return
+            val e = p.edit()
+            if (p.getString(KEY_ACCEL, null)?.startsWith("NNAPI") == true) e.putString(KEY_ACCEL, "XNNPACK")
+            val choice = p.getString("accel_choice", null)
+            if (choice == null || choice == "auto" || choice.startsWith("nnapi")) e.putString("accel_choice", "xnnpack")
+            e.remove(KEY_BENCH_PREFIX + "NNAPI_GPU").remove(KEY_BENCH_PREFIX + "NNAPI_NPU").remove("auto_accel_done")
+            e.putInt(KEY_PREFS_VERSION, PREFS_VERSION).apply()
+        }
 
         fun savedAccel(context: Context): Accel? =
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

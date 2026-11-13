@@ -342,8 +342,8 @@ fun EditorScreen(
         // Last child so the dimming overlay covers the canvas and chrome and blocks touches.
         if (vm.generating) {
             GeneratingIndicator(
-                stage = vm.generationStage,
-                fraction = vm.generationProgress,
+                stage = vm.generationStageLabel,
+                fraction = vm.generationDisplayProgress,
             )
         }
     }
@@ -389,6 +389,9 @@ fun EditorScreen(
             activeAccelLabel = vm.activeAccelLabel,
             fallbackReason = vm.fallbackReason,
             onDismiss = { vm.closeMlSettings() },
+            nnapiWarningPending = vm.nnapiWarningPending != null,
+            onConfirmNnapi = { vm.confirmNnapiWarning() },
+            onDismissNnapi = { vm.dismissNnapiWarning() },
         )
     }
 

@@ -51,10 +51,20 @@ class ModelSpecTest {
     @Test fun targetSizeMultiple256RoundsUp() {
         val (tw, th) = ModelSpecs.ANIME.targetSize(1000, 700, 768)
         assertEquals(768, tw)
-        assertEquals(768, th) // 537.6 -> ceil to 768
+        assertEquals(512, th) // 537.6 would round up to 768x768 > maxPixels(512*768): clamped
         val (w2, h2) = ModelSpecs.ANIME.targetSize(1000, 500, 768)
         assertEquals(768, w2)
         assertEquals(512, h2) // 384 -> 512
+    }
+
+    @Test fun maxPixelsCapHolds() {
+        for (spec in ModelSpecs.ALL) for ((w, h) in listOf(1000 to 700, 700 to 1000, 1000 to 1000, 4000 to 3000, 300 to 300)) {
+            for (ls in listOf(512, 768, 1024)) {
+                val (tw, th) = spec.targetSize(w, h, ls)
+                assertTrue("${spec.id} $w x $h ls=$ls -> $tw x $th", tw.toLong() * th <= spec.maxPixels)
+                assertEquals(0, tw % spec.sizeMultiple); assertEquals(0, th % spec.sizeMultiple)
+            }
+        }
     }
 
     @Test(expected = IllegalArgumentException::class)
