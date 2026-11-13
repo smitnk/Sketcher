@@ -6,6 +6,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import com.smitnk.sketcher.model.LayerKind
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.io.IOException
 
 class ProjectCodecTest {
@@ -18,8 +21,9 @@ class ProjectCodecTest {
                     StrokeSnapshot(floatArrayOf(1f, 2f, 3.5f, 4.5f), 0xFF222222.toInt(), 1.8f, 0, 1f),
                     StrokeSnapshot(floatArrayOf(), 0x80FF0000.toInt(), 3f, 3, 0.25f),
                 ),
+                LayerKind.AUTO_SHADING.ordinal,
             ),
-            LayerSnapshot(7L, "Empty", false, 1f, true, false, -1, emptyList()),
+            LayerSnapshot(7L, "Empty", false, 1f, true, false, -1, emptyList(), LayerKind.MANUAL.ordinal),
         ),
         selectedIndex = 1, backgroundVisible = false, backgroundOpacity = 0.4f, animationSeconds = 6.5f,
     )
@@ -39,6 +43,7 @@ class ProjectCodecTest {
             assertEquals(x.visible, y.visible); assertEquals(x.opacity, y.opacity, 0f)
             assertEquals(x.locked, y.locked); assertEquals(x.inAnimation, y.inAnimation)
             assertEquals(x.animPriority, y.animPriority)
+            assertEquals(x.kind, y.kind)
             assertEquals(x.strokes.size, y.strokes.size)
             for (j in x.strokes.indices) {
                 val p = x.strokes[j]; val q = y.strokes[j]
@@ -54,5 +59,45 @@ class ProjectCodecTest {
         val bad = bytes.copyOf(); bad[0] = 'X'.code.toByte()
         try { ProjectCodec.decode(bad); fail() } catch (e: IOException) { assertTrue(true) }
         try { ProjectCodec.decode(bytes.copyOf(bytes.size / 2)); fail() } catch (e: IOException) { assertTrue(true) }
+    }
+
+    /** Hand-built version-1 file (no per-layer kind byte), as written by older app versions. */
+    private fun v1Bytes(w: Int = 100, h: Int = 50, layerNames: List<String> = listOf("Outline", "Colour Fill", "Shading", "My Drawing")): ByteArray {
+        val bos = ByteArrayOutputStream()
+        val o = DataOutputStream(bos)
+        o.write("SKCH".toByteArray()); o.writeInt(1)
+        o.writeInt(w); o.writeInt(h); o.writeInt(0)
+        o.writeBoolean(true); o.writeFloat(1f); o.writeFloat(0f)
+        o.writeInt(layerNames.size)
+        for ((i, n) in layerNames.withIndex()) {
+            o.writeLong(i.toLong()); o.writeUTF(n); o.writeBoolean(true); o.writeFloat(1f)
+            o.writeBoolean(false); o.writeBoolean(true); o.writeInt(-1)
+            o.writeInt(1)
+            o.writeInt(0xFF000000.toInt()); o.writeFloat(2f); o.writeInt(0); o.writeFloat(1f)
+            o.writeInt(4); for (f in floatArrayOf(1f, 2f, 3f, 4f)) o.writeFloat(f)
+        }
+        return bos.toByteArray()
+    }
+
+    @Test fun version1InfersKindFromName() {
+        val s = ProjectCodec.decode(v1Bytes())
+        assertEquals(4, s.layers.size)
+        assertEquals(listOf(LayerKind.AUTO_OUTLINE, LayerKind.AUTO_FILL, LayerKind.AUTO_SHADING, LayerKind.MANUAL).map { it.ordinal }, s.layers.map { it.kind })
+        assertEquals(-1, s.layers[0].animPriority)
+        assertArrayEquals(floatArrayOf(1f, 2f, 3f, 4f), s.layers[3].strokes[0].points, 0f)
+    }
+
+    @Test fun rejectsHugeCountsAndBadSize() {
+        val ok = v1Bytes()
+        // point count of first stroke lives at a fixed offset: header(4+4+12+1+4+4+4)=33, layer: 8+2+7+1+4+1+1+4+4=32, stroke 16 -> n
+        val nOff = 33 + 32 + 16
+        val bad = ok.copyOf()
+        DataOutputStream(object : java.io.OutputStream() {
+            var pos = nOff
+            override fun write(b: Int) { bad[pos++] = b.toByte() }
+        }).writeInt(40_000_000)
+        try { ProjectCodec.decode(bad); fail() } catch (e: IOException) { assertTrue(true) }
+        try { ProjectCodec.decode(v1Bytes(w = 0)); fail() } catch (e: IOException) { assertTrue(true) }
+        try { ProjectCodec.decode(v1Bytes(h = 100_000)); fail() } catch (e: IOException) { assertTrue(true) }
     }
 }

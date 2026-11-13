@@ -39,6 +39,7 @@ import com.smitnk.sketcher.image.pipeline.PipelineSettings
 import com.smitnk.sketcher.image.pipeline.ShadingLevel
 import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.model.Layer
+import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
 import com.smitnk.sketcher.ui.home.RecentProjectUi
 import kotlinx.coroutines.CancellationException
@@ -162,8 +163,11 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        lineArtModel?.close()
+        generateJob?.cancel()
+        // close() waits for a running inference; never block the main thread on it.
+        val m = lineArtModel
         lineArtModel = null
+        if (m != null) Thread({ try { m.close() } catch (e: Throwable) { android.util.Log.w("SketcherModel", "close failed", e) } }, "model-close").start()
         super.onCleared()
     }
 
@@ -208,7 +212,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Adds "Shading (manual)" directly above Outline, selects it, soft grey brush. */
     fun addShadingLayer() {
         val layer = project.newLayer("Shading (manual)")
-        val o = project.layers.indexOfFirst { it.name == "Outline" }
+        val o = project.layers.indexOfFirst { it.kind == LayerKind.AUTO_OUTLINE }
         val at = if (o >= 0) o + 1 else (project.selectedIndex + 1).coerceIn(0, project.layers.size)
         project.layers.add(at, layer)
         project.selectedIndex = at
@@ -316,6 +320,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             h = 31 * h + (if (l.locked) 1 else 0)
             h = 31 * h + (if (l.inAnimation) 1 else 0)
             h = 31 * h + l.animPriority
+            h = 31 * h + l.kind.ordinal
         }
         return h
     }
@@ -429,6 +434,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             if (project.layers.isEmpty()) project.layers.add(project.newLayer("Layer 1"))
             project.background = loaded.source
             sourceBitmap = loaded.source
+            if (loaded.source != null) model().warmUp()
             sourceThumbnail = loaded.source?.let { makeThumbnail(it) }
             if (snap.animationSeconds > 0f) anim.durationSec = snap.animationSeconds
             hasProject = true
@@ -472,13 +478,23 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun loadImage(uri: Uri) {
         viewModelScope.launch {
-            val bmp = withContext(Dispatchers.IO) { ImageLoader.load(app, uri, settings.maxSide) }
+            val bmp = withContext(Dispatchers.IO) {
+                try {
+                    ImageLoader.load(app, uri, settings.maxSide)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) { // incl. OutOfMemoryError
+                    null
+                }
+            }
             if (bmp == null) {
                 toast("Could not open that image")
                 return@launch
             }
+            flushPendingSave()
             resetProject()
             setSource(bmp)
+            model().warmUp()
             styleSheetRequest = true
         }
     }
@@ -486,27 +502,47 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Loads an asset (default assets/demo.png) and generates + animates it like an imported photo. */
     fun runDemo(asset: String = "demo.png") {
         viewModelScope.launch {
-            val bmp = withContext(Dispatchers.IO) { ImageLoader.loadAsset(app, asset, settings.maxSide) }
+            val bmp = withContext(Dispatchers.IO) {
+                try {
+                    ImageLoader.loadAsset(app, asset, settings.maxSide)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    null
+                }
+            }
             if (bmp == null) {
                 toast("Could not open demo image")
                 return@launch
             }
+            flushPendingSave()
             resetProject()
             setSource(bmp)
+            model().warmUp()
             generate()
         }
     }
 
     /** Starts an empty project (no photo, one blank layer). */
     fun newProject() {
-        resetProject()
-        sourceBitmap = null
-        sourceThumbnail = null
-        hasProject = false
-        styleSheetRequest = false
-        project.background = null
-        project.width = 1024
-        project.height = 1024
+        viewModelScope.launch {
+            flushPendingSave()
+            resetProject()
+            sourceBitmap = null
+            sourceThumbnail = null
+            hasProject = false
+            styleSheetRequest = false
+            project.background = null
+            project.width = 1024
+            project.height = 1024
+        }
+    }
+
+    /** Saves unsaved edits of the open project before it is replaced (cancels the debounce first). */
+    private suspend fun flushPendingSave() {
+        debounceJob?.cancel()
+        saveNow()
+        refreshRecent()
     }
 
     /** Called from MainActivity with the launch intent extras. */
@@ -543,6 +579,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         debounceJob?.cancel()
         dirty = false
         projectGen++
+        // Drop any running generation: its result belongs to the project being replaced.
+        generateJob?.cancel()
+        generateJob = null
+        generating = false
+        generationStage = ""
+        generationProgress = 0f
         currentProjectId = null
         projectName = DEFAULT_PROJECT_NAME
         project.layers.clear()
@@ -582,10 +624,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         generating = true
         anim.showFinished()
         val genStart = android.os.SystemClock.elapsedRealtime()
-        viewModelScope.launch {
+        val gen = projectGen
+        generateJob = viewModelScope.launch {
             try {
                 val ps = pipelineSettings
                 val m = model()
+                m.detail = ps.detail
                 generationStage = "Starting"
                 generationProgress = 0f
                 val (drawing, scaledBg) = withContext(Dispatchers.Default) {
@@ -604,6 +648,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     }
                     d to bg
                 }
+                if (gen != projectGen) return@launch // another project was opened meanwhile
                 lastAppliedSettings = ps
                 applyDrawing(drawing, scaledBg)
                 android.util.Log.i(
@@ -627,41 +672,77 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     else "Generation failed: ${t.message}",
                 )
             } finally {
-                generating = false
-                generationStage = ""
-                generationProgress = 0f
+                if (gen == projectGen) {
+                    generating = false
+                    generationStage = ""
+                    generationProgress = 0f
+                }
             }
         }
     }
 
+    private var generateJob: Job? = null
     private var lastAppliedSettings = PipelineSettings()
 
+    /** Stacking order of generated layers, bottom to top. */
+    private fun autoRank(k: LayerKind): Int = when (k) {
+        LayerKind.AUTO_FILL -> 0
+        LayerKind.AUTO_OUTLINE -> 1
+        LayerKind.AUTO_SHADING -> 2
+        LayerKind.MANUAL -> 3
+    }
+
+    /**
+     * Replaces only the auto-generated layers (kind AUTO_*) in place, keeping their position, visibility, name
+     * and opacity. Manual layers and their order are untouched. Newly needed auto layers go below the manual ones.
+     */
     private fun applyDrawing(drawing: GeneratedDrawing, scaledBackground: Bitmap?) {
         project.width = drawing.width
         project.height = drawing.height
         if (scaledBackground != null) project.background = scaledBackground
-        val outline = project.newLayer("Outline")
-        outline.strokes.addAll(drawing.outline)
-        val mine = project.newLayer("My Drawing")
         val ps = lastAppliedSettings
-        val stack = ArrayList<Layer>()
-        if (ps.colourFill) {
-            // Bottom -> top: Colour Fill, Outline, (Shading), My Drawing. Outline is animated first.
-            val fill = project.newLayer("Colour Fill")
-            fill.strokes.addAll(drawing.fill)
-            outline.animPriority = -1
-            stack.add(fill)
+        val previousSelected = project.selectedLayer
+        val result = project.layers.toMutableList()
+
+        // kind -> (default name, strokes or null when this run does not produce that kind), bottom to top.
+        val wanted = listOf(
+            Triple(LayerKind.AUTO_FILL, "Colour Fill", if (ps.colourFill) drawing.fill else null),
+            Triple(LayerKind.AUTO_OUTLINE, "Outline", drawing.outline),
+            Triple(LayerKind.AUTO_SHADING, "Shading", if (ps.shading != ShadingLevel.NONE) drawing.shading else null),
+        )
+        for ((kind, name, strokes) in wanted) {
+            val existing = result.filter { it.kind == kind }
+            if (strokes == null) {
+                result.removeAll(existing) // no longer produced by the current settings
+                continue
+            }
+            result.removeAll(existing.drop(1)) // duplicates
+            val layer = existing.firstOrNull() ?: project.newLayer(name).also {
+                it.kind = kind
+                val below = result.indexOfLast { l -> l.kind != LayerKind.MANUAL && autoRank(l.kind) < autoRank(kind) }
+                result.add(below + 1, it)
+            }
+            layer.strokes.clear()
+            layer.strokes.addAll(strokes)
+            layer.animPriority = if (kind == LayerKind.AUTO_OUTLINE && ps.colourFill) -1 else 0
         }
-        stack.add(outline)
-        if (ps.shading != ShadingLevel.NONE) {
-            val shading = project.newLayer("Shading")
-            shading.strokes.addAll(drawing.shading)
-            stack.add(shading)
+        if (result.none { it.kind == LayerKind.MANUAL }) {
+            result.add(project.newLayer("My Drawing"))
         }
-        stack.add(mine)
-        project.layers.clear()
-        project.layers.addAll(stack)
-        project.selectedIndex = stack.lastIndex
+        val manual = result.filter { it.kind == LayerKind.MANUAL }
+        val first = manual.singleOrNull()
+        if (first != null && first.strokes.isEmpty() && first.name == "Layer 1") first.name = "My Drawing"
+
+        if (result != project.layers.toList()) {
+            project.layers.clear()
+            project.layers.addAll(result)
+        }
+        val sel = if (previousSelected != null && previousSelected.kind == LayerKind.MANUAL && previousSelected in result) {
+            previousSelected
+        } else {
+            manual.last()
+        }
+        project.selectedIndex = result.indexOf(sel).coerceAtLeast(0)
         project.backgroundVisible = false
         clearHistory()
         val extra = if (ps.colourFill) "${drawing.fill.size} fill" else "${drawing.shading.size} shading"
@@ -863,6 +944,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 it.visible = src.visible
                 it.opacity = src.opacity
                 it.inAnimation = src.inAnimation
+                it.animPriority = src.animPriority
+                it.locked = src.locked
+                it.kind = src.kind
                 it.strokes.addAll(src.strokes.toList())
             }
         }
@@ -996,7 +1080,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Exports all visible layers as PNG, then the Outline layer alone as transparent PNG. */
     fun autoExport() {
-        val outline = project.layers.firstOrNull { it.name == "Outline" }
+        val outline = project.layers.firstOrNull { it.kind == LayerKind.AUTO_OUTLINE }
         export(1, ExportFormat.PNG, false, false)
         if (outline != null) {
             val layers = snapshotLayers(outline)

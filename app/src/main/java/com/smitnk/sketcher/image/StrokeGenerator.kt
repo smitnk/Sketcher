@@ -32,7 +32,7 @@ data class Stroke(
     val alpha: Float = 1f,
 ) {
     /** Total polyline length, computed once. */
-    val length: Float by lazy(LazyThreadSafetyMode.NONE) {
+    val length: Float by lazy(LazyThreadSafetyMode.PUBLICATION) {
         var total = 0f
         var i = 2
         while (i < points.size) {

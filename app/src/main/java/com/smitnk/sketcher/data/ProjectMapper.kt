@@ -2,6 +2,7 @@ package com.smitnk.sketcher.data
 
 import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.Stroke
+import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
 
 /** Capture [this] into a Compose-free snapshot. Call on the main thread (reads snapshot state). */
@@ -17,6 +18,7 @@ fun Project.toSnapshot(animationSeconds: Float = 0f): ProjectSnapshot = ProjectS
             locked = l.locked,
             inAnimation = l.inAnimation,
             animPriority = l.animPriority,
+            kind = l.kind.ordinal,
             // Stroke.points arrays are never mutated after creation, so sharing is safe.
             strokes = l.strokes.map { StrokeSnapshot(it.points, it.color, it.width, it.brush.ordinal, it.alpha) },
         )
@@ -45,6 +47,7 @@ fun Project.applySnapshot(s: ProjectSnapshot) {
         layer.locked = ls.locked
         layer.inAnimation = ls.inAnimation
         layer.animPriority = ls.animPriority
+        layer.kind = LayerKind.values().getOrElse(ls.kind) { LayerKind.MANUAL }
         for (st in ls.strokes) {
             layer.strokes.add(
                 Stroke(st.points, st.color, st.width, brushes.getOrElse(st.brush) { BrushType.PEN }, st.alpha),

@@ -7,10 +7,14 @@ import android.graphics.Canvas
 import android.graphics.Color
 import com.smitnk.sketcher.export.Renderer
 import com.smitnk.sketcher.model.Layer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -18,6 +22,8 @@ import kotlin.math.roundToInt
 data class ProjectMeta(val id: String, val name: String, val updatedAt: Long, val thumbPath: String?)
 
 class LoadedProject(val snapshot: ProjectSnapshot, val source: Bitmap?)
+
+private const val MAX_SOURCE_SIDE = 2048
 
 class ProjectRepository(context: Context) {
     private val root = File(context.applicationContext.filesDir, "projects")
@@ -36,16 +42,33 @@ class ProjectRepository(context: Context) {
             val d = dir(pid)
             d.mkdirs()
             writeAtomic(File(d, "project.skch"), ProjectCodec.encode(snapshot))
-            File(d, "name.txt").writeText(name)
+            writeAtomic(File(d, "name.txt"), name.toByteArray(Charsets.UTF_8))
             val src = File(d, "source.jpg")
             if (source != null && !source.isRecycled) {
-                FileOutputStream(src).use { source.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                // Re-encode the photo only when it is a different bitmap than the one last written (or the file is gone).
+                val unchanged = synchronized(this@ProjectRepository) {
+                    lastSourceId == pid && lastSource === source
+                } && src.exists()
+                if (!unchanged) {
+                    val tmp = File(d, "source.jpg.tmp")
+                    FileOutputStream(tmp).use {
+                        source.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                        it.fd.sync()
+                    }
+                    moveReplace(tmp, src)
+                    synchronized(this@ProjectRepository) { lastSourceId = pid; lastSource = source }
+                }
             } else {
                 src.delete()
+                synchronized(this@ProjectRepository) { if (lastSourceId == pid) lastSource = null }
             }
             writeThumb(d, snapshot, source)
             pid
         }
+
+    // Identity of the source bitmap last written to disk (and for which project), so autosaves skip the JPEG encode.
+    private var lastSource: Bitmap? = null
+    private var lastSourceId: String? = null
 
     suspend fun load(id: String): LoadedProject? = withContext(Dispatchers.IO) {
         if (!safeId(id)) return@withContext null
@@ -54,18 +77,32 @@ class ProjectRepository(context: Context) {
         if (!f.exists()) return@withContext null
         val snap = try {
             ProjectCodec.decode(f.readBytes())
-        } catch (e: Exception) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) { // includes OutOfMemoryError from a corrupt file
+            android.util.Log.w("SketcherLoad", "cannot read project $id", t)
             return@withContext null
         }
         val src = File(d, "source.jpg")
-        val bmp = if (src.exists()) {
-            BitmapFactory.decodeFile(src.absolutePath)?.let {
-                if (it.isMutable) it else it.copy(Bitmap.Config.ARGB_8888, true)
-            }
-        } else {
-            null
-        }
+        val bmp = if (src.exists()) decodeSource(src) else null
         LoadedProject(snap, bmp)
+    }
+
+    /** Decodes the photo, subsampling so the long side stays <= [MAX_SOURCE_SIDE]; null on failure or OOM. */
+    private fun decodeSource(src: File): Bitmap? = try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(src.absolutePath, bounds)
+        var sample = 1
+        while (max(bounds.outWidth, bounds.outHeight) / sample > MAX_SOURCE_SIDE) sample *= 2
+        BitmapFactory.decodeFile(
+            src.absolutePath,
+            BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.ARGB_8888 },
+        )
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        android.util.Log.w("SketcherLoad", "cannot decode source photo", t)
+        null
     }
 
     /** Newest first. */
@@ -87,16 +124,22 @@ class ProjectRepository(context: Context) {
 
     suspend fun rename(id: String, newName: String): Boolean = withContext(Dispatchers.IO) {
         if (!safeId(id) || !File(dir(id), "project.skch").exists()) return@withContext false
-        File(dir(id), "name.txt").writeText(newName)
+        writeAtomic(File(dir(id), "name.txt"), newName.toByteArray(Charsets.UTF_8))
         true
     }
 
     private fun writeAtomic(target: File, bytes: ByteArray) {
         val tmp = File(target.parentFile, target.name + ".tmp")
         FileOutputStream(tmp).use { it.write(bytes); it.fd.sync() }
-        if (!tmp.renameTo(target)) {
-            target.delete()
-            tmp.renameTo(target)
+        moveReplace(tmp, target)
+    }
+
+    /** Atomic rename over [target]; never deletes the old file first. */
+    private fun moveReplace(tmp: File, target: File) {
+        try {
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        } catch (e: AtomicMoveNotSupportedException) {
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
@@ -132,7 +175,7 @@ class ProjectRepository(context: Context) {
             Renderer.drawLayers(c, s.width, s.height, layers)
             FileOutputStream(File(d, "thumb.png")).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bmp.recycle()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // thumbnail is best-effort
         }
     }
