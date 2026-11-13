@@ -17,14 +17,15 @@ object CartoonLineExtractor {
     // ------------------------------------------------------------------ public API
 
     /**
-     * 0..1 likelihood that the image is a flat-colour cartoon with ink outlines (>= 0.6 = cartoon).
+     * 0..1 likelihood that the image is a flat-colour cartoon with ink outlines (AUTO treats >= 0.75 as cartoon).
      * Measured on the subject only (the flat background connected to the border is excluded, so a 3D
      * render or photo on a flat backdrop does not look like a cartoon) and requires dark ink lines
      * along a meaningful share of the subject's strong edges (renders use shading, not ink).
      */
-    fun cartoonScore(argb: IntArray, w: Int, h: Int): Float {
+    fun cartoonScore(argb: IntArray, w: Int, h: Int, subject: SubjectCrop.Result? = null): Float {
         if (w < 8 || h < 8) return 0f
-        val sub = SubjectCrop.detect(argb, w, h, 0.02f)
+        // [subject] lets the pipeline share its crop (only the margin differs; background pixels are masked out)
+        val sub = subject ?: SubjectCrop.detect(argb, w, h, 0.02f)
         val f = features(argb, w, h, sub)
         val conc = ramp(f[0], 0.45f, 0.85f)     // dominant-colour concentration
         val flat = ramp(f[1], 0.55f, 0.90f)     // flat-pixel fraction
@@ -37,8 +38,9 @@ object CartoonLineExtractor {
             // clear backdrop: outlines must really enclose the shapes (shaded renders have few)
             score *= ramp(f[4], 0.20f, 0.45f)
         }
-        // subject-only features run lower than whole-frame ones: stretch so >= 0.6 stays the cartoon cut
-        return (score / 0.65f).coerceIn(0f, 1f)
+        // subject-only features run lower than whole-frame ones: stretch so JPEG'd real cartoons (raw ~0.45) clear the
+        // AUTO cut (0.75) while 3D renders/photos (raw <= ~0.25-0.35) stay clearly below it
+        return (score / 0.55f).coerceIn(0f, 1f)
     }
 
     /** Clean ink map, 0 = paper, 1 = ink. [detail] 0..1 lowers thresholds and adds region boundaries. */

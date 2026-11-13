@@ -55,8 +55,9 @@ object SubjectCrop {
 
     /**
      * Inner rectangle [x0,y0,x1,y1] after stripping near-uniform dark/light bars from each side, or null.
-     * A line counts as bar when >= 60% of its pixels are near the bar colour (median of the outermost line),
-     * so status-bar glyphs and round buttons do not break the bar.
+     * A dark line counts as bar when >= 60% of its pixels are near the bar colour (median of the outermost line),
+     * so status-bar glyphs and round buttons do not break the bar; light (white) bars need >= 99.5% and are only
+     * taken continuously from the border, so a white backdrop around a narrow figure is never letterbox.
      */
     internal fun letterbox(argb: IntArray, w: Int, h: Int): IntArray? {
         fun px(x: Int, y: Int) = argb[y * w + x]
@@ -71,11 +72,14 @@ object SubjectCrop {
         // returns number of bar lines scanned from the edge
         fun scan(lines: Int, len: Int, at: (Int, Int) -> Int): Int {
             val c = barColor(len) { at(0, it) } ?: return 0
+            // White studio backdrops must never read as bars: light bars need near-total uniformity, dark bars 60%.
+            val light = ((c shr 16) and 255) > 200 && ((c shr 8) and 255) > 200 && (c and 255) > 200
+            val need = if (light) 0.995f else 0.60f
             var n = 0
             while (n < lines) {
                 var ok = 0
                 for (i in 0 until len) if (near(c, at(n, i))) ok++
-                if (ok < 0.60f * len) break
+                if (ok < need * len) break
                 n++
             }
             return n

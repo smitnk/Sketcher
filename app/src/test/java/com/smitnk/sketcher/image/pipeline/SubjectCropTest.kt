@@ -56,6 +56,45 @@ class SubjectCropTest {
         assertTrue(r.bgMask!![30 * w + 40])      // button is background now
     }
 
+    /** Narrow shaded figure (head circle + body + legs) on a pure-white studio backdrop, 516x1024 like beard.png. */
+    private fun whiteBackdropFigure(): Triple<IntArray, Int, Int> {
+        val fw = 516; val fh = 1024
+        val px = IntArray(fw * fh) { rgb(255, 255, 255) }
+        fun shade(x: Int, y: Int, base: Int) = rgb((base + (x % 40)).coerceAtMost(235), (base + (y % 30)).coerceAtMost(235), base + 10)
+        for (y in 0 until fh) for (x in 0 until fw) {
+            val head = (x - 258) * (x - 258) + (y - 150) * (y - 150) < 70 * 70
+            val body = x in 200..316 && y in 220..700
+            val legs = (x in 205..250 || x in 266..311) && y in 700..1000
+            if (head) px[y * fw + x] = rgb(230, 190, 170)
+            else if (body || legs) px[y * fw + x] = shade(x, y, 70)
+        }
+        return Triple(px, fw, fh)
+    }
+
+    @Test fun whiteBackdropIsNotLetterbox() {
+        val (px, fw, fh) = whiteBackdropFigure()
+        assertEquals(null, SubjectCrop.letterbox(px, fw, fh))
+        val r = SubjectCrop.detect(px, fw, fh)
+        assertTrue("head inside crop, y0=${r.y0}", r.y0 <= 80)
+        assertTrue("feet inside crop, y1=${r.y1}", r.y1 >= 1000)
+        assertTrue("sides inside crop", r.x0 <= 200 && r.x1 >= 316)
+        assertTrue(r.hasBackground)
+    }
+
+    @Test fun trueWhiteLetterboxStillStrippedWhenPerfectlyUniform() {
+        val px = IntArray(w * h) { rgb(255, 255, 255) }
+        val inner = render()
+        for (y in 0 until 400) for (x in 0 until w) px[(100 + y) * w + x] = inner[(y + 100) * w + x]
+        val lb = SubjectCrop.letterbox(px, w, h)
+        assertNotNull(lb)
+        assertEquals(100, lb!![1]); assertEquals(500, lb[3])
+    }
+
+    @Test fun elfOnGreyKeepsWholeFigure() {
+        val r = SubjectCrop.detect(render(), w, h)
+        assertTrue(r.y0 <= 120 && r.y1 >= 480 && r.x0 <= 100 && r.x1 >= 220)
+    }
+
     @Test fun noisyPhotoReturnsFullFrame() {
         val rnd = Random(5)
         val px = IntArray(w * h) { rgb(rnd.nextInt(256), rnd.nextInt(256), rnd.nextInt(256)) }

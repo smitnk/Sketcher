@@ -17,8 +17,19 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
-/** Execution provider preference. NNAPI_* differ only in flags: ORT cannot pick the NNAPI device. */
-enum class Accel { CPU, XNNPACK, NNAPI_GPU, NNAPI_NPU }
+/**
+ * Execution provider preference. NNAPI_* differ only in flags: ORT cannot pick the NNAPI device (Android decides
+ * between GPU, NPU/DSP and its own CPU reference), so the UI presents both as one "NNAPI accelerator" option.
+ */
+enum class Accel(val label: String) {
+    CPU("CPU"),
+    XNNPACK("CPU + XNNPACK"),
+    NNAPI_GPU(NNAPI_LABEL),
+    NNAPI_NPU(NNAPI_LABEL),
+}
+
+/** Honest name for the NNAPI provider: which hardware actually runs it is up to the phone's driver. */
+const val NNAPI_LABEL = "NNAPI accelerator (GPU/NPU)"
 
 /**
  * ONNX Runtime line-art model driven by a [ModelSpec] (normalisation, output polarity, size multiple).
@@ -64,6 +75,10 @@ class OnnxLineArtModel(
 
     /** Wall time of the last successful [infer] in ms (pre + run + post); null until one ran. */
     @Volatile var lastInferenceMs: Long? = null
+        private set
+
+    /** Pure session.run time of the last successful [infer] in ms (what the accelerator actually did). */
+    @Volatile var lastRunMs: Long? = null
         private set
 
     @Volatile private var warming = false
@@ -218,6 +233,7 @@ class OnnxLineArtModel(
         val res = if (tw == w && th == h) out else upsample(out, tw, th, w, h)
         val totalMs = (System.nanoTime() - tStart) / 1_000_000
         lastInferenceMs = totalMs
+        lastRunMs = (tRun - tPre) / 1_000_000
         Log.i(
             TAG,
             "infer ${spec.id} ${w}x$h -> ${tw}x$th (canvas ${cw}x$ch) accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +

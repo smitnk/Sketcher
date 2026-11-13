@@ -21,6 +21,21 @@ object SketchPipeline {
     /** Line source actually used by the most recent [run] (after AUTO resolution and fallbacks). */
     @Volatile var lastLineSource: String = ""
 
+    /**
+     * Wall-clock ms per stage of the most recent [run]: preFilter, model, vectorize, coverage, shading, total
+     * (stages that did not run are absent). For the processing sheet.
+     */
+    @Volatile var lastTimings: Map<String, Long> = emptyMap()
+
+    /** Accumulates stage times; inline so call sites stay allocation-free. */
+    internal class Timer {
+        val ms = LinkedHashMap<String, Long>()
+        inline fun <T> time(name: String, f: () -> T): T {
+            val t0 = System.nanoTime()
+            try { return f() } finally { ms[name] = (ms[name] ?: 0L) + (System.nanoTime() - t0) / 1_000_000 }
+        }
+    }
+
     /** Last model/extractor failure that caused a fallback (null if the last run had none). */
     @Volatile var lastError: Throwable? = null
 
@@ -33,19 +48,23 @@ object SketchPipeline {
         progress: (stage: String, fraction: Float) -> Unit = { _, _ -> },
     ): GeneratedDrawing = withContext(Dispatchers.Default) {
         lastError = null
+        val tm = Timer()
+        val tTotal = System.nanoTime()
         val ctx = currentCoroutineContext()
         fun check() = ctx.ensureActive()
 
         progress("Preparing image", 0.02f)
-        val (px, pw, ph) = downscale(argb, w, h, settings.workingSize)
+        val (px, pw, ph) = tm.time("prep") { downscale(argb, w, h, settings.workingSize) }
         check()
 
+        // subject rectangle (flat backdrop / letterbox bars excluded); full frame for ordinary photos
+        val sub = tm.time("crop") { SubjectCrop.detect(px, pw, ph) }
         // choose line source
         var source = settings.lineSource
         if (source == LineSource.AUTO) {
             progress("Analysing image", 0.06f)
             source = when {
-                CartoonLineExtractor.cartoonScore(px, pw, ph) >= 0.6f -> LineSource.CARTOON
+                tm.time("analyse") { CartoonLineExtractor.cartoonScore(px, pw, ph, sub) } >= AUTO_CARTOON_CUT -> LineSource.CARTOON
                 model != null -> LineSource.AI
                 else -> LineSource.CLASSIC
             }
@@ -57,16 +76,15 @@ object SketchPipeline {
         val lineWidth = settings.lineWidth // LineArtVectorizer scales width by image size itself
         var ink: FloatArray? = null
         var outline: List<Stroke>? = null
-        // subject rectangle (flat backdrop / letterbox bars excluded); full frame for ordinary photos
-        val sub = SubjectCrop.detect(px, pw, ph)
         val bgMask = if (settings.ignoreBackground) sub.bgMask else null
         var aiStrokes: List<Stroke>? = null
-        if (source == LineSource.AI) {
+        fun runAi() {
             progress("Running AI line-art model", 0.10f)
             try {
-                val r = runModelOnSubject(argb, w, h, pw, ph, sub, bgMask, settings, model!!)
+                val r = runModelOnSubject(argb, w, h, pw, ph, sub, bgMask, settings, model!!, tm)
                 ink = r.first
                 aiStrokes = r.second
+                source = LineSource.AI
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
@@ -77,13 +95,20 @@ object SketchPipeline {
             }
             check()
         }
-        lastLineSource = source.name
+        if (source == LineSource.AI) runAi()
         if (source == LineSource.CARTOON) {
             progress("Extracting cartoon lines", 0.10f)
-            ink = CartoonLineExtractor.inkMap(px, pw, ph, settings.detail)
-            if (bgMask != null) for (i in ink.indices) if (bgMask[i]) ink[i] = 0f
+            val cm = tm.time("cartoonInk") { CartoonLineExtractor.inkMap(px, pw, ph, settings.detail) }
+            if (bgMask != null) for (i in cm.indices) if (bgMask[i]) cm[i] = 0f
             check()
+            // AUTO guard: a render/photo that scored as cartoon but yields almost no strong ink is not inked art.
+            if (settings.lineSource == LineSource.AUTO && model != null && !hasStrongInk(cm, pw, ph, sub, bgMask)) {
+                runAi()
+            } else {
+                ink = cm
+            }
         }
+        lastLineSource = source.name
 
         if (source == LineSource.CLASSIC) {
             progress("Tracing outline", 0.35f)
@@ -92,12 +117,12 @@ object SketchPipeline {
                 includeShading = false,
                 maxSide = max(pw, ph),
             )
-            outline = StrokeGenerator.generateBlocking(px, pw, ph, gs).outline
+            outline = tm.time("vectorize") { StrokeGenerator.generateBlocking(px, pw, ph, gs).outline }
         } else if (aiStrokes != null) {
-            outline = aiStrokes
+            outline = aiStrokes!!
         } else {
             progress("Vectorising lines", 0.40f)
-            outline = LineArtVectorizer.vectorize(ink!!, pw, ph, settings.detail, lineWidth, settings.maxStrokes)
+            outline = tm.time("vectorize") { LineArtVectorizer.vectorize(ink!!, pw, ph, settings.detail, lineWidth, settings.maxStrokes) }
         }
         // never keep junk in the backdrop or a frame drawn around the image edge
         outline = dropBackgroundStrokes(outline, pw, ph, bgMask)
@@ -106,7 +131,7 @@ object SketchPipeline {
         var shading: List<Stroke> = emptyList()
         if (settings.shading != ShadingLevel.NONE) {
             progress("Shading", 0.60f)
-            shading = ShadingGenerator.generate(px, pw, ph, settings, ink, cartoon = source == LineSource.CARTOON)
+            shading = tm.time("shading") { ShadingGenerator.generate(px, pw, ph, settings, ink, cartoon = source == LineSource.CARTOON) }
             check()
         }
 
@@ -130,15 +155,18 @@ object SketchPipeline {
         val usesInk = (source == LineSource.AI || source == LineSource.CARTOON) && ink != null
         if (settings.outlineStyle == OutlineStyle.PENCIL_REVEAL && usesInk && !(settings.colourFill && source != LineSource.CARTOON)) {
             progress("Pencil texture", 0.95f)
-            val vis = inkVisibility(ink!!, pw, ph, sub, bgMask)
+            val vis = inkVisibility(ink!!, pw, ph, sub, bgMask, normalised = source == LineSource.AI)
             val r = revealRadius(settings.lineWidth, pw, ph)
-            outline = outline + InkCoverage.coverageStrokes(vis, pw, ph, outline, r, COVER_THRESHOLD, settings.lineWidth)
+            val base = outline
+            outline = base + tm.time("coverage") { InkCoverage.coverageStrokes(vis, pw, ph, base, r, COVER_THRESHOLD, settings.lineWidth) }
             inkArgb = visibilityToArgb(vis)
             revealWidth = 2f * r
             check()
         }
 
         progress("Done", 1f)
+        tm.ms["total"] = (System.nanoTime() - tTotal) / 1_000_000
+        lastTimings = LinkedHashMap(tm.ms)
         GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth)
     }
 
@@ -153,7 +181,9 @@ object SketchPipeline {
      * Full-image ink (0..1) -> visible ink alpha: paper noise removed, background zeroed, and a thin margin along
      * the subject crop's edge cleared (the model draws a frame line there; the vectoriser drops it as well).
      */
-    internal fun inkVisibility(ink: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, bgMask: BooleanArray?): FloatArray {
+    internal fun inkVisibility(
+        ink: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, bgMask: BooleanArray?, normalised: Boolean = false,
+    ): FloatArray {
         val out = FloatArray(pw * ph)
         val m = max(3, (0.004f * max(sub.x1 - sub.x0, sub.y1 - sub.y0)).roundToInt())
         val x0 = sub.x0 + m; val x1 = min(pw, sub.x1) - m
@@ -162,7 +192,8 @@ object SketchPipeline {
             for (x in max(0, x0) until x1) {
                 val i = y * pw + x
                 if (bgMask != null && bgMask[i]) continue
-                out[i] = ((ink[i] - INK_LO) / (INK_HI - INK_LO)).coerceIn(0f, 1f)
+                // AI ink is already percentile-normalised + gamma'd (see normaliseInk); cartoon ink is 0/0.5..1 as is
+                out[i] = if (normalised) ink[i].coerceIn(0f, 1f) else ((ink[i] - INK_LO) / (INK_HI - INK_LO)).coerceIn(0f, 1f)
             }
         }
         return out
@@ -170,6 +201,52 @@ object SketchPipeline {
 
     private const val INK_LO = 0.06f
     private const val INK_HI = 0.95f
+
+    /** AUTO: cartoon score at/above which the cartoon extractor is used (3D renders and photos score below). */
+    internal const val AUTO_CARTOON_CUT = 0.75f
+
+    /** Fraction of subject pixels that must carry strong ink (> 0.5) for the cartoon extractor to be trusted. */
+    internal const val MIN_STRONG_INK = 0.004f
+
+    internal fun hasStrongInk(ink: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, bgMask: BooleanArray?): Boolean {
+        var strong = 0; var area = 0
+        for (y in max(0, sub.y0) until min(ph, sub.y1)) for (x in max(0, sub.x0) until min(pw, sub.x1)) {
+            val i = y * pw + x
+            if (bgMask != null && bgMask[i]) continue
+            area++
+            if (ink[i] > 0.5f) strong++
+        }
+        return area > 0 && strong >= MIN_STRONG_INK * area
+    }
+
+    private const val NORM_LO = 0.04f
+    private const val NORM_GAMMA = 0.7f
+
+    /**
+     * Normalises AI ink in place by the 99.5th percentile of [ink] (the subject: pixels with [valid] true, or all
+     * when null) so thin / light models (anime, informative) read as clearly as heavy ones, then applies gamma.
+     * hi is clamped to [0.35, 0.95]: the gain never exceeds ~3.2x on faint models and never dims strong ones, and
+     * a noise floor that scales with hi stops coarse/informative models' grey wash from turning muddy.
+     */
+    internal fun normaliseInk(ink: FloatArray, valid: BooleanArray? = null) {
+        val bins = IntArray(1001)
+        var n = 0
+        for (i in ink.indices) {
+            if (valid != null && !valid[i]) continue
+            bins[(ink[i].coerceIn(0f, 1f) * 1000f).toInt()]++; n++
+        }
+        if (n == 0) return
+        val target = (n * 0.005f).toInt()
+        var acc = 0; var b = 1000
+        while (b > 0) { acc += bins[b]; if (acc > target) break; b-- }
+        val hi = (b / 1000f).coerceIn(0.35f, 0.95f)
+        val lo = max(NORM_LO, 0.10f * hi)
+        val inv = 1f / (hi - lo)
+        for (i in ink.indices) {
+            val v = ((ink[i] - lo) * inv).coerceIn(0f, 1f)
+            ink[i] = if (v <= 0f) 0f else Math.pow(v.toDouble(), NORM_GAMMA.toDouble()).toFloat()
+        }
+    }
 
     /** Ink-black ARGB with alpha = visibility. */
     internal fun visibilityToArgb(vis: FloatArray): IntArray =
@@ -186,7 +263,7 @@ object SketchPipeline {
      */
     private fun runModelOnSubject(
         argb: IntArray, w: Int, h: Int, pw: Int, ph: Int,
-        sub: SubjectCrop.Result, bgMask: BooleanArray?, settings: PipelineSettings, model: LineArtModel,
+        sub: SubjectCrop.Result, bgMask: BooleanArray?, settings: PipelineSettings, model: LineArtModel, tm: Timer,
     ): Pair<FloatArray, List<Stroke>> {
         val fx = w.toFloat() / pw; val fy = h.toFloat() / ph
         val ox0 = (sub.x0 * fx).roundToInt().coerceIn(0, w - 8)
@@ -199,21 +276,29 @@ object SketchPipeline {
         val target = min(modelSide(settings.detail), 2 * max(cw, ch))
         val (mpx, mw, mh) = resample(crop, cw, ch, target)
         // fur/grass -> smooth tone so the model draws contours, not every hair (high detail = less smoothing)
-        val modelIn = PreFilter.smoothTextures(mpx, mw, mh, 1f - 0.8f * settings.detail.coerceIn(0f, 1f))
-        val ink = model.infer(modelIn, mw, mh)
+        // Renders/characters on a clean studio backdrop have no noisy texture; smoothing would erase
+        // glasses, eyes and beard detail, so only pre-filter real photos (no detected backdrop).
+        val preStrength = if (sub.hasBackground) 0f else 1f - 0.8f * settings.detail.coerceIn(0f, 1f)
+        val modelIn = if (preStrength <= 0f) mpx
+            else tm.time("preFilter") { PreFilter.smoothTextures(mpx, mw, mh, preStrength) }
+        val ink = tm.time("model") { model.infer(modelIn, mw, mh) }
         // crop (model space) -> working-image coordinates
         val cropPw = (sub.x1 - sub.x0).toFloat(); val cropPh = (sub.y1 - sub.y0).toFloat()
         val sx = cropPw / mw; val sy = cropPh / mh
+        var valid: BooleanArray? = null
         if (bgMask != null) {
+            valid = BooleanArray(mw * mh) { true }
             for (y in 0 until mh) {
                 val py = min(ph - 1, sub.y0 + (y * sy).toInt())
                 for (x in 0 until mw) {
                     val pxx = min(pw - 1, sub.x0 + (x * sx).toInt())
-                    if (bgMask[py * pw + pxx]) ink[y * mw + x] = 0f
+                    if (bgMask[py * pw + pxx]) { ink[y * mw + x] = 0f; valid[y * mw + x] = false }
                 }
             }
         }
-        var strokes = LineArtVectorizer.vectorize(ink, mw, mh, (settings.detail + 0.2f).coerceAtMost(1f), settings.lineWidth, settings.maxStrokes)
+        // percentile-normalise inside the subject (bg already zeroed) before vectorising and for the pencil texture
+        normaliseInk(ink, valid)
+        var strokes = tm.time("vectorize") { LineArtVectorizer.vectorize(ink, mw, mh, (settings.detail + 0.2f).coerceAtMost(1f), settings.lineWidth, settings.maxStrokes) }
         strokes = dropBorderStrokes(strokes, mw, mh)
         val ws = (sx + sy) * 0.5f
         val mapped = strokes.map { st ->

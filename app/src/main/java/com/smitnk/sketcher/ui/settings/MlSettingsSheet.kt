@@ -37,10 +37,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.smitnk.sketcher.image.pipeline.NNAPI_LABEL
+import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 
 /**
- * "Processing" sheet: choose where the AI line model runs (Auto / CPU / XNNPACK / GPU / NPU) and
+ * "Processing" sheet: choose where the AI line model runs (Auto / CPU / XNNPACK / NNAPI accelerator) and
  * optionally benchmark each option on this phone.
  *
  * @param accelOptions (id, label) pairs, e.g. "auto" to "Auto (fastest)".
@@ -58,11 +60,18 @@ fun MlSettingsSheet(
     activeAccelLabel: String?,
     fallbackReason: String?,
     onDismiss: () -> Unit,
+    /** Per-stage ms of the last drawing (SketchPipeline.lastTimings); "total" is the whole run. */
+    stageTimings: Map<String, Long> = SketchPipeline.lastTimings,
 ) {
+    // One honest NNAPI entry (GPU vs NPU cannot be chosen from ORT); CPU and CPU+XNNPACK stay as is.
+    val options = collapseNnapi(accelOptions)
+    val selected = if (selectedAccel.startsWith("nnapi")) NNAPI_ID else selectedAccel
+    val results = collapseNnapiResults(benchmarkResults)
+    val activeLabel = activeAccelLabel?.let { if (it.contains("NNAPI")) NNAPI_LABEL else it }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scheme = MaterialTheme.colorScheme
-    val maxMs = benchmarkResults.values.filterNotNull().maxOrNull()?.coerceAtLeast(1L) ?: 1L
-    val bestMs = benchmarkResults.values.filterNotNull().minOrNull()
+    val maxMs = results.values.filterNotNull().maxOrNull()?.coerceAtLeast(1L) ?: 1L
+    val bestMs = results.values.filterNotNull().minOrNull()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -86,21 +95,21 @@ fun MlSettingsSheet(
             )
 
             Column(Modifier.selectableGroup()) {
-                for ((id, label) in accelOptions) {
-                    val ms = if (benchmarkResults.containsKey(id)) benchmarkResults[id] else null
-                    val ran = benchmarkResults.containsKey(id)
+                for ((id, label) in options) {
+                    val ms = if (results.containsKey(id)) results[id] else null
+                    val ran = results.containsKey(id)
                     Column(
                         Modifier
                             .fillMaxWidth()
                             .heightIn(min = SketcherTokens.minTouchTarget)
                             .selectable(
-                                selected = id == selectedAccel,
+                                selected = id == selected,
                                 role = Role.RadioButton,
                                 onClick = { onSelectAccel(id) },
                             ),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = id == selectedAccel, onClick = null)
+                            RadioButton(selected = id == selected, onClick = null)
                             Spacer(Modifier.width(SketcherTokens.space12))
                             Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                             if (ran) {
@@ -150,14 +159,26 @@ fun MlSettingsSheet(
                 }
             }
 
-            if (activeAccelLabel != null || lastInferenceMs != null) {
+            val totalMs = stageTimings["total"]
+            if (activeLabel != null || lastInferenceMs != null || totalMs != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space2)) {
-                    if (activeAccelLabel != null) {
-                        Text("Running on: $activeAccelLabel", style = MaterialTheme.typography.bodyMedium)
+                    if (activeLabel != null) {
+                        Text("Running on: $activeLabel", style = MaterialTheme.typography.bodyMedium)
                     }
-                    if (lastInferenceMs != null) {
+                    if (lastInferenceMs != null || totalMs != null) {
                         Text(
-                            "Last drawing: $lastInferenceMs ms",
+                            listOfNotNull(
+                                lastInferenceMs?.let { "AI model $it ms" },
+                                totalMs?.let { "whole drawing $it ms" },
+                            ).joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                        )
+                    }
+                    val rest = stageTimings.filterKeys { it != "total" && it != "model" }.filterValues { it > 0 }
+                    if (rest.isNotEmpty()) {
+                        Text(
+                            rest.entries.joinToString("  ") { (k, v) -> "$k $v ms" },
                             style = MaterialTheme.typography.bodySmall,
                             color = scheme.onSurfaceVariant,
                         )
@@ -172,11 +193,33 @@ fun MlSettingsSheet(
                 )
             }
             Text(
-                "GPU and NPU may fall back to CPU if your phone doesn't support them. Auto picks the fastest option that works.",
+                "NNAPI lets Android choose the GPU, NPU or CPU for you, and may fall back to CPU if your phone doesn't support it, so it can run at the same speed as CPU. Auto picks the fastest option that works.",
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(SketcherTokens.space16))
         }
     }
+}
+
+private const val NNAPI_ID = "nnapi_gpu"
+
+/** Merges the two NNAPI flag variants into a single "NNAPI accelerator (GPU/NPU)" option. */
+internal fun collapseNnapi(options: List<Pair<String, String>>): List<Pair<String, String>> {
+    val out = ArrayList<Pair<String, String>>()
+    for ((id, label) in options) {
+        if (id.startsWith("nnapi")) { if (out.none { it.first == NNAPI_ID }) out.add(NNAPI_ID to NNAPI_LABEL) } else out.add(id to label)
+    }
+    return out
+}
+
+/** NNAPI benchmark = the faster of its two variants (null if neither ran successfully, still "ran" if present). */
+internal fun collapseNnapiResults(r: Map<String, Long?>): Map<String, Long?> {
+    val out = LinkedHashMap<String, Long?>()
+    var nn: Long? = null; var seen = false
+    for ((k, v) in r) {
+        if (k.startsWith("nnapi")) { seen = true; if (v != null && (nn == null || v < nn)) nn = v } else out[k] = v
+    }
+    if (seen) out[NNAPI_ID] = nn
+    return out
 }
