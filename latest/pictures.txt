@@ -1,0 +1,18 @@
++ adb shell ls -lR /sdcard/Movies
+/sdcard/Movies:
+total 8
+drwxrws--- 2 u0_a142 media_rw 4096 2026-11-13 13:26 Sketcher
+
+/sdcard/Movies/Sketcher:
+total 1228
+-rwxrwx--- 1 u0_a142 media_rw 1246877 2026-11-13 13:26 Sketcher_animation_20261113_132615.mp4
++ adb shell ls -lR /sdcard/Pictures
+/sdcard/Pictures:
+total 8
+drwxrws--- 2 u0_a142 media_rw 4096 2026-11-13 13:26 Sketcher
+
+/sdcard/Pictures/Sketcher:
+total 844
+-rwxrwx--- 1 u0_a142 media_rw  19694 2026-11-13 13:25 Sketcher_Outline_20261113_132555.png
+-rwxrwx--- 1 u0_a142 media_rw 800694 2026-11-13 13:26 Sketcher_animation_20261113_132639.gif
+-rwxrwx--- 1 u0_a142 media_rw  27492 2026-11-13 13:25 Sketcher_drawing_20261113_132554.png

@@ -24,24 +24,9 @@ INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
 INSTRUMENTATION_STATUS: current=2
 INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
 INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stack=androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
-	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
-	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
-	at com.smitnk.sketcher.EditorFlowTest.awaitGeneration(EditorFlowTest.kt:32)
-	at com.smitnk.sketcher.EditorFlowTest.openEditorWithDemo(EditorFlowTest.kt:41)
-	at com.smitnk.sketcher.EditorFlowTest.outlinePlusShadingCreatesShadingLayer(EditorFlowTest.kt:83)
-
-INSTRUMENTATION_STATUS: stream=
-Error in outlinePlusShadingCreatesShadingLayer(com.smitnk.sketcher.EditorFlowTest):
-androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
-	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
-	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
-	at com.smitnk.sketcher.EditorFlowTest.awaitGeneration(EditorFlowTest.kt:32)
-	at com.smitnk.sketcher.EditorFlowTest.openEditorWithDemo(EditorFlowTest.kt:41)
-	at com.smitnk.sketcher.EditorFlowTest.outlinePlusShadingCreatesShadingLayer(EditorFlowTest.kt:83)
-
+INSTRUMENTATION_STATUS: stream=.
 INSTRUMENTATION_STATUS: test=outlinePlusShadingCreatesShadingLayer
-INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
 INSTRUMENTATION_STATUS: current=3
 INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
@@ -86,18 +71,9 @@ INSTRUMENTATION_STATUS: test=homeShowsActionsAndDemoOpensEditor
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 223.148
-There was 1 failure:
-1) outlinePlusShadingCreatesShadingLayer(com.smitnk.sketcher.EditorFlowTest)
-androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 60000 ms
-	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:441)
-	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
-	at com.smitnk.sketcher.EditorFlowTest.awaitGeneration(EditorFlowTest.kt:32)
-	at com.smitnk.sketcher.EditorFlowTest.openEditorWithDemo(EditorFlowTest.kt:41)
-	at com.smitnk.sketcher.EditorFlowTest.outlinePlusShadingCreatesShadingLayer(EditorFlowTest.kt:83)
+Time: 159.621
 
-FAILURES!!!
-Tests run: 5,  Failures: 1
+OK (5 tests)
 
 
 INSTRUMENTATION_CODE: -1

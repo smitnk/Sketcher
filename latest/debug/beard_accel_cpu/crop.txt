@@ -2,7 +2,7 @@ crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=AI
 model=informative
 accelActive=CPU fallback=null
-inferenceMs=1409 (wrapped=1821) genMs=3588
+inferenceMs=1578 (wrapped=1828) genMs=3558
 ink: min=0.0 mean=0.035977750273920944 max=0.8708098 (300x768)
 strokes: outline=362 shading=0 fill=0
 inkW=516 inkH=1024 drawing=516x1024 revealWidth=11.0

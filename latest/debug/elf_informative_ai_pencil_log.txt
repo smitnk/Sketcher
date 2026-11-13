@@ -1,4 +1,4 @@
 --------- beginning of main
-11-13 13:05:52.566  9417  9417 I SketcherGen: GEN_DONE ms=6526 outline=535 shading=0 fill=0 size=734x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-13 13:05:54.715  9417  9441 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/elf_informative_ai_pencil
-11-13 13:06:04.825  9417  9417 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-13 13:20:54.072  8229  8229 I SketcherGen: GEN_DONE ms=5517 outline=535 shading=0 fill=0 size=734x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-13 13:20:55.924  8229  8253 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/elf_informative_ai_pencil
+11-13 13:21:06.375  8229  8229 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
