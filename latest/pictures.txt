@@ -1,1 +1,6 @@
 /sdcard/Pictures:
+Sketcher
+
+/sdcard/Pictures/Sketcher:
+Sketcher_Outline_20261113_061013.png
+Sketcher_drawing_20261113_061013.png

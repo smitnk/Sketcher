@@ -1,37 +1,47 @@
-11-13 06:03:52.279   518   945 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity} from uid 2000
-11-13 06:03:52.319   759   817 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f09000a task=11 suggestType=3
-11-13 06:03:52.370   518   563 I ActivityManager: Start proc 1873:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
-11-13 06:03:53.283  1477  1477 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.smitnk.sketcher. Reason: package android.intent.action.PACKAGE_ADDED
-11-13 06:03:53.284   746   746 D MediaPlayerList: Name of package changed: com.smitnk.sketcher
-11-13 06:03:53.299   518   585 E AppHibernationService: Package com.smitnk.sketcher is not installed for user 0
-11-13 06:03:53.299   518   585 E AppHibernationService: Package com.smitnk.sketcher is not installed for any user
-11-13 06:03:53.460  1873  1873 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
-11-13 06:03:55.199   518   551 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s910ms
-11-13 06:03:55.401   946   946 D ImsResolver: maybeAddedImsService, packageName: com.smitnk.sketcher
-11-13 06:03:55.966   518  2292 W InputManager-JNI: Input channel object '739ab70 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
-11-13 06:03:58.944   518   548 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.packageinstaller/com.android.packageinstaller.PackageInstalledReceiver
-11-13 06:03:58.944   518   562 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
-11-13 06:03:58.944   518   562 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
-11-13 06:03:58.944   518   562 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
-11-13 06:03:58.944   518   562 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.googlequicksearchbox/com.google.android.apps.gsa.googlequicksearchbox.GelStubAppWatcher
-11-13 06:03:58.960   518  1906 I ActivityManager: Force stopping com.smitnk.sketcher appid=10145 user=0: from pid 2812
-11-13 06:03:58.963   518  1906 I ActivityManager: Killing 1873:com.smitnk.sketcher/u0a145 (adj 0): stop com.smitnk.sketcher due to from pid 2812
-11-13 06:03:58.974   518  1906 W ActivityTaskManager: Force removing ActivityRecord{164c23c u0 com.smitnk.sketcher/.MainActivity t11 f}}: app died, no saved state
-11-13 06:03:59.129   518  1906 W InputManager-JNI: Input channel object '72b2376 com.smitnk.sketcher/com.smitnk.sketcher.MainActivity (client)' was disposed without first being removed with the input manager!
-11-13 06:03:59.300   518   809 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
-11-13 06:03:59.330   759   817 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f09000a task=13 suggestType=3
-11-13 06:03:59.422   518  1556 V ActivityManager: Got obituary of 1873:com.smitnk.sketcher
-11-13 06:03:59.461   518   563 I ActivityManager: Start proc 2851:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
-11-13 06:04:00.229  1042  2439 W GCM     : Unexpected forwarded intent: Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 pkg=com.google.android.gms cmp=com.google.android.gms/.chimera.PersistentIntentOperationService (has extras) }
-11-13 06:04:00.230  1042  2437 I FontLog : Package com.smitnk.sketcher has no metadata [CONTEXT service_id=132 ]
-11-13 06:04:00.444  1042  2437 W GCM     : Unexpected forwarded intent: Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 pkg=com.google.android.gms cmp=com.google.android.gms/.chimera.PersistentIntentOperationService (has extras) }
-11-13 06:04:00.547  2851  2851 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
-11-13 06:04:00.879   518   554 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{2c0dfa1 u0 com.smitnk.sketcher/.MainActivity t13}
-11-13 06:04:00.884   518   554 W ActivityTaskManager: Activity pause timeout for ActivityRecord{2c0dfa1 u0 com.smitnk.sketcher/.MainActivity t13}
-11-13 06:04:03.018   518   551 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +3s683ms
-11-13 06:04:03.366   518   736 W InputManager-JNI: Input channel object '3c62852 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
-11-13 06:04:07.056  2851  3419 D ProfileInstaller: Installing profile for com.smitnk.sketcher
-11-13 06:04:12.536  3812  3834 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
-11-13 06:04:24.255   518  2292 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
-11-13 06:04:29.566  5510  5532 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
-11-13 06:04:49.549   518  1961 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 06:09:11.857   523  2050 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity} from uid 2000
+11-13 06:09:11.903  1487  1487 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.smitnk.sketcher. Reason: package android.intent.action.PACKAGE_ADDED
+11-13 06:09:11.966   751   751 D MediaPlayerList: Name of package changed: com.smitnk.sketcher
+11-13 06:09:12.077   764   815 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f09000a task=12 suggestType=3
+11-13 06:09:12.210  1509  1509 I GsaVoiceInteractionSrv: O received Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) }
+11-13 06:09:12.482   523   565 I ActivityManager: Start proc 2334:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-13 06:09:14.343  2334  2334 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-13 06:09:15.200   958   958 D ImsResolver: maybeAddedImsService, packageName: com.smitnk.sketcher
+11-13 06:09:17.067   523   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +5s199ms
+11-13 06:09:17.696   523  1719 W InputManager-JNI: Input channel object 'fbf35bf Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-13 06:09:19.003   523  1733 I ActivityManager: Force stopping com.smitnk.sketcher appid=10145 user=0: from pid 2792
+11-13 06:09:19.019   523  1733 I ActivityManager: Killing 2334:com.smitnk.sketcher/u0a145 (adj 0): stop com.smitnk.sketcher due to from pid 2792
+11-13 06:09:19.021   523  1733 W ActivityTaskManager: Force removing ActivityRecord{517b799 u0 com.smitnk.sketcher/.MainActivity t12 f}}: app died, no saved state
+11-13 06:09:19.104   523  1733 W InputManager-JNI: Input channel object 'ef10c2a com.smitnk.sketcher/com.smitnk.sketcher.MainActivity (client)' was disposed without first being removed with the input manager!
+11-13 06:09:19.175   523  2054 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 06:09:19.181   764   815 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f09000a task=13 suggestType=3
+11-13 06:09:19.223   523   889 V ActivityManager: Got obituary of 2334:com.smitnk.sketcher
+11-13 06:09:19.314   523   565 I ActivityManager: Start proc 2815:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-13 06:09:20.418  2815  2815 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-13 06:09:22.088   523   556 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{7cd4951 u0 com.smitnk.sketcher/.MainActivity t13}
+11-13 06:09:22.088   523   556 W ActivityTaskManager: Activity pause timeout for ActivityRecord{7cd4951 u0 com.smitnk.sketcher/.MainActivity t13}
+11-13 06:09:22.735  1057  2901 W GCM     : Unexpected forwarded intent: Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 pkg=com.google.android.gms cmp=com.google.android.gms/.chimera.PersistentIntentOperationService (has extras) }
+11-13 06:09:22.739  1057  2802 W GCM     : Unexpected forwarded intent: Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 pkg=com.google.android.gms cmp=com.google.android.gms/.chimera.PersistentIntentOperationService (has extras) }
+11-13 06:09:22.753  1057  2433 I FontLog : Package com.smitnk.sketcher has no metadata [CONTEXT service_id=132 ]
+11-13 06:09:22.886   523   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +3s670ms
+11-13 06:09:23.501   523   550 W InputManager-JNI: Input channel object '151f353 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-13 06:09:25.093   523  1079 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.packageinstaller/com.android.packageinstaller.PackageInstalledReceiver
+11-13 06:09:25.097   523   564 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+11-13 06:09:25.097   523   564 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+11-13 06:09:25.097   523   564 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+11-13 06:09:25.097   523   564 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.smitnk.sketcher flg=0x4000010 (has extras) } to com.google.android.googlequicksearchbox/com.google.android.apps.gsa.googlequicksearchbox.GelStubAppWatcher
+11-13 06:09:25.727  2815  3087 D ProfileInstaller: Installing profile for com.smitnk.sketcher
+11-13 06:09:29.829   523  2041 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@5b669e0
+11-13 06:09:45.793   523  1965 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 06:09:52.056   523  1733 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@1f74ce9
+11-13 06:10:04.319  5128  5156 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-13 06:10:06.190  5316  5330 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-13 06:10:11.428   523  1991 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 06:10:13.556  1487  3320 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/.pending-1795155013-Sketcher_Outline_20261113_061013.png. Uid: 10145
+11-13 06:10:13.738  1487  1504 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/.pending-1795155013-Sketcher_drawing_20261113_061013.png. Uid: 10145
+11-13 06:10:13.949  1487  1504 D MediaProvider: Moving /storage/emulated/0/Pictures/Sketcher/.pending-1795155013-Sketcher_Outline_20261113_061013.png to /storage/emulated/0/Pictures/Sketcher/Sketcher_Outline_20261113_061013.png
+11-13 06:10:14.235  1487  1504 D MediaProvider: Moving /storage/emulated/0/Pictures/Sketcher/.pending-1795155013-Sketcher_drawing_20261113_061013.png to /storage/emulated/0/Pictures/Sketcher/Sketcher_drawing_20261113_061013.png
+11-13 06:10:17.360   523   822 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@4e48724
+11-13 06:10:21.653   523  1977 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@1fc8d18
+11-13 06:10:25.522   523  2051 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@7a34ecc
+11-13 06:10:26.237  1487  1508 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_Outline_20261113_061013.png. Uid: 10118
+11-13 06:10:26.249  1487  1504 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_drawing_20261113_061013.png. Uid: 10118
