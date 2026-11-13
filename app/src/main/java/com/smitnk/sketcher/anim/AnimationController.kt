@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import com.smitnk.sketcher.model.Layer
 
 /**
- * Reveals strokes progressively, layer by layer in list order (index 0 first).
+ * Reveals strokes progressively, layer by layer in animPriority order, then list order (index 0 first).
  * Progress is distributed over total stroke length, so long strokes take longer to draw.
  * The frame loop lives in the UI (withFrameNanos) and calls [advance].
  */
@@ -64,7 +64,7 @@ class AnimationController {
         for (l in layers) if (l.visible && l.inAnimation) total += l.totalLength()
         var budget = progress * total
         val map = HashMap<Long, Float>()
-        for (l in layers) {
+        for (l in layers.sortedBy { it.animPriority }) { // stable: ties keep list order
             if (!l.visible || !l.inAnimation) continue
             val len = l.totalLength()
             map[l.id] = budget.coerceIn(0f, len)

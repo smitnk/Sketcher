@@ -19,7 +19,13 @@ adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez showlayers true
 sleep 25; shot 06_layers
 adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez autoexport true
 sleep 25; shot 07_export
-adb shell ls -R /sdcard/Pictures > $OUT/pictures.txt 2>&1
+adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez autovideo true
+sleep 70; shot 08_video_export
+mkdir -p $OUT/files
+adb pull /sdcard/Pictures/Sketcher $OUT/files/pictures >/dev/null 2>&1
+adb pull /sdcard/Movies/Sketcher $OUT/files/movies >/dev/null 2>&1
+adb shell ls -lR /sdcard/Movies >> $OUT/pictures.txt 2>&1
+adb shell ls -lR /sdcard/Pictures > $OUT/pictures.txt 2>&1
 adb shell pidof $PKG > $OUT/pid.txt 2>&1
 adb logcat -d -b crash > $OUT/crash.txt 2>&1
 adb logcat -d | grep -iE "sketcher|AndroidRuntime|FATAL" | tail -n 400 > $OUT/logcat.txt

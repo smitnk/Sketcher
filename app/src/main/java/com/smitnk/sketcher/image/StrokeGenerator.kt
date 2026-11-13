@@ -36,6 +36,8 @@ data class GeneratedDrawing(
     val height: Int,
     val outline: List<Stroke>,
     val shading: List<Stroke>,
+    /** Colour fill strokes (only in colour mode). */
+    val fill: List<Stroke> = emptyList(),
 )
 
 data class GeneratorSettings(
@@ -54,6 +56,12 @@ data class GeneratorSettings(
     val hatchAngle: Float = 45f,
     /** Max distance (pixels) over which broken outline pieces are bridged; < 0 derives it from [detail]. */
     val gapClose: Float = -1f,
+    /** Colour support (see ColorStrokeGenerator). */
+    val mode: DrawMode = DrawMode.OUTLINE_SHADING,
+    /** Number of colours for fill quantisation (6..16). */
+    val fillColors: Int = 10,
+    /** Distance between fill scribble lines in pixels. */
+    val fillSpacing: Float = 5f,
 )
 
 object StrokeGenerator {

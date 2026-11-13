@@ -12,8 +12,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.smitnk.sketcher.anim.AnimationController
+import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
 import com.smitnk.sketcher.export.Exporter
+import com.smitnk.sketcher.export.GifExporter
+import com.smitnk.sketcher.export.VideoExporter
+import com.smitnk.sketcher.image.ColorStrokeGenerator
+import com.smitnk.sketcher.image.DrawMode
 import com.smitnk.sketcher.image.GeneratedDrawing
 import com.smitnk.sketcher.image.GeneratorSettings
 import com.smitnk.sketcher.image.ImageLoader
@@ -23,6 +28,8 @@ import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.Project
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -93,6 +100,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         private set
     var pendingShowLayers by mutableStateOf(false)
     var pendingAutoExport by mutableStateOf(false)
+    private var pendingAutoVideo = false
+
+    /** Non-null while an MP4/GIF export runs (shown in a progress dialog). */
+    var exportLabel by mutableStateOf<String?>(null)
+        private set
+    var exportProgress by mutableFloatStateOf(0f)
+        private set
+    private var exportJob: Job? = null
 
     private var sourceBitmap: Bitmap? = null
     private val undoStack = ArrayList<EditAction>()
@@ -138,7 +153,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Called from MainActivity with the launch intent extras. */
-    fun handleIntentFlags(autodemo: Boolean, showLayers: Boolean, autoExport: Boolean) {
+    fun handleIntentFlags(autodemo: Boolean, showLayers: Boolean, autoExport: Boolean, autoVideo: Boolean = false) {
+        if (autoVideo) pendingAutoVideo = true
         if (showLayers) pendingShowLayers = true
         if (autoExport) pendingAutoExport = true
         if (autodemo) runDemo()
@@ -178,7 +194,17 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = StrokeGenerator.generate(pixels, w, h, settings)
+                    val st = settings.copy(includeShading = settings.mode == DrawMode.OUTLINE_SHADING)
+                    var d = StrokeGenerator.generate(pixels, w, h, st)
+                    if (st.mode == DrawMode.COLOUR_FILL) {
+                        val fill = ColorStrokeGenerator.generateFill(
+                            pixels, w, h, d.width, d.height, st.fillColors.coerceIn(6, 16), st.fillSpacing,
+                        )
+                        d = d.copy(
+                            outline = ColorStrokeGenerator.colorizeOutline(d.outline, pixels, w, h, d.width, d.height),
+                            fill = fill,
+                        )
+                    }
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {
@@ -188,6 +214,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
                 applyDrawing(drawing, scaledBg)
                 generationCount++
+                if (pendingAutoVideo) {
+                    pendingAutoVideo = false
+                    autoVideo()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
@@ -207,15 +237,31 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (scaledBackground != null) project.background = scaledBackground
         val outline = project.newLayer("Outline")
         outline.strokes.addAll(drawing.outline)
-        val shading = project.newLayer("Shading")
-        shading.strokes.addAll(drawing.shading)
         val mine = project.newLayer("My Drawing")
+        val stack = ArrayList<Layer>()
+        if (settings.mode == DrawMode.COLOUR_FILL) {
+            // Bottom -> top: Colour Fill, Outline, My Drawing. Outline is animated first.
+            val fill = project.newLayer("Colour Fill")
+            fill.strokes.addAll(drawing.fill)
+            outline.animPriority = -1
+            stack.add(fill)
+            stack.add(outline)
+        } else {
+            stack.add(outline)
+            if (drawing.shading.isNotEmpty() || settings.mode == DrawMode.OUTLINE_SHADING) {
+                val shading = project.newLayer("Shading")
+                shading.strokes.addAll(drawing.shading)
+                stack.add(shading)
+            }
+        }
+        stack.add(mine)
         project.layers.clear()
-        project.layers.addAll(listOf(outline, shading, mine))
-        project.selectedIndex = 2
+        project.layers.addAll(stack)
+        project.selectedIndex = stack.lastIndex
         project.backgroundVisible = false
         clearHistory()
-        toast("${drawing.outline.size} outline + ${drawing.shading.size} shading strokes")
+        val extra = if (settings.mode == DrawMode.COLOUR_FILL) "${drawing.fill.size} fill" else "${drawing.shading.size} shading"
+        toast("${drawing.outline.size} outline + $extra strokes")
         anim.restart()
     }
 
@@ -406,6 +452,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             Layer(src.id, src.name).also {
                 it.visible = src.visible
                 it.opacity = src.opacity
+                it.inAnimation = src.inAnimation
                 it.strokes.addAll(src.strokes.toList())
             }
         }
@@ -448,6 +495,60 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         export(1, ExportFormat.PNG, false, false)
         if (outline != null) {
             exportSnapshot(snapshotLayers(outline), project.width, project.height, 1, ExportFormat.PNG, true, true, "Outline")
+        }
+    }
+
+    /** Exports the draw-along animation as MP4 or GIF on a background thread, with progress + cancel. */
+    fun exportAnimation(kind: AnimExportKind) = startAnimationExport(listOf(kind))
+
+    /** For CI: after generation, exports both MP4 and GIF. */
+    fun autoVideo() = startAnimationExport(listOf(AnimExportKind.VIDEO, AnimExportKind.GIF))
+
+    fun cancelExport() {
+        exportJob?.cancel()
+    }
+
+    private fun startAnimationExport(kinds: List<AnimExportKind>) {
+        if (exportJob?.isActive == true) return
+        if (project.layers.all { it.strokes.isEmpty() }) {
+            toast("Nothing to export yet")
+            return
+        }
+        val layers = snapshotLayers(null)
+        val w = project.width
+        val h = project.height
+        val duration = anim.durationSec
+        exportProgress = 0f
+        exportLabel = "Preparing..."
+        exportJob = viewModelScope.launch {
+            try {
+                val saved = withContext(Dispatchers.Default) {
+                    val results = ArrayList<String>()
+                    for ((i, kind) in kinds.withIndex()) {
+                        exportLabel = if (kind == AnimExportKind.VIDEO) "Exporting MP4 video..." else "Exporting GIF..."
+                        val onProgress = { p: Float ->
+                            val overall = (i + p) / kinds.size
+                            if (overall - exportProgress >= 0.005f || overall >= 1f) exportProgress = overall
+                        }
+                        val check = { ensureActive() }
+                        val where = if (kind == AnimExportKind.VIDEO) {
+                            VideoExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
+                        } else {
+                            GifExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
+                        }
+                        if (where != null) results.add(where)
+                    }
+                    results
+                }
+                toast(if (saved.isNotEmpty()) "Saved: " + saved.joinToString(", ") else "Export failed")
+            } catch (e: CancellationException) {
+                toast("Export cancelled")
+                throw e
+            } catch (t: Throwable) {
+                toast("Export failed: ${t.message}")
+            } finally {
+                exportLabel = null
+            }
         }
     }
 

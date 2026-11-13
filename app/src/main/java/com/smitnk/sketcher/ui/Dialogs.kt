@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -26,7 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.image.DrawMode
 import com.smitnk.sketcher.image.GeneratorSettings
 import kotlin.math.roundToInt
 
@@ -40,7 +44,9 @@ fun SettingsDialog(
     onApply: (GeneratorSettings) -> Unit,
 ) {
     var detail by remember { mutableFloatStateOf(current.detail) }
-    var shading by remember { mutableStateOf(current.includeShading) }
+    var mode by remember { mutableStateOf(current.mode) }
+    var fillColors by remember { mutableFloatStateOf(current.fillColors.toFloat().coerceIn(6f, 16f)) }
+    var fillSpacing by remember { mutableFloatStateOf(current.fillSpacing.coerceIn(3f, 10f)) }
     var density by remember {
         mutableFloatStateOf(((MAX_SPACING - current.hatchSpacing) / (MAX_SPACING - MIN_SPACING)).coerceIn(0f, 1f))
     }
@@ -53,11 +59,19 @@ fun SettingsDialog(
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text("Detail (more edges)")
                 Slider(value = detail, onValueChange = { detail = it })
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Shading layer", modifier = Modifier.weight(1f))
-                    Switch(checked = shading, onCheckedChange = { shading = it })
+                Text("Mode")
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (m in DrawMode.values()) {
+                        FilterChip(selected = mode == m, onClick = { mode = m }, label = { Text(m.label) })
+                    }
                 }
-                if (shading) {
+                if (mode == DrawMode.COLOUR_FILL) {
+                    Text("Fill colours: ${fillColors.roundToInt()}")
+                    Slider(value = fillColors, onValueChange = { fillColors = it }, valueRange = 6f..16f, steps = 9)
+                    Text("Fill stroke spacing: ${"%.1f".format(fillSpacing)} px")
+                    Slider(value = fillSpacing, onValueChange = { fillSpacing = it }, valueRange = 3f..10f)
+                }
+                if (mode == DrawMode.OUTLINE_SHADING) {
                     Text("Shading density")
                     Slider(value = density, onValueChange = { density = it })
                     Text("Shading levels: ${levels.roundToInt()}")
@@ -70,7 +84,10 @@ fun SettingsDialog(
                 onApply(
                     current.copy(
                         detail = detail,
-                        includeShading = shading,
+                        mode = mode,
+                        includeShading = mode == DrawMode.OUTLINE_SHADING,
+                        fillColors = fillColors.roundToInt().coerceIn(6, 16),
+                        fillSpacing = fillSpacing,
                         hatchSpacing = MAX_SPACING - (MAX_SPACING - MIN_SPACING) * density,
                         shadingLevels = levels.roundToInt().coerceIn(1, 4),
                     ),
@@ -81,12 +98,16 @@ fun SettingsDialog(
     )
 }
 
+private enum class ExportMode { IMAGE, VIDEO, GIF }
+
 @Composable
 fun ExportDialog(
     selectedLayerName: String,
     onDismiss: () -> Unit,
     onExport: (scale: Int, format: ExportFormat, transparent: Boolean, layerOnly: Boolean) -> Unit,
+    onExportAnimation: (AnimExportKind) -> Unit,
 ) {
+    var mode by remember { mutableStateOf(ExportMode.IMAGE) }
     var scale by remember { mutableIntStateOf(1) }
     var format by remember { mutableStateOf(ExportFormat.PNG) }
     var transparent by remember { mutableStateOf(false) }
@@ -96,41 +117,86 @@ fun ExportDialog(
         title = { Text("Export") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Resolution")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = scale == 1, onClick = { scale = 1 }, label = { Text("x1") })
-                    FilterChip(selected = scale == 2, onClick = { scale = 2 }, label = { Text("x2") })
-                }
-                Text("Format")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        selected = format == ExportFormat.PNG,
-                        onClick = { format = ExportFormat.PNG },
-                        label = { Text("PNG") },
+                        selected = mode == ExportMode.IMAGE,
+                        onClick = { mode = ExportMode.IMAGE },
+                        label = { Text("Image (PNG/JPEG)") },
                     )
                     FilterChip(
-                        selected = format == ExportFormat.JPEG,
-                        onClick = { format = ExportFormat.JPEG },
-                        label = { Text("JPEG (white)") },
+                        selected = mode == ExportMode.VIDEO,
+                        onClick = { mode = ExportMode.VIDEO },
+                        label = { Text("Video MP4") },
+                    )
+                    FilterChip(
+                        selected = mode == ExportMode.GIF,
+                        onClick = { mode = ExportMode.GIF },
+                        label = { Text("GIF") },
                     )
                 }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Transparent background (PNG)", modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = transparent && format == ExportFormat.PNG,
-                        onCheckedChange = { transparent = it },
-                        enabled = format == ExportFormat.PNG,
-                    )
+                if (mode == ExportMode.VIDEO) {
+                    Text("Draw-along animation as an MP4 video (30 fps, up to 1080 px, white background). Saved to Movies/Sketcher.")
+                } else if (mode == ExportMode.GIF) {
+                    Text("Draw-along animation as a looping GIF (12 fps, up to 540 px). Saved to Pictures/Sketcher.")
+                } else {
+                    Text("Resolution")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(selected = scale == 1, onClick = { scale = 1 }, label = { Text("x1") })
+                        FilterChip(selected = scale == 2, onClick = { scale = 2 }, label = { Text("x2") })
+                    }
+                    Text("Format")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = format == ExportFormat.PNG,
+                            onClick = { format = ExportFormat.PNG },
+                            label = { Text("PNG") },
+                        )
+                        FilterChip(
+                            selected = format == ExportFormat.JPEG,
+                            onClick = { format = ExportFormat.JPEG },
+                            label = { Text("JPEG (white)") },
+                        )
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Transparent background (PNG)", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = transparent && format == ExportFormat.PNG,
+                            onCheckedChange = { transparent = it },
+                            enabled = format == ExportFormat.PNG,
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { onExport(scale, ExportFormat.PNG, true, true) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Export only \"$selectedLayerName\" (transparent PNG)") }
                 }
-                OutlinedButton(
-                    onClick = { onExport(scale, ExportFormat.PNG, true, true) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Export only \"$selectedLayerName\" (transparent PNG)") }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onExport(scale, format, transparent, false) }) { Text("Export") }
+            TextButton(onClick = {
+                when (mode) {
+                    ExportMode.IMAGE -> onExport(scale, format, transparent, false)
+                    ExportMode.VIDEO -> onExportAnimation(AnimExportKind.VIDEO)
+                    ExportMode.GIF -> onExportAnimation(AnimExportKind.GIF)
+                }
+            }) { Text("Export") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/** Shown while an MP4/GIF export runs; [progress] is 0..1. */
+@Composable
+fun ExportProgressDialog(label: String, progress: Float, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(label) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                Text("${(progress.coerceIn(0f, 1f) * 100f).roundToInt()}%")
+            }
+        },
+        confirmButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }

@@ -19,6 +19,9 @@ class Layer(val id: Long, name: String) {
     /** Whether this layer takes part in the draw-along animation. */
     var inAnimation by mutableStateOf(true)
 
+    /** Animation order: lower plays first; ties keep list (bottom-to-top) order. */
+    var animPriority by mutableIntStateOf(0)
+
     fun totalLength(): Float {
         var total = 0f
         for (s in strokes) total += s.length

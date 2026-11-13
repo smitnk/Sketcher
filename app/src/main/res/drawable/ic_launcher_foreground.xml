@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: a pencil drawing a curvy line.
+     Artwork stays inside the 66dp centre safe zone (21..87 of 108). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Pencil silhouette: sharpened tip, body and eraser end -->
+    <path
+        android:fillColor="#2B2118"
+        android:pathData="M34,74 L37.89,63.75 L64.76,36.88 L69.00,32.64 L75.36,39.00 L71.12,43.24 L44.25,70.11 Z" />
+
+    <!-- Curvy ink line left behind by the pencil tip -->
+    <path
+        android:strokeColor="#2B2118"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M22,82 C28,88 30,76 34,74" />
+</vector>

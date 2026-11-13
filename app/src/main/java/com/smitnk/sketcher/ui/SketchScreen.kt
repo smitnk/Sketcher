@@ -206,7 +206,23 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
                     run()
                 }
             },
+            onExportAnimation = { kind ->
+                showExport = false
+                val run = { vm.exportAnimation(kind) }
+                val needsPerm = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                    context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                if (needsPerm) {
+                    pendingExport = run
+                    permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                } else {
+                    run()
+                }
+            },
         )
+    }
+
+    vm.exportLabel?.let { label ->
+        ExportProgressDialog(label, vm.exportProgress, onCancel = { vm.cancelExport() })
     }
 }
 

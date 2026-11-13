@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
             autodemo = intent.getBooleanExtra("autodemo", false),
             showLayers = intent.getBooleanExtra("showlayers", false),
             autoExport = intent.getBooleanExtra("autoexport", false),
+            autoVideo = intent.getBooleanExtra("autovideo", false),
         )
     }
 }
