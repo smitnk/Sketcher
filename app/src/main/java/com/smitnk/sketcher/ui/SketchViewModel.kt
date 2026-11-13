@@ -867,7 +867,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         engine: String? = null,
         shading: String? = null,
         testImage: String? = null,
+        model: String? = null,
+        accel: String? = null,
+        outline: String? = null,
+        label: String? = null,
     ) {
+        if (label != null) DebugDump.runLabel = label
         if (autoVideo) pendingAutoVideo = true
         if (showLayers) pendingShowLayers = true
         if (autoExport) pendingAutoExport = true
@@ -877,13 +882,41 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             "color" -> settings = settings.copy(mode = DrawMode.COLOUR_FILL)
         }
         applyIntentOptions(engine, shading)
-        if (autodemo) runDemo(
-            when {
-                testImage != null -> "testimages/$testImage.jpg"
-                demo == "color" -> "demo_color.png"
-                else -> "demo.png"
+        when (outline?.lowercase()) {
+            "pencil" -> pipelineSettings = pipelineSettings.copy(outlineStyle = com.smitnk.sketcher.image.pipeline.OutlineStyle.PENCIL_REVEAL)
+            "vector" -> pipelineSettings = pipelineSettings.copy(outlineStyle = com.smitnk.sketcher.image.pipeline.OutlineStyle.CLEAN_VECTOR)
+        }
+        val start = {
+            if (autodemo) runDemo(
+                when {
+                    testImage != null -> "testimages/$testImage.jpg"
+                    demo == "color" -> "demo_color.png"
+                    else -> "demo.png"
+                }
+            )
+        }
+        if (model == null && accel == null) { start(); return }
+        viewModelScope.launch {
+            try {
+                val spec = model?.lowercase()?.let { models.spec(it) }
+                if (spec != null) {
+                    val ok = withContext(Dispatchers.IO) { models.isAvailable(spec.id) }
+                    if (ok) installedModelIds = installedModelIds + spec.id
+                    else {
+                        downloadLineModel(spec.id)
+                        var waited = 0
+                        while (spec.id !in installedModelIds && waited < 85_000) { delay(500); waited += 500 }
+                    }
+                    selectLineModel(spec.id)
+                }
+                accel?.lowercase()?.let { selectAccel(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                android.util.Log.w("SketcherGen", "intent model/accel setup failed", t)
             }
-        )
+            start()
+        }
     }
 
     private fun resetProject() {
@@ -957,7 +990,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, m) { stage, fraction ->
+                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, m)) { stage, fraction ->
                         generationStage = stage
                         generationProgress = fraction
                     }
@@ -978,6 +1011,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                         "outline=${drawing.outline.size} shading=${drawing.shading.size} fill=${drawing.fill.size} " +
                         "size=${drawing.width}x${drawing.height} settings=$ps",
                 )
+                if (DebugDump.enabled(app)) {
+                    val snap = project.layers.toList()
+                    DebugDump.layersRef = project.layers
+                    val genMs = android.os.SystemClock.elapsedRealtime() - genStart
+                    val a = activeAccelLabel; val fb = fallbackReason; val inf = lastInferenceMs; val mid = selectedLineModelId
+                    withContext(Dispatchers.Default) {
+                        DebugDump.afterGeneration(app, drawing, bmp, ps, snap, mid, a, fb, inf, genMs, SketchPipeline.lastLineSource)
+                    }
+                }
                 generationCount++
                 markDirty()
                 if (pendingAutoVideo) {

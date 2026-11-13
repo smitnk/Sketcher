@@ -48,13 +48,44 @@ run_gen() {
 adb shell am start -n $PKG/.MainActivity
 sleep 6; shot 00_home
 
-# b) each test image, outline-only and with medium shading
-for img in elf astronaut coffee chelsea cartoon toy_grass rocket; do
-  for cfg in "outline:none" "shading:medium"; do
-    shading=${cfg#*:}
-    run_gen "$img $cfg" "${img}_${cfg//:/-}" \
-      --es testimage "$img" --es engine auto --es shading "$shading"
+# b) diagnostic matrix: one run per combination, screenshots at +3s/+7s/+20s after GEN_DONE,
+# debug dumps (ink_raw, strokes, coverage, renders, crop.txt) pulled into emu/debug/<label>/.
+mkdir -p $OUT/debug
+dbg_run() {
+  local label=$1 img=$2
+  shift 2
+  adb shell am force-stop $PKG
+  adb logcat -c
+  adb shell am start -n $PKG/.MainActivity --ez autodemo true --es testimage "$img" --es label "$label" "$@"
+  local waited=0 seen=0
+  while [ $waited -lt 90 ]; do   # up to 90 s (model downloads)
+    if adb logcat -d -s SketcherGen 2>/dev/null | grep -q "GEN_DONE"; then seen=1; break; fi
+    sleep 1
+    waited=$((waited + 1))
   done
+  echo "== $label (GEN_DONE seen=$seen after ${waited}s)" >> $OUT/gen_times.txt
+  if [ $seen -eq 1 ]; then
+    sleep 3; shot "${label}_t03"
+    sleep 4; shot "${label}_t07"
+    sleep 13; shot "${label}_end"
+  else
+    sleep 5; shot "${label}_nogen"
+  fi
+  adb logcat -d -s SketcherGen >> $OUT/gen_times.txt 2>&1
+  adb logcat -d -s SketcherGen > $OUT/debug/${label}_log.txt 2>&1
+  adb pull /sdcard/Android/data/$PKG/files/debug/$label $OUT/debug/ >/dev/null 2>&1
+}
+
+for img in beard elf cartoon; do
+  models="informative realistic coarse"
+  [ "$img" = beard ] && models="$models anime"
+  for m in $models; do
+    dbg_run "${img}_${m}_ai_pencil" "$img" --es engine ai --es model "$m" --es outline pencil
+  done
+done
+dbg_run beard_cartoon_vector beard --es engine cartoon --es outline vector
+for acc in cpu nnapi_gpu; do
+  dbg_run "beard_accel_${acc}" beard --es engine ai --es model informative --es accel "$acc" --es outline pencil
 done
 
 # c) colour mode on cartoon

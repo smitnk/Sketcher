@@ -58,6 +58,10 @@ class MainActivity : ComponentActivity() {
             engine = intent.getStringExtra("engine"),
             shading = intent.getStringExtra("shading"),
             testImage = intent.getStringExtra("testimage"),
+            model = intent.getStringExtra("model"),
+            accel = intent.getStringExtra("accel"),
+            outline = intent.getStringExtra("outline"),
+            label = intent.getStringExtra("label"),
         )
     }
 }

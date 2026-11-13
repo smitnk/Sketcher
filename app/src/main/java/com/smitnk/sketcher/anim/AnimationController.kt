@@ -58,6 +58,7 @@ class AnimationController {
         if (progress >= 1f) {
             progress = 1f
             playing = false
+            com.smitnk.sketcher.ui.DebugDump.logAnimEnd(progress)
         }
     }
 
