@@ -12,11 +12,16 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.smitnk.sketcher.anim.AnimationController
+import com.smitnk.sketcher.data.ProjectMeta
+import com.smitnk.sketcher.data.ProjectRepository
+import com.smitnk.sketcher.data.applySnapshot
+import com.smitnk.sketcher.data.toSnapshot
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
 import com.smitnk.sketcher.export.Exporter
@@ -35,12 +40,22 @@ import com.smitnk.sketcher.image.pipeline.ShadingLevel
 import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.Project
+import com.smitnk.sketcher.ui.home.RecentProjectUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.sqrt
 
@@ -80,6 +95,9 @@ private class EraseAction(val layer: Layer, val removed: List<Pair<Int, Stroke>>
         }
     }
 }
+
+private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
+private const val AUTOSAVE_DELAY_MS = 2000L
 
 class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -129,6 +147,21 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         lineArtModel ?: OnnxLineArtModel(app).also { lineArtModel = it }
 
     override fun onCleared() {
+        // Best-effort final save: snapshot now (main thread), write on a scope that outlives viewModelScope.
+        if (dirty && shouldSave()) {
+            val id = currentProjectId
+            val name = projectName
+            val snap = project.toSnapshot(anim.durationSec)
+            val bg = project.background
+            dirty = false
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    saveMutex.withLock { repo.save(id, name, snap, bg) }
+                } catch (t: Throwable) {
+                    android.util.Log.w("SketcherSave", "final save failed", t)
+                }
+            }
+        }
         lineArtModel?.close()
         lineArtModel = null
         super.onCleared()
@@ -179,6 +212,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val at = if (o >= 0) o + 1 else (project.selectedIndex + 1).coerceIn(0, project.layers.size)
         project.layers.add(at, layer)
         project.selectedIndex = at
+        markDirty()
         selectBrush(BrushType.SOFT)
         brushColor = 0xFF555555.toInt()
         brushSize = 14f
@@ -244,6 +278,194 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     init {
         val layer = project.newLayer("Layer 1")
         project.layers.add(layer)
+    }
+
+    // ------------------------------------------------------------------ projects / autosave
+
+    private val repo = ProjectRepository(app)
+    private val saveMutex = Mutex()
+
+    init {
+        refreshRecent()
+    }
+
+    var currentProjectId: String? = null
+        private set
+
+    var projectName by mutableStateOf(DEFAULT_PROJECT_NAME)
+        private set
+
+    var recentProjects by mutableStateOf<List<RecentProjectUi>>(emptyList())
+        private set
+
+    private var dirty = false
+    private var debounceJob: Job? = null
+
+    /** Bumped whenever the editor switches to another project, so late saves do not claim the new one. */
+    private var projectGen = 0
+    private var lastFingerprint: Int? = null
+
+    /** Cheap hash of layer structure/properties (not strokes, not selection). Reads Compose state. */
+    private fun layerFingerprint(): Int {
+        var h = project.layers.size
+        for (l in project.layers) {
+            h = 31 * h + l.id.hashCode()
+            h = 31 * h + l.name.hashCode()
+            h = 31 * h + (if (l.visible) 1 else 0)
+            h = 31 * h + l.opacity.hashCode()
+            h = 31 * h + (if (l.locked) 1 else 0)
+            h = 31 * h + (if (l.inAnimation) 1 else 0)
+            h = 31 * h + l.animPriority
+        }
+        return h
+    }
+
+    /** Runs until cancelled (call from a LaunchedEffect): layer property edits made in the UI trigger autosave. */
+    suspend fun watchLayerChanges() {
+        snapshotFlow { layerFingerprint() }.collect { fp ->
+            val prev = lastFingerprint
+            lastFingerprint = fp
+            if (prev != null && prev != fp) markDirty()
+        }
+    }
+
+    private fun shouldSave(): Boolean =
+        currentProjectId != null || project.layers.any { it.strokes.isNotEmpty() }
+
+    /** Call after any content mutation: saves 2 s after the last call. */
+    fun markDirty() {
+        dirty = true
+        debounceJob?.cancel()
+        debounceJob = viewModelScope.launch {
+            delay(AUTOSAVE_DELAY_MS)
+            // Launched on viewModelScope (not as a child) so a later markDirty cannot cancel a running write.
+            viewModelScope.launch { saveNow() }
+        }
+    }
+
+    private suspend fun saveNow() {
+        if (!dirty) return
+        if (!shouldSave()) {
+            dirty = false
+            return
+        }
+        dirty = false
+        val gen = projectGen
+        val startId = currentProjectId
+        val name = projectName
+        val snap = project.toSnapshot(anim.durationSec) // main thread: reads Compose state
+        val bg = project.background
+        try {
+            val pid = withContext(NonCancellable) {
+                saveMutex.withLock {
+                    val id = if (gen == projectGen) currentProjectId else startId
+                    repo.save(id, name, snap, bg)
+                }
+            }
+            if (gen == projectGen && currentProjectId == null) currentProjectId = pid
+        } catch (t: Throwable) {
+            dirty = true
+            android.util.Log.w("SketcherSave", "autosave failed", t)
+        }
+    }
+
+    /** Saves pending changes immediately, then reloads the recent list (used when leaving the editor). */
+    fun saveAndRefresh() {
+        debounceJob?.cancel()
+        viewModelScope.launch {
+            saveNow()
+            refreshRecent()
+        }
+    }
+
+    fun refreshRecent() {
+        viewModelScope.launch {
+            recentProjects = withContext(Dispatchers.IO) { repo.list().map { it.toUi() } }
+        }
+    }
+
+    private fun ProjectMeta.toUi(): RecentProjectUi {
+        val thumb = thumbPath?.let { path ->
+            try {
+                android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap()
+            } catch (t: Throwable) {
+                null
+            }
+        }
+        return RecentProjectUi(id, name, thumb, updatedLabel(updatedAt))
+    }
+
+    private fun updatedLabel(t: Long): String {
+        val now = System.currentTimeMillis()
+        val diff = (now - t).coerceAtLeast(0L)
+        fun startOfDay(ms: Long): Long = Calendar.getInstance().apply {
+            timeInMillis = ms
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val days = Math.round((startOfDay(now) - startOfDay(t)) / 86_400_000.0)
+        return when {
+            diff < 60_000L -> "Just now"
+            days == 0L && diff < 3_600_000L -> "${diff / 60_000L} min ago"
+            days == 0L -> "${diff / 3_600_000L} h ago"
+            days == 1L -> "Yesterday"
+            else -> java.text.SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(t))
+        }
+    }
+
+    fun openProject(id: String) {
+        viewModelScope.launch {
+            debounceJob?.cancel()
+            saveNow() // flush the project currently open
+            val loaded = repo.load(id)
+            if (loaded == null) {
+                toast("Could not open that project")
+                refreshRecent()
+                return@launch
+            }
+            val name = repo.list().firstOrNull { it.id == id }?.name ?: DEFAULT_PROJECT_NAME
+            resetProject()
+            val snap = loaded.snapshot
+            project.applySnapshot(snap)
+            if (project.layers.isEmpty()) project.layers.add(project.newLayer("Layer 1"))
+            project.background = loaded.source
+            sourceBitmap = loaded.source
+            sourceThumbnail = loaded.source?.let { makeThumbnail(it) }
+            if (snap.animationSeconds > 0f) anim.durationSec = snap.animationSeconds
+            hasProject = true
+            styleSheetRequest = false
+            currentProjectId = id
+            projectName = name
+            dirty = false
+            lastFingerprint = layerFingerprint()
+            anim.showFinished()
+        }
+    }
+
+    fun deleteProject(id: String) {
+        viewModelScope.launch {
+            if (id == currentProjectId) {
+                debounceJob?.cancel()
+                dirty = false
+                currentProjectId = null
+            }
+            withContext(NonCancellable) { saveMutex.withLock { repo.delete(id) } }
+            refreshRecent()
+        }
+    }
+
+    fun renameProject(name: String) {
+        val n = name.trim().take(80)
+        if (n.isEmpty()) return
+        projectName = n
+        val id = currentProjectId
+        if (id == null) {
+            markDirty()
+        } else {
+            viewModelScope.launch {
+                withContext(NonCancellable) { saveMutex.withLock { repo.rename(id, n) } }
+                refreshRecent()
+            }
+        }
     }
 
     // ------------------------------------------------------------------ import / generate
@@ -318,6 +540,11 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     private fun resetProject() {
+        debounceJob?.cancel()
+        dirty = false
+        projectGen++
+        currentProjectId = null
+        projectName = DEFAULT_PROJECT_NAME
         project.layers.clear()
         project.layers.add(project.newLayer("Layer 1"))
         project.selectedIndex = 0
@@ -325,16 +552,18 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         anim.showFinished()
     }
 
+    private fun makeThumbnail(bmp: Bitmap): ImageBitmap? = try {
+        val m = max(bmp.width, bmp.height).coerceAtLeast(1)
+        val k = 320f / m
+        if (k >= 1f) bmp.asImageBitmap()
+        else Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true).asImageBitmap()
+    } catch (t: Throwable) {
+        null
+    }
+
     private fun setSource(bmp: Bitmap) {
         sourceBitmap = bmp
-        sourceThumbnail = try {
-            val m = max(bmp.width, bmp.height).coerceAtLeast(1)
-            val k = 320f / m
-            if (k >= 1f) bmp.asImageBitmap()
-            else Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true).asImageBitmap()
-        } catch (t: Throwable) {
-            null
-        }
+        sourceThumbnail = makeThumbnail(bmp)
         hasProject = true
         project.width = bmp.width
         project.height = bmp.height
@@ -384,6 +613,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                         "size=${drawing.width}x${drawing.height} settings=$ps",
                 )
                 generationCount++
+                markDirty()
                 if (pendingAutoVideo) {
                     pendingAutoVideo = false
                     autoVideo()
@@ -450,6 +680,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val layer = project.newLayer("Layer ${project.layers.size + 1}")
         project.layers.add(layer)
         project.selectedIndex = project.layers.lastIndex
+        markDirty()
     }
 
     fun deleteLayer(layer: Layer) {
@@ -462,6 +693,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val keep = if (selected === layer) project.layers.lastOrNull() else selected
         project.selectedIndex = max(0, project.layers.indexOf(keep))
         clearHistory()
+        markDirty()
     }
 
     /** delta +1 moves the layer up the stack (drawn later), -1 down. */
@@ -473,6 +705,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.layers.removeAt(from)
         project.layers.add(to, layer)
         project.selectedIndex = max(0, project.layers.indexOf(selected))
+        markDirty()
     }
 
     // ------------------------------------------------------------------ drawing
@@ -589,6 +822,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         undoStack.add(action)
         redoStack.clear()
         syncHistoryFlags()
+        markDirty()
     }
 
     fun undo() {
@@ -597,6 +831,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         a.undo()
         redoStack.add(a)
         syncHistoryFlags()
+        markDirty()
     }
 
     fun redo() {
@@ -605,6 +840,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         a.redo()
         undoStack.add(a)
         syncHistoryFlags()
+        markDirty()
     }
 
     private fun clearHistory() {

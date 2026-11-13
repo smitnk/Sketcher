@@ -5,7 +5,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,6 +76,7 @@ fun HomeScreen(
     onImportPose: () -> Unit,
     onTryDemo: () -> Unit,
     onOpenProject: (String) -> Unit = {},
+    onDeleteProject: (String) -> Unit = {},
     recentProjects: List<RecentProjectUi> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -122,7 +125,7 @@ fun HomeScreen(
                 item(span = { GridItemSpan(maxLineSpan) }) { EmptyRecent() }
             } else {
                 items(recentProjects, key = { it.id }) { p ->
-                    RecentCard(p, onClick = { onOpenProject(p.id) })
+                    RecentCard(p, onClick = { onOpenProject(p.id) }, onLongClick = { onDeleteProject(p.id) })
                 }
             }
         }
@@ -252,14 +255,19 @@ private fun Step(icon: ImageVector, number: String, label: String, modifier: Mod
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecentCard(p: RecentProjectUi, onClick: () -> Unit) {
+private fun RecentCard(p: RecentProjectUi, onClick: () -> Unit, onLongClick: () -> Unit) {
     Surface(
-        onClick = onClick,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).combinedClickable(
+            onClickLabel = "Open ${p.name}",
+            onLongClickLabel = "Delete ${p.name}",
+            onLongClick = onLongClick,
+            onClick = onClick,
+        ),
     ) {
         Column(Modifier.padding(SketcherTokens.space8)) {
             Box(

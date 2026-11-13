@@ -17,62 +17,203 @@ import kotlin.math.sqrt
  */
 object LineArtVectorizer {
 
-    fun vectorize(ink: FloatArray, w: Int, h: Int, detail: Float, lineWidth: Float, maxStrokes: Int): List<Stroke> {
-        if (w < 8 || h < 8 || ink.size < w * h || maxStrokes <= 0) return emptyList()
+    fun vectorize(ink0: FloatArray, w: Int, h: Int, detail: Float, lineWidth: Float, maxStrokes: Int): List<Stroke> {
+        if (w < 8 || h < 8 || ink0.size < w * h || maxStrokes <= 0) return emptyList()
         val d = detail.coerceIn(0f, 1f)
         val sc = (max(w, h) / 768f).coerceIn(1f, 3f)
+        val lineScale = (max(w, h) / 1024f).coerceIn(0.6f, 2.2f)
+        val ink = normalizeLocal(ink0, w, h)
 
-                val lo = 0.22f - 0.12f * d
-        val hi = 0.46f - 0.20f * d
+        val lo = 0.17f - 0.09f * d
+        val hi = 0.50f - 0.20f * d
         val mask = dilate(hysteresis(ink, w, h, lo, hi, (6 * sc * sc).toInt().coerceAtLeast(4)), w, h)
         // clear border so neighbour access never goes out of range
         for (x in 0 until w) { mask[x] = false; mask[(h - 1) * w + x] = false }
         for (y in 0 until h) { mask[y * w] = false; mask[y * w + w - 1] = false }
         thin(mask, w, h)
 
-        // prune spurs & tiny fragments, bridge gaps, rebuild
+        // prune spurs & tiny fragments (first pass), then find dense-texture zones and prune harder there
         val spurLen = (7f * sc).toInt()
         val minLen = (10f * sc).toInt()
         var g = Graph.build(mask, w, h)
-        g.prune(mask, spurLen, minLen)
+        g.prune(mask, spurLen, minLen, null)
+        g = Graph.build(mask, w, h)
+        val tex = textureMap(g, mask, w, h, sc)
+        g.prune(mask, spurLen, minLen, tex)
         bridge(mask, ink, w, h, (6f + 7f * d) * sc, lo)
         g = Graph.build(mask, w, h)
         val chains = g.strokes()
 
-        // ---- chains -> smooth strokes
+        // ---- chains -> smooth strokes (split at sharp corners so weight can vary along long lines)
         val cands = ArrayList<Cand>(chains.size)
-        val eps = 0.65f
-        val minScore = (16f - 11f * d) * sc
+        val minScore = (11f - 8f * d) * sc
         for (c in chains) {
             val n = c.size
             if (n < 4) continue
-            var sum = 0f
-            for (i in 0 until n) sum += localMax(ink, w, h, c[i])
-            val mean = sum / n
+            var texCount = 0
+            for (i in 0 until n) if (tex.at(c[i])) texCount++
+            val isTex = texCount * 10 >= n * 6
             var pts = FloatArray(n * 2)
             for (i in 0 until n) { pts[i * 2] = (c[i] % w) + 0.5f; pts[i * 2 + 1] = (c[i] / w) + 0.5f }
             pts = movingAverage(movingAverage(pts, 3), 2)
-            pts = rdp(pts, eps)
-            pts = chaikin(chaikin(pts))
-            val len = polyLen(pts)
-            if (len < 5f * sc) continue
-            val score = len * mean
-            if (score < minScore || mean < 0.20f - 0.06f * d) continue
-            cands.add(Cand(pts, len, mean, score))
+            val cuts = if (!isTex && n > 60 * sc) cornerCuts(pts, sc) else IntArray(0)
+            var from = 0
+            val bounds = IntArray(cuts.size + 1) { if (it < cuts.size) cuts[it] else n - 1 }
+            for (to in bounds) {
+                if (to - from < 3) { from = to; continue }
+                var sum = 0f
+                for (i in from..to) sum += localMax(ink, w, h, c[i])
+                val mean = sum / (to - from + 1)
+                var p = pts.copyOfRange(from * 2, (to + 1) * 2)
+                p = chaikin(chaikin(rdp(p, 0.65f)))
+                from = to
+                val len = polyLen(p)
+                if (len < 5f * sc) continue
+                val score = len * mean
+                if (score < minScore || mean < 0.17f - 0.06f * d) continue
+                cands.add(Cand(p, len, mean, score, isTex, if (isTex) len * Math.exp(-15.0 * turnRate(p, len)).toFloat() else 0f))
+            }
         }
-        var kept: List<Cand> = cands
+        // sparse selection inside texture zones: only the longest, smoothest strokes survive
+        val texC = cands.filter { it.tex }.sortedByDescending { it.tscore }
+        val keepTex = HashSet<Cand>()
+        val budget = (texC.size * 0.2f).toInt().coerceAtLeast(min(texC.size, 1))
+        for (c in texC) { if (keepTex.size >= budget) break; if (c.len >= 22f * sc) keepTex.add(c) }
+        var kept: List<Cand> = cands.filter { !it.tex || it in keepTex }
         if (kept.size > maxStrokes) kept = kept.sortedByDescending { it.score }.take(maxStrokes)
 
         val ordered = order(kept)
         val out = ArrayList<Stroke>(ordered.size)
         for (c in ordered) {
-            val s = ((c.mean - 0.15f) / 0.4f).coerceIn(0f, 1f)
-            out.add(Stroke(c.pts, 0xFF000000.toInt(), lineWidth * (0.6f + 1.0f * s), BrushType.PEN, 1f))
+            val s = ((c.mean - 0.12f) / 0.5f).coerceIn(0f, 1f)
+            val wd = lineWidth * lineScale * (0.5f + 0.8f * s) * (if (c.tex && c.len < 45f * sc) 0.8f else 1f)
+            out.add(Stroke(c.pts, 0xFF000000.toInt(), wd, BrushType.PEN, if (c.tex && c.len < 45f * sc) 0.6f else 1f))
         }
         return out
     }
 
-    private class Cand(var pts: FloatArray, val len: Float, val mean: Float, val score: Float)
+    private class Cand(var pts: FloatArray, val len: Float, val mean: Float, val score: Float, val tex: Boolean = false, val tscore: Float = 0f)
+
+    // ------------------------------------------------------------------ local normalisation
+
+    /** Boosts faint-but-local lines: scales ink by 0.9 / (blend of global and ~48px-local peak), 1..2.2x. */
+    private fun normalizeLocal(ink: FloatArray, w: Int, h: Int): FloatArray {
+        val hist = IntArray(256)
+        for (i in 0 until w * h) hist[(ink[i].coerceIn(0f, 1f) * 255f).toInt()]++
+        var acc = 0
+        var gb = 255
+        val tail = (w * h * 0.003f).toInt()
+        while (gb > 0) { acc += hist[gb]; if (acc > tail) break; gb-- }
+        val gmax = (gb / 255f).coerceIn(0.3f, 1f)
+        val bs = 16
+        val bw = (w + bs - 1) / bs; val bh = (h + bs - 1) / bs
+        val bm = FloatArray(bw * bh)
+        for (y in 0 until h) for (x in 0 until w) { val k = (y / bs) * bw + x / bs; if (ink[y * w + x] > bm[k]) bm[k] = ink[y * w + x] }
+        val lm = FloatArray(bw * bh)
+        for (by in 0 until bh) for (bx in 0 until bw) {
+            var m = 0f
+            for (yy in max(0, by - 1)..min(bh - 1, by + 1)) for (xx in max(0, bx - 1)..min(bw - 1, bx + 1)) m = max(m, bm[yy * bw + xx])
+            lm[by * bw + bx] = m
+        }
+        val out = FloatArray(w * h)
+        for (y in 0 until h) {
+            val fy = ((y + 0.5f) / bs - 0.5f).coerceIn(0f, bh - 1f)
+            val y0 = fy.toInt(); val y1 = min(bh - 1, y0 + 1); val ty = fy - y0
+            for (x in 0 until w) {
+                val fx = ((x + 0.5f) / bs - 0.5f).coerceIn(0f, bw - 1f)
+                val x0 = fx.toInt(); val x1 = min(bw - 1, x0 + 1); val tx = fx - x0
+                val l = (lm[y0 * bw + x0] * (1 - tx) + lm[y0 * bw + x1] * tx) * (1 - ty) +
+                    (lm[y1 * bw + x0] * (1 - tx) + lm[y1 * bw + x1] * tx) * ty
+                val denom = max(0.4f, 0.5f * gmax + 0.5f * l)
+                val boost = (0.9f / denom).coerceIn(1f, 2.2f)
+                out[y * w + x] = min(1f, ink[y * w + x] * boost)
+            }
+        }
+        return out
+    }
+
+    // ------------------------------------------------------------------ texture zones (fur / grass)
+
+    private class TexMap(val cell: Int, val gw: Int, val gh: Int, val w: Int, val flag: BooleanArray) {
+        fun at(p: Int): Boolean = flag[((p / w) / cell).coerceAtMost(gh - 1) * gw + ((p % w) / cell).coerceAtMost(gw - 1)]
+    }
+
+    /** Flags 32px cells whose 3x3 neighbourhood has dense skeleton, many short segments and low orientation coherence. */
+    private fun textureMap(g: Graph, img: BooleanArray, w: Int, h: Int, sc: Float): TexMap {
+        val cell = 32
+        val gw = (w + cell - 1) / cell; val gh = (h + cell - 1) / cell
+        val px = IntArray(gw * gh); val shortN = IntArray(gw * gh)
+        val cx = FloatArray(gw * gh); val sy = FloatArray(gw * gh); val tl = FloatArray(gw * gh)
+        for (y in 1 until h - 1) for (x in 1 until w - 1) if (img[y * w + x]) px[(y / cell) * gw + x / cell]++
+        val shortLen = 30f * sc
+        for (e in 0 until g.nEdges) {
+            val o = g.off.a[e]; val l = g.len.a[e]
+            if (l < 2) continue
+            val mid = g.pool.a[o + l / 2]
+            val k = (mid / w / cell).coerceAtMost(gh - 1) * gw + (mid % w / cell).coerceAtMost(gw - 1)
+            if (l < shortLen) shortN[k]++
+            val a = g.pool.a[o]; val b = g.pool.a[o + l - 1]
+            val dx = (b % w - a % w).toFloat(); val dy = (b / w - a / w).toFloat()
+            val n2 = dx * dx + dy * dy
+            if (n2 < 1f) continue
+            // doubled-angle vector weighted by length: coherent lines add up, random ticks cancel
+            cx[k] += l * (dx * dx - dy * dy) / n2; sy[k] += l * 2f * dx * dy / n2; tl[k] += l
+        }
+        val flag = BooleanArray(gw * gh)
+        for (gy in 0 until gh) for (gx in 0 until gw) {
+            var p = 0; var sn = 0; var ax = 0f; var ay = 0f; var at = 0f; var area = 0
+            for (yy in max(0, gy - 1)..min(gh - 1, gy + 1)) for (xx in max(0, gx - 1)..min(gw - 1, gx + 1)) {
+                val k = yy * gw + xx
+                p += px[k]; sn += shortN[k]; ax += cx[k]; ay += sy[k]; at += tl[k]; area += cell * cell
+            }
+            val density = p.toFloat() / area
+            val coh = if (at > 1f) sqrt(ax * ax + ay * ay) / at else 1f
+            flag[gy * gw + gx] = density > 0.085f && sn >= 14 && coh < 0.5f
+        }
+        return TexMap(cell, gw, gh, w, flag)
+    }
+
+    private fun turnRate(p: FloatArray, len: Float): Float = turnTotal(p) / max(len, 1f)
+
+    private fun turnTotal(p: FloatArray): Float {
+        var t = 0f
+        var i = 4
+        while (i < p.size) {
+            val ux = p[i - 2] - p[i - 4]; val uy = p[i - 1] - p[i - 3]
+            val vx = p[i] - p[i - 2]; val vy = p[i + 1] - p[i - 1]
+            t += abs(kotlin.math.atan2(ux * vy - uy * vx, ux * vx + uy * vy))
+            i += 2
+        }
+        return t
+    }
+
+    /** Indices (ascending, excluding the final one) where a long chain turns sharply; pieces keep >= 14*sc points. */
+    private fun cornerCuts(p: FloatArray, sc: Float): IntArray {
+        val n = p.size / 2
+        val k = (7 * sc).toInt()
+        val minPiece = (14 * sc).toInt()
+        val cuts = ArrayList<Int>()
+        var last = 0
+        var i = k
+        while (i < n - k) {
+            val ux = p[i * 2] - p[(i - k) * 2]; val uy = p[i * 2 + 1] - p[(i - k) * 2 + 1]
+            val vx = p[(i + k) * 2] - p[i * 2]; val vy = p[(i + k) * 2 + 1] - p[i * 2 + 1]
+            val ang = abs(kotlin.math.atan2(ux * vy - uy * vx, ux * vx + uy * vy))
+            if (ang > 1.1f && i - last >= minPiece && n - 1 - i >= minPiece) {
+                // refine to the sharpest point within +-k/2
+                var best = i; var ba = ang
+                for (j in i + 1..min(n - k - 1, i + k / 2)) {
+                    val a2x = p[j * 2] - p[(j - k) * 2]; val a2y = p[j * 2 + 1] - p[(j - k) * 2 + 1]
+                    val b2x = p[(j + k) * 2] - p[j * 2]; val b2y = p[(j + k) * 2 + 1] - p[j * 2 + 1]
+                    val a2 = abs(kotlin.math.atan2(a2x * b2y - a2y * b2x, a2x * b2x + a2y * b2y))
+                    if (a2 > ba) { ba = a2; best = j }
+                }
+                cuts.add(best); last = best; i = best + k
+            } else i++
+        }
+        return cuts.toIntArray()
+    }
+
 
     // ------------------------------------------------------------------ preprocessing
 
@@ -301,12 +442,14 @@ object LineArtVectorizer {
         }
 
         /** Removes spurs (free end attached to junction) shorter than [spur] and loose fragments shorter than [minLen]. */
-        fun prune(img: BooleanArray, spur: Int, minLen: Int) {
+        fun prune(img: BooleanArray, spur: Int, minLen: Int, tex: TexMap?) {
             for (e in 0 until nEdges) {
                 val l = len.a[e]
                 val free0 = c0.a[e] < 0
                 val free1 = c1.a[e] < 0
-                val kill = (free0 && free1 && l < minLen) || ((free0 != free1) && l < spur)
+                val t = tex != null && l >= 2 && tex.at(pool.a[off.a[e] + l / 2])
+                val kill = (free0 && free1 && l < (if (t) minLen * 2 else minLen)) ||
+                    ((free0 != free1) && l < (if (t) spur * 3 else spur))
                 if (!kill) continue
                 val o = off.a[e]
                 for (k in 0 until l) {

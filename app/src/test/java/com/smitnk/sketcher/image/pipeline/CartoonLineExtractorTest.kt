@@ -79,4 +79,38 @@ class CartoonLineExtractorTest {
         assertEquals(0f, CartoonLineExtractor.cartoonScore(IntArray(4), 2, 2), 0f)
         assertEquals(4, CartoonLineExtractor.inkMap(IntArray(4), 2, 2, 0.5f).size)
     }
+
+    /** Eye: white disc, black ring, solid pupil (too wide for the line detector) on a coloured face. */
+    private fun eyeCartoon(outline: Int, noise: Int): IntArray {
+        val rnd = Random(3)
+        val px = IntArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val g = 190 + y * 40 / h
+            px[y * w + x] = rgb(g - 120, g - 40, 255)
+            val d = sqrt(((x - 200) * (x - 200) + (y - 150) * (y - 150)).toDouble())
+            if (d < 70) px[y * w + x] = rgb(250, 250, 250)
+            if (d in 68.0..73.0) px[y * w + x] = outline
+            if (d < 10) px[y * w + x] = rgb(10, 10, 15)
+            if (noise > 0) {
+                val c = px[y * w + x]; val e = rnd.nextInt(2 * noise + 1) - noise
+                px[y * w + x] = rgb(((c shr 16 and 255) + e).coerceIn(0, 255), ((c shr 8 and 255) + e).coerceIn(0, 255), ((c and 255) + e).coerceIn(0, 255))
+            }
+        }
+        return px
+    }
+
+    @Test fun pupilKeptAsSolidDot() {
+        val ink = CartoonLineExtractor.inkMap(eyeCartoon(rgb(15, 15, 25), 0), w, h, 0.5f)
+        assertTrue(ink[150 * w + 200] > 0.5f)
+        assertTrue(ink[150 * w + 191] > 0.5f)
+        assertEquals(0f, ink[150 * w + 150], 0f) // eye white stays paper
+    }
+
+    @Test fun darkBlueNoisyOutlineIsInk() {
+        val ink = CartoonLineExtractor.inkMap(eyeCartoon(rgb(30, 40, 110), 6), w, h, 0.5f)
+        var onRing = 0
+        for (x in 125 until 135) for (y in 145 until 155) if (ink[y * w + x] > 0.5f) onRing++
+        assertTrue(onRing > 0)
+        assertTrue(ink[150 * w + 200] > 0.5f)
+    }
 }

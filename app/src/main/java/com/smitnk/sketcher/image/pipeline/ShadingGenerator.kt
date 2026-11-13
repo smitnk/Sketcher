@@ -22,7 +22,14 @@ object ShadingGenerator {
 
     private class Piece(val region: Int, val band: Int, val order: Int, val stroke: Stroke)
 
-    fun generate(argb: IntArray, w: Int, h: Int, settings: PipelineSettings, ink: FloatArray?): List<Stroke> {
+    /**
+     * @param cartoon true for flat-colour cartoon art: only cel-shadow regions (a darker tone of the same hue
+     * adjacent to a larger region) are shaded; if none qualify the result is empty.
+     */
+    fun generate(
+        argb: IntArray, w: Int, h: Int, settings: PipelineSettings, ink: FloatArray?,
+        cartoon: Boolean = false,
+    ): List<Stroke> {
         if (settings.shading == ShadingLevel.NONE || w < 8 || h < 8 || argb.size < w * h) return emptyList()
         val n = w * h
         val long = max(w, h)
@@ -34,7 +41,9 @@ object ShadingGenerator {
             val c = argb[i]
             lum[i] = (0.299f * ((c shr 16) and 255) + 0.587f * ((c shr 8) and 255) + 0.114f * (c and 255)) / 255f
         }
-        val tone = boxBlur(boxBlur(lum, w, h, max(2, long / 220)), w, h, max(2, long / 220))
+        if (cartoon) return generateCartoon(argb, w, h, settings, ink, lum)
+        // heavier smoothing keeps band contours organic instead of speckled
+        val tone = boxBlur(boxBlur(boxBlur(lum, w, h, max(3, long / 110)), w, h, max(3, long / 110)), w, h, max(2, long / 160))
 
         // ---- subject estimation --------------------------------------------
         val subject: ByteArray? = if (settings.ignoreBackground) estimateSubject(lum, w, h, ink) else null
@@ -63,6 +72,7 @@ object ShadingGenerator {
         // ---- band masks (nested, cleaned) -----------------------------------
         val mr = max(1, long / 260)
         val minArea = max(40, (long * 0.022f * long * 0.022f).toInt())
+        val skip = inkSkipMask(lum, w, h, ink)
         val masks = ArrayList<ByteArray>()
         var prev: ByteArray? = null
         for (k in ts.indices) {
@@ -73,8 +83,11 @@ object ShadingGenerator {
                 // At HEAVY the background may only receive the very darkest band, lightly.
                 if (inSubject || (level == ShadingLevel.HEAVY && k == ts.size - 1)) m[i] = 1
             }
+            for (i in 0 until n) if (skip[i].toInt() != 0) m[i] = 0
             var c = morph(morph(m, w, h, mr, true), w, h, mr, false)   // open
             c = morph(morph(c, w, h, mr + 1, false), w, h, mr + 1, true) // close
+            c = smoothMask(c, w, h, max(2, long / 80))
+            for (i in 0 until n) if (skip[i].toInt() != 0) c[i] = 0
             if (prev != null) for (i in 0 until n) if (prev[i].toInt() == 0) c[i] = 0
             removeSmall(c, w, h, minArea)
             masks.add(c); prev = c
@@ -83,7 +96,7 @@ object ShadingGenerator {
 
         // ---- stroke generation (adaptive spacing to respect the cap) --------
         val cap = min(HARD_CAP, settings.maxStrokes)
-        var spacing = max(4f, long * 0.0068f)
+        var spacing = max(max(4f, long * 0.0068f), 2.2f * hatchWidth(long))
         var pieces: List<Piece> = emptyList()
         for (attempt in 0 until 8) {
             pieces = build(masks, regionLabels, w, h, long, spacing, settings.shadingStyle)
@@ -96,11 +109,13 @@ object ShadingGenerator {
 
     // ===================== hatch / scribble =====================================
 
+    private fun hatchWidth(long: Int) = (1.4f * (long / 1024f).coerceIn(0.7f, 2f)).coerceIn(1.2f, 1.6f * 2f)
+
     private fun build(
         masks: List<ByteArray>, labels: IntArray, w: Int, h: Int, long: Int, spacing: Float, style: ShadingStyle,
     ): List<Piece> {
         val rnd = Random(1234567L + w * 31L + h)
-        val width = (1.4f * (long / 1024f).coerceIn(0.7f, 2f)).coerceIn(1.2f, 1.6f * 2f)
+        val width = hatchWidth(long)
         val out = ArrayList<Piece>()
         val minLen = max(7f, long * 0.012f)
         val maxLen = long * (if (style == ShadingStyle.SCRIBBLE) 0.14f else 0.075f)
@@ -165,8 +180,12 @@ object ShadingGenerator {
             var e = min(t1, s + maxLen * (0.7f + 0.3f * rnd.nextFloat()))
             if (t1 - e < minLen * 0.8f) e = t1
             // taper: pull ends in by a random amount
-            val a = s + rnd.nextFloat() * min(3f, (e - s) * 0.1f) + (if (s > t0) 1f else 0f)
-            val b = e - rnd.nextFloat() * min(3f, (e - s) * 0.1f) - (if (e < t1) 1f else 0f)
+            // feather: ends that sit on a band edge get a random, sometimes long, pull-in so edges look drawn
+            val feather = spacing * 1.8f
+            val fa = if (s <= t0) rnd.nextFloat() * rnd.nextFloat() * feather else 0f
+            val fb = if (e >= t1) rnd.nextFloat() * rnd.nextFloat() * feather else 0f
+            val a = s + rnd.nextFloat() * min(3f, (e - s) * 0.1f) + (if (s > t0) 1f else 0f) + fa
+            val b = e - rnd.nextFloat() * min(3f, (e - s) * 0.1f) - (if (e < t1) 1f else 0f) - fb
             if (b - a >= minLen) {
                 val mx = (bx + ux * (a + b) / 2 + 0.5f).toInt().coerceIn(0, w - 1)
                 val my = (by + uy * (a + b) / 2 + 0.5f).toInt().coerceIn(0, h - 1)
@@ -202,6 +221,170 @@ object ShadingGenerator {
             }
             s = e + (if (scribble) 0f else rnd.nextFloat() * 3f)
         }
+    }
+
+    // ===================== ink density / smoothing ================================
+
+    /** Cells where existing line art is dense or sits right on a line: hatching there only adds mud. */
+    private fun inkSkipMask(lum: FloatArray, w: Int, h: Int, ink: FloatArray?): ByteArray {
+        val n = w * h
+        val long = max(w, h)
+        val src = inkBinary(lum, w, h, ink)
+        val dens = boxBlur(src, w, h, max(3, long / 30))
+        val out = ByteArray(n) { if (dens[it] > 0.27f) 1 else 0 }
+        // keep a small clearance around lines so hatching doesn't collide with the outline
+        // light clearance only around strong ink (soft AI ink maps would otherwise erase everything)
+        if (ink != null && ink.size >= n) {
+            val strong = ByteArray(n) { if (ink[it] > 0.7f) 1 else 0 }
+            val near = morph(strong, w, h, 1, false)
+            for (i in 0 until n) if (near[i].toInt() != 0) out[i] = 1
+        }
+        return out
+    }
+
+    private fun inkBinary(lum: FloatArray, w: Int, h: Int, ink: FloatArray?): FloatArray {
+        val n = w * h
+        if (ink != null && ink.size >= n) return FloatArray(n) { if (ink[it] > 0.35f) 1f else 0f }
+        val l = boxBlur(lum, w, h, 1)
+        val e = FloatArray(n)
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            val i = y * w + x
+            val g = abs(l[i + 1] - l[i - 1]) + abs(l[i + w] - l[i - w])
+            e[i] = if (g > 0.12f) 1f else 0f
+        }
+        return e
+    }
+
+    /** Blur + threshold: rounds corners so contours are smooth curves rather than blocky polygons. */
+    private fun smoothMask(m: ByteArray, w: Int, h: Int, r: Int): ByteArray {
+        var f = FloatArray(m.size) { m[it].toFloat() }
+        f = boxBlur(boxBlur(f, w, h, r), w, h, r)
+        return ByteArray(m.size) { if (f[it] > 0.5f) 1 else 0 }
+    }
+
+    // ===================== cartoon (cel shading aware) ============================
+
+    private fun generateCartoon(
+        argb: IntArray, w: Int, h: Int, settings: PipelineSettings, ink: FloatArray?, lum: FloatArray,
+    ): List<Stroke> {
+        val n = w * h
+        val long = max(w, h)
+        val minArea = max(60, (long * 0.025f * long * 0.025f).toInt())
+        val lab = IntArray(n) { -1 }
+        val areas = ArrayList<Int>()
+        val sumR = ArrayList<Long>(); val sumG = ArrayList<Long>(); val sumB = ArrayList<Long>()
+        val q = IntArray(n)
+        val tol = 12
+        var k = 0
+        for (s0 in 0 until n) {
+            if (lab[s0] >= 0) continue
+            val c0 = argb[s0]
+            val r0 = (c0 shr 16) and 255; val g0 = (c0 shr 8) and 255; val b0 = c0 and 255
+            var qh = 0; var qt = 0
+            q[qt++] = s0; lab[s0] = k
+            var sr = 0L; var sg = 0L; var sb = 0L
+            while (qh < qt) {
+                val i = q[qh++]
+                val c = argb[i]
+                sr += (c shr 16) and 255; sg += (c shr 8) and 255; sb += c and 255
+                val x = i % w; val y = i / w
+                for (d in 0 until 4) {
+                    val j = when (d) { 0 -> if (x > 0) i - 1 else -1; 1 -> if (x < w - 1) i + 1 else -1; 2 -> if (y > 0) i - w else -1; else -> if (y < h - 1) i + w else -1 }
+                    if (j < 0 || lab[j] >= 0) continue
+                    val cj = argb[j]
+                    if (abs(((cj shr 16) and 255) - r0) <= tol && abs(((cj shr 8) and 255) - g0) <= tol && abs((cj and 255) - b0) <= tol) {
+                        lab[j] = k; q[qt++] = j
+                    }
+                }
+            }
+            areas.add(qt); sumR.add(sr); sumG.add(sg); sumB.add(sb); k++
+        }
+        // per-region HSL
+        val hue = FloatArray(k); val sat = FloatArray(k); val light = FloatArray(k)
+        for (r in 0 until k) {
+            val a = areas[r].toFloat()
+            val rr = sumR[r] / a / 255f; val gg = sumG[r] / a / 255f; val bb = sumB[r] / a / 255f
+            val mx = max(rr, max(gg, bb)); val mn = min(rr, min(gg, bb))
+            light[r] = (mx + mn) / 2f
+            val d = mx - mn
+            sat[r] = if (d < 1e-4f) 0f else d / (1f - abs(2f * light[r] - 1f)).coerceAtLeast(1e-3f)
+            hue[r] = if (d < 1e-4f) 0f else 60f * when (mx) {
+                rr -> (((gg - bb) / d) % 6f + 6f) % 6f
+                gg -> (bb - rr) / d + 2f
+                else -> (rr - gg) / d + 4f
+            }
+        }
+        fun sameHue(a: Int, b: Int): Boolean {
+            val lowA = sat[a] < 0.15f; val lowB = sat[b] < 0.15f
+            if (lowA && lowB) return true
+            if (lowA || lowB) return false
+            var dh = abs(hue[a] - hue[b]); if (dh > 180f) dh = 360f - dh
+            return dh < 28f
+        }
+        // candidate shadow regions: sizeable, not ink-black
+        val cand = BooleanArray(k) { areas[it] >= minArea && areas[it] < n * 0.35f && light[it] > 0.15f }
+        val isShadow = BooleanArray(k)
+        val adj = HashMap<Int, IntArray>()  // candidate -> adjacency counts keyed later
+        val reach = max(2, long / 120)
+        val adjCount = HashMap<Long, Int>()
+        for (y in 0 until h) for (x in 0 until w) {
+            val a = lab[y * w + x]
+            if (!cand[a]) continue
+            for (d in 0 until 4) {
+                val dx = if (d == 0) 1 else if (d == 1) -1 else 0
+                val dy = if (d == 2) 1 else if (d == 3) -1 else 0
+                var xx = x; var yy = y
+                var t = 0
+                while (t < reach) {
+                    xx += dx; yy += dy; t++
+                    if (xx !in 0 until w || yy !in 0 until h) break
+                    val b = lab[yy * w + xx]
+                    if (b == a) continue
+                    if (areas[b] < 3) continue   // antialias dust
+                    // thin dark line between: keep looking past it
+                    if (light[b] <= 0.2f || areas[b] < minArea / 4) continue
+                    val key = a.toLong() * k + b
+                    adjCount[key] = (adjCount[key] ?: 0) + 1
+                    break
+                }
+            }
+        }
+        val perim = IntArray(k)
+        for (y in 0 until h) for (x in 0 until w) {
+            val a = lab[y * w + x]
+            if (cand[a] && ((x > 0 && lab[y * w + x - 1] != a) || (x < w - 1 && lab[y * w + x + 1] != a) ||
+                    (y > 0 && lab[(y - 1) * w + x] != a) || (y < h - 1 && lab[(y + 1) * w + x] != a))) perim[a]++
+        }
+        for ((key, cnt) in adjCount) {
+            val a = (key / k).toInt(); val b = (key % k).toInt()
+            if (areas[b] <= areas[a] * 1.3f) continue
+            if (cnt < max(8, perim[a] / 6)) continue
+            if (!sameHue(a, b)) continue
+            if (light[a] < light[b] * 0.85f && light[a] > light[b] * 0.35f) isShadow[a] = true
+        }
+        val mask = ByteArray(n)
+        var any = false
+        for (i in 0 until n) if (isShadow[lab[i]]) { mask[i] = 1; any = true }
+        if (!any) return emptyList()
+        var c = morph(morph(mask, w, h, max(1, long / 260), true), w, h, max(1, long / 260), false)
+        c = smoothMask(c, w, h, max(2, long / 120))
+        // keep clear of the outline
+        val src = inkBinary(lum, w, h, ink)
+        val near = morph(ByteArray(n) { if (src[it] > 0f) 1 else 0 }, w, h, max(1, long / 300), false)
+        for (i in 0 until n) if (near[i].toInt() != 0) c[i] = 0
+        removeSmall(c, w, h, minArea / 2)
+        var left = false; for (v in c) if (v.toInt() != 0) { left = true; break }
+        if (!left) return emptyList()
+        val labels = label(c, w, h)
+        val cap = min(HARD_CAP, settings.maxStrokes)
+        var spacing = max(max(4f, long * 0.0068f), 2.2f * hatchWidth(long))
+        var pieces: List<Piece> = emptyList()
+        for (attempt in 0 until 8) {
+            pieces = build(listOf(c), labels, w, h, long, spacing, settings.shadingStyle)
+            if (pieces.size <= cap) break
+            spacing *= 1.22f
+        }
+        return pieces.sortedWith(compareBy<Piece>({ it.region }, { it.band }, { it.order })).take(cap).map { it.stroke }
     }
 
     // ===================== subject / background =================================

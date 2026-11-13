@@ -18,6 +18,12 @@ import kotlin.math.roundToInt
 /** Orchestrates line source selection, vectorising, shading and colour fill. */
 object SketchPipeline {
 
+    /** Line source actually used by the most recent [run] (after AUTO resolution and fallbacks). */
+    @Volatile var lastLineSource: String = ""
+
+    /** Last model/extractor failure that caused a fallback (null if the last run had none). */
+    @Volatile var lastError: Throwable? = null
+
     suspend fun run(
         argb: IntArray,
         w: Int,
@@ -26,6 +32,7 @@ object SketchPipeline {
         model: LineArtModel?,
         progress: (stage: String, fraction: Float) -> Unit = { _, _ -> },
     ): GeneratedDrawing = withContext(Dispatchers.Default) {
+        lastError = null
         val ctx = currentCoroutineContext()
         fun check() = ctx.ensureActive()
 
@@ -47,6 +54,7 @@ object SketchPipeline {
         }
         check()
 
+        val lineWidth = settings.lineWidth // LineArtVectorizer scales width by image size itself
         var ink: FloatArray? = null
         var outline: List<Stroke>? = null
         if (source == LineSource.AI) {
@@ -56,11 +64,13 @@ object SketchPipeline {
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
+                lastError = t
                 source = LineSource.CLASSIC
                 ink = null
             }
             check()
         }
+        lastLineSource = source.name
         if (source == LineSource.CARTOON) {
             progress("Extracting cartoon lines", 0.10f)
             ink = CartoonLineExtractor.inkMap(px, pw, ph, settings.detail)
@@ -77,14 +87,14 @@ object SketchPipeline {
             outline = StrokeGenerator.generateBlocking(px, pw, ph, gs).outline
         } else {
             progress("Vectorising lines", 0.40f)
-            outline = LineArtVectorizer.vectorize(ink!!, pw, ph, settings.detail, settings.lineWidth, settings.maxStrokes)
+            outline = LineArtVectorizer.vectorize(ink!!, pw, ph, settings.detail, lineWidth, settings.maxStrokes)
         }
         check()
 
         var shading: List<Stroke> = emptyList()
         if (settings.shading != ShadingLevel.NONE) {
             progress("Shading", 0.60f)
-            shading = ShadingGenerator.generate(px, pw, ph, settings, ink)
+            shading = ShadingGenerator.generate(px, pw, ph, settings, ink, cartoon = source == LineSource.CARTOON)
             check()
         }
 
@@ -95,7 +105,10 @@ object SketchPipeline {
                 px, pw, ph, pw, ph, settings.fillColors.coerceIn(6, 16), settings.fillSpacing,
             )
             check()
-            outline = ColorStrokeGenerator.colorizeOutline(outline, px, pw, ph, pw, ph)
+            // Cartoon ink stays black; photos get a recoloured outline, darkened by >= 45%.
+            if (source != LineSource.CARTOON) {
+                outline = ColorStrokeGenerator.colorizeOutline(outline, px, pw, ph, pw, ph, darken = 0.55f)
+            }
             check()
         }
 

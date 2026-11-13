@@ -49,6 +49,8 @@ object CartoonLineExtractor {
         val out = FloatArray(n)
         for (i in 0 until n) if (mask[i]) out[i] = max(0.5f, strength[i]).let { if (strength[i] < 0.5f) 1f else it }
 
+        addDarkBlobs(v, w, h, strength, mask, out, d)
+        addSmallRegions(argb, w, h, mask, out)
         if (d > 0.15f) addRegionBoundaries(argb, w, h, d, mask, out, long)
         return out
     }
@@ -87,10 +89,13 @@ object CartoonLineExtractor {
         val out = FloatArray(n)
         for (i in 0 until n) {
             val vv = v[i].toFloat()
-            val dark = ramp(hi - vv, 0f, hi - lo)           // 1 when vv <= lo
+            val gap = (closed[i] - v[i]).toFloat()
+            var dark = ramp(hi - vv, 0f, hi - lo)           // 1 when vv <= lo
+            // outlines that are dark-blue/brown rather than black: accept up to hi+45 when the
+            // local surround is much brighter (relative darkness gate)
+            if (vv < hi + 45f) dark = max(dark, ramp(gap, 75f, 110f) * ramp(hi + 45f - vv, 0f, 20f))
             if (dark <= 0f) continue
-            val bh = ramp((closed[i] - v[i]).toFloat(), bhLo, bhHi)
-            out[i] = dark * bh
+            out[i] = dark * ramp(gap, bhLo, bhHi)
         }
         return out
     }
@@ -183,6 +188,174 @@ object CartoonLineExtractor {
                 if (y < h - 1) { val q = p + w; if (!mask[q] && !seen[q]) { seen[q] = true; stack[sp++] = q } }
             }
             if (!border && cnt <= maxArea && dark >= 0.6f * cnt) for (k in 0 until cnt) mask[comp[k]] = true
+        }
+    }
+
+
+    // ------------------------------------------------------------------ small features
+
+    /**
+     * Keeps compact dark blobs (pupils, nose, buttons) that the thin-line black-hat drops.
+     * Small blobs become solid dots, large ones a ring plus a centre dot.
+     */
+    private fun addDarkBlobs(v: IntArray, w: Int, h: Int, strength: FloatArray, mask: BooleanArray, out: FloatArray, d: Float) {
+        val n = w * h
+        val long = max(w, h)
+        val hist = IntArray(256)
+        for (x in v) hist[x]++
+        var acc = 0; var p1 = 0
+        val target = (n * 0.01f).toInt()
+        for (i in 0 until 256) { acc += hist[i]; if (acc >= target) { p1 = i; break } }
+        val t = (p1 + 55f + 30f * d).coerceIn(70f, 130f).toInt()
+        val dark = BooleanArray(n) { v[it] < t }
+        val minA = max(8f, n * 0.00002f); val maxA = n * 0.005f
+        val bigA = n * 0.0001f
+        val near = max(3, (long * 0.012f).roundToInt())
+        val inkInt = IntArray(n) { if (mask[it]) 1 else 0 }
+        val inkNear = slidingMax(inkInt, w, h, near)
+        val seen = BooleanArray(n); val stack = IntArray(n); val comp = IntArray(n)
+        for (s in 0 until n) {
+            if (!dark[s] || seen[s]) continue
+            var sp = 0; var cnt = 0
+            stack[sp++] = s; seen[s] = true
+            var x0 = w; var x1 = 0; var y0 = h; var y1 = 0; var sumV = 0L; var nearCnt = 0; var inkCnt = 0
+            while (sp > 0) {
+                val p = stack[--sp]; comp[cnt++] = p
+                val x = p % w; val y = p / w
+                sumV += v[p]; if (inkNear[p] == 1) nearCnt++; if (mask[p]) inkCnt++
+                if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
+                if (x > 0) { val q = p - 1; if (dark[q] && !seen[q]) { seen[q] = true; stack[sp++] = q } }
+                if (x < w - 1) { val q = p + 1; if (dark[q] && !seen[q]) { seen[q] = true; stack[sp++] = q } }
+                if (y > 0) { val q = p - w; if (dark[q] && !seen[q]) { seen[q] = true; stack[sp++] = q } }
+                if (y < h - 1) { val q = p + w; if (dark[q] && !seen[q]) { seen[q] = true; stack[sp++] = q } }
+            }
+            if (cnt < minA || cnt > maxA) continue
+            val bw = x1 - x0 + 1; val bh = y1 - y0 + 1
+            if (cnt < 0.45f * bw * bh || max(bw, bh) > 2.5f * min(bw, bh)) continue
+            if (inkCnt > 0.5f * cnt) continue               // already a drawn line
+            val pad = max(3, (0.6f * max(bw, bh)).toInt())
+            var rs = 0L; var rc = 0
+            for (yy in max(0, y0 - pad)..min(h - 1, y1 + pad)) for (xx in max(0, x0 - pad)..min(w - 1, x1 + pad)) {
+                val q = yy * w + xx
+                if (!dark[q]) { rs += v[q]; rc++ }
+            }
+            if (rc == 0) continue
+            val contrast = rs.toFloat() / rc - sumV.toFloat() / cnt
+            val nearInk = nearCnt > 0
+            val ok = if (nearInk) contrast >= 45f && cnt >= minA else contrast >= 80f && cnt >= bigA
+            if (!ok) continue
+            val rad = kotlin.math.sqrt(cnt / 3.14159f)
+            if (rad <= long * 0.02f) {
+                for (k in 0 until cnt) out[comp[k]] = 1f
+            } else {
+                val cx = (x0 + x1) / 2f; val cy = (y0 + y1) / 2f
+                for (k in 0 until cnt) {
+                    val p = comp[k]; val x = p % w; val y = p / w
+                    var edge = false
+                    if (x == 0 || y == 0 || x == w - 1 || y == h - 1) edge = true
+                    else if (!dark[p - 1] || !dark[p + 1] || !dark[p - w] || !dark[p + w]) edge = true
+                    val dx = x - cx; val dy = y - cy
+                    if (edge || dx * dx + dy * dy <= (0.3f * rad) * (0.3f * rad)) out[p] = 1f
+                }
+            }
+        }
+    }
+
+    /**
+     * Small, strongly coloured regions (pink inner ears, cheeks) next to ink: emits their boundary
+     * where no ink exists yet. Regions are grown on a box-smoothed image so JPEG noise is ignored.
+     */
+    private fun addSmallRegions(argb: IntArray, w: Int, h: Int, inkMask: BooleanArray, out: FloatArray) {
+        val n = w * h
+        val long = max(w, h)
+        val sc = max(1, long / 512)
+        val sw = w / sc; val sh = h / sc
+        if (sw < 8 || sh < 8) return
+        val sn = sw * sh
+        val rr = IntArray(sn); val gg = IntArray(sn); val bb = IntArray(sn)
+        val ink = BooleanArray(sn)
+        val k = sc * sc
+        for (y in 0 until sh) for (x in 0 until sw) {
+            var sr = 0; var sg = 0; var sb = 0; var ic = 0
+            for (yy in 0 until sc) for (xx in 0 until sc) {
+                val p = (y * sc + yy) * w + x * sc + xx
+                val c = argb[p]
+                sr += (c shr 16) and 255; sg += (c shr 8) and 255; sb += c and 255
+                if (inkMask[p]) ic++
+            }
+            rr[y * sw + x] = sr / k; gg[y * sw + x] = sg / k; bb[y * sw + x] = sb / k
+            ink[y * sw + x] = ic * 3 >= k
+        }
+        fun cd2(a: Int, b: Int): Int {
+            val dr = rr[a] - rr[b]; val dg = gg[a] - gg[b]; val db = bb[a] - bb[b]
+            return dr * dr + dg * dg + db * db
+        }
+        val lab = IntArray(sn) { -1 }
+        val st = IntArray(sn); val cm = IntArray(sn)
+        val minA = max(6f, sn * 0.00015f); val maxA = sn * 0.006f
+        val link = 22 * 22
+        val boundary = BooleanArray(sn)
+        var id = 0
+        for (s in 0 until sn) {
+            if (lab[s] >= 0 || ink[s]) continue
+            var sp = 0; var cnt = 0
+            st[sp++] = s; lab[s] = id
+            var x0 = sw; var x1 = 0; var y0 = sh; var y1 = 0
+            while (sp > 0) {
+                val p = st[--sp]; cm[cnt++] = p
+                val x = p % sw; val y = p / sw
+                if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
+                if (cnt > maxA) { /* too big: keep labelling but cheaply */ }
+                if (x > 0) { val q = p - 1; if (lab[q] < 0 && !ink[q] && cd2(p, q) < link) { lab[q] = id; st[sp++] = q } }
+                if (x < sw - 1) { val q = p + 1; if (lab[q] < 0 && !ink[q] && cd2(p, q) < link) { lab[q] = id; st[sp++] = q } }
+                if (y > 0) { val q = p - sw; if (lab[q] < 0 && !ink[q] && cd2(p, q) < link) { lab[q] = id; st[sp++] = q } }
+                if (y < sh - 1) { val q = p + sw; if (lab[q] < 0 && !ink[q] && cd2(p, q) < link) { lab[q] = id; st[sp++] = q } }
+            }
+            id++
+            if (cnt < minA || cnt > maxA) continue
+            val bw = x1 - x0 + 1; val bh = y1 - y0 + 1
+            if (cnt < 0.4f * bw * bh) continue
+            // mean colour of the region vs. mean colour of the non-ink ring around it; count ink contact
+            var mr = 0L; var mg = 0L; var mb = 0L
+            for (j in 0 until cnt) { mr += rr[cm[j]]; mg += gg[cm[j]]; mb += bb[cm[j]] }
+            val cr = mr / cnt; val cg = mg / cnt; val cb = mb / cnt
+            var er = 0L; var eg = 0L; var eb = 0L; var en = 0; var edgeN = 0; var inkContact = 0
+            val pad = 2
+            for (j in 0 until cnt) {
+                val p = cm[j]; val x = p % sw; val y = p / sw
+                var isEdge = false
+                for (dy in -pad..pad) for (dx in -pad..pad) {
+                    val xx = x + dx; val yy = y + dy
+                    if (xx < 0 || yy < 0 || xx >= sw || yy >= sh) continue
+                    val q = yy * sw + xx
+                    if (lab[q] == lab[s] && lab[q] >= 0) continue
+                    if (abs(dx) <= 1 && abs(dy) <= 1) isEdge = true
+                    if (ink[q]) { if (abs(dx) <= 1 && abs(dy) <= 1) inkContact++; continue }
+                    er += rr[q]; eg += gg[q]; eb += bb[q]; en++
+                }
+                if (isEdge) edgeN++
+            }
+            if (en == 0 || edgeN == 0) continue
+            val dr = cr - er / en; val dg = cg - eg / en; val db = cb - eb / en
+            if (dr * dr + dg * dg + db * db < 80L * 80L) continue
+            // must sit inside ink structure: ink touches a good part of the outline
+            if (inkContact < edgeN * 0.2f) continue
+            for (j in 0 until cnt) {
+                val p = cm[j]; val x = p % sw; val y = p / sw
+                var e = false
+                if (x == 0 || y == 0 || x == sw - 1 || y == sh - 1 || lab[p - 1] != lab[p] || lab[p + 1] != lab[p] || lab[p - sw] != lab[p] || lab[p + sw] != lab[p]) e = true
+                if (e) boundary[p] = true
+            }
+        }
+        val near = max(2, (long * 0.006f).roundToInt())
+        val inkInt = IntArray(n) { if (inkMask[it]) 1 else 0 }
+        val dil = slidingMax(inkInt, w, h, near)
+        for (y in 0 until sh) for (x in 0 until sw) {
+            if (!boundary[y * sw + x]) continue
+            for (yy in y * sc until min(h, y * sc + sc)) for (xx in x * sc until min(w, x * sc + sc)) {
+                val p = yy * w + xx
+                if (dil[p] == 0 && out[p] < 0.9f) out[p] = 0.9f
+            }
         }
     }
 

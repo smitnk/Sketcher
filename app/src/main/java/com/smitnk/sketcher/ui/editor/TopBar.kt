@@ -1,5 +1,6 @@
 package com.smitnk.sketcher.ui.editor
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -58,6 +60,7 @@ fun TopBar(
     onGenerate: () -> Unit,
     modifier: Modifier = Modifier,
     onSettings: (() -> Unit)? = null,
+    onRename: (() -> Unit)? = null,
 ) {
     val colors = SketcherTokens.colors
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -82,7 +85,8 @@ fun TopBar(
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(horizontal = SketcherTokens.space4),
+                        modifier = Modifier.weight(1f).padding(horizontal = SketcherTokens.space4)
+                            .let { m -> if (onRename != null) m.clickable(onClickLabel = "Rename project", onClick = onRename) else m },
                     )
                 } else {
                     Spacer(Modifier.weight(1f))
@@ -109,7 +113,7 @@ fun TopBar(
                     Icon(Icons.Default.FileDownload, contentDescription = "Export")
                 }
                 Spacer(Modifier.width(SketcherTokens.space2))
-                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings)
+                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename)
             }
         }
     }
@@ -122,6 +126,7 @@ private fun OverflowMenu(
     onDemo: () -> Unit,
     onGenerate: () -> Unit,
     onSettings: (() -> Unit)?,
+    onRename: (() -> Unit)?,
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
@@ -144,6 +149,13 @@ private fun OverflowMenu(
             leadingIcon = { Icon(Icons.Default.AutoFixHigh, contentDescription = null) },
             onClick = { open = false; onGenerate() },
         )
+        if (onRename != null) {
+            DropdownMenuItem(
+                text = { Text("Rename project") },
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                onClick = { open = false; onRename() },
+            )
+        }
         if (onSettings != null) {
             DropdownMenuItem(
                 text = { Text("Settings") },

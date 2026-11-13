@@ -58,6 +58,35 @@ class ColorStrokeGeneratorTest {
     }
 
     @Test
+    fun gradientBecomesSmoothPerStrokeColours() {
+        // vertical blue gradient, dark at top -> light at bottom
+        val n = 300
+        val px = IntArray(n * n) { i -> val y = i / n; val v = 120 + y * 100 / n; (0xFF shl 24) or ((v - 60) shl 16) or ((v - 20) shl 8) or 255 }
+        val fill = ColorStrokeGenerator.generateFill(px, n, n, n, n, colors = 8, spacing = 5f)
+        assertTrue(fill.isNotEmpty())
+        assertTrue("distinct colours ${fill.map { it.color }.toSet().size}", fill.map { it.color }.toSet().size >= 8)
+        val top = fill.filter { it.points[1] < 60f }.map { r(it.color) }
+        val bottom = fill.filter { it.points[1] > 240f }.map { r(it.color) }
+        assertTrue(top.isNotEmpty() && bottom.isNotEmpty())
+        assertTrue(top.average() < bottom.average())
+    }
+
+    @Test
+    fun fillStaysInsideOutlineAndOffPaper() {
+        val px = IntArray(200 * 200) { white }
+        for (y in 50 until 150) for (x in 50 until 150) {
+            val edge = x < 53 || x >= 147 || y < 53 || y >= 147
+            px[y * 200 + x] = if (edge) 0xFF111111.toInt() else red
+        }
+        val fill = ColorStrokeGenerator.generateFill(px, 200, 200, 200, 200, colors = 6, spacing = 4f)
+        assertTrue(fill.isNotEmpty())
+        for (s in fill) for (i in s.points.indices step 2) {
+            assertTrue("x=${s.points[i]}", s.points[i] in 52f..148f)
+            assertTrue("y=${s.points[i + 1]}", s.points[i + 1] in 52f..148f)
+        }
+    }
+
+    @Test
     fun runsFastOnLargeImage() {
         val n = 1024
         val px = IntArray(n * n) { i -> val x = i % n; val y = i / n; (0xFF shl 24) or ((x / 4 and 255) shl 16) or ((y / 4 and 255) shl 8) or 128 }

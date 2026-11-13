@@ -60,4 +60,18 @@ class ShadingGeneratorTest {
             assertTrue(s.all { it.color == 0xFF3A3A3A.toInt() && it.width in 1.0f..3.4f && it.points.size >= 4 })
         }
     }
+
+    @Test fun cartoonFlatColourGivesNoShading() {
+        val px = IntArray(w * h) { 0xFF3070D0.toInt() }
+        val s = ShadingGenerator.generate(px, w, h, PipelineSettings(shading = ShadingLevel.MEDIUM), null, cartoon = true)
+        assertTrue(s.isEmpty())
+    }
+
+    @Test fun cartoonCelShadowIsShaded() {
+        val px = IntArray(w * h) { 0xFFFFFFFF.toInt() }
+        for (y in 40 until 260) for (x in 60 until 340) px[y * w + x] = if (x > 220) 0xFF2050A0.toInt() else 0xFF4080E0.toInt()
+        val s = ShadingGenerator.generate(px, w, h, PipelineSettings(shading = ShadingLevel.MEDIUM), null, cartoon = true)
+        assertTrue(s.isNotEmpty())
+        assertTrue(s.all { st -> (0 until st.points.size step 2).all { st.points[it] > 200f } })
+    }
 }

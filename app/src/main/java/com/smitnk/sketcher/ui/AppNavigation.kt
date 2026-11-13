@@ -4,14 +4,19 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smitnk.sketcher.ui.home.HomeScreen
+import com.smitnk.sketcher.ui.home.RecentProjectUi
 
 private enum class Screen { HOME, EDITOR }
 
@@ -30,6 +35,12 @@ fun AppNavigation(
     var screen by rememberSaveable { mutableStateOf(if (startInEditor) Screen.EDITOR else Screen.HOME) }
     // 'pose' hint: set when the picker was opened from "Import pose render". Not yet consumed by the VM.
     var poseHint by rememberSaveable { mutableStateOf(false) }
+
+    var deleteTarget by remember { mutableStateOf<RecentProjectUi?>(null) }
+
+    LaunchedEffect(screen) {
+        if (screen == Screen.HOME) vm.refreshRecent()
+    }
 
     LaunchedEffect(editorRequest) {
         if (editorRequest > 0) screen = Screen.EDITOR
@@ -54,12 +65,35 @@ fun AppNavigation(
                 vm.runDemo() // starts a fresh project (resets layers, then generates)
                 screen = Screen.EDITOR
             },
-            onOpenProject = { screen = Screen.EDITOR },
-            recentProjects = emptyList(),
+            onOpenProject = { id ->
+                vm.openProject(id)
+                screen = Screen.EDITOR
+            },
+            recentProjects = vm.recentProjects,
+            onDeleteProject = { id -> deleteTarget = vm.recentProjects.firstOrNull { it.id == id } },
         )
         Screen.EDITOR -> {
-            BackHandler { screen = Screen.HOME }
-            SketchScreen(vm, onBack = { screen = Screen.HOME })
+            val leave = {
+                vm.saveAndRefresh()
+                screen = Screen.HOME
+            }
+            BackHandler { leave() }
+            SketchScreen(vm, onBack = leave)
         }
+    }
+
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Delete project?") },
+            text = { Text("\"${target.name}\" will be permanently deleted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deleteProject(target.id)
+                    deleteTarget = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+        )
     }
 }

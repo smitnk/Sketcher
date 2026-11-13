@@ -25,7 +25,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +68,10 @@ fun EditorScreen(
     var showLayers by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showExport by remember { mutableStateOf(false) }
+    var renameText by remember { mutableStateOf<String?>(null) }
+
+    // Layer property edits (visibility, opacity, order...) made in the panel trigger autosave.
+    LaunchedEffect(vm) { vm.watchLayerChanges() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) vm.loadImage(uri)
@@ -165,7 +173,8 @@ fun EditorScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             TopBar(
-                title = projectTitle,
+                title = vm.projectName,
+                onRename = { renameText = vm.projectName },
                 generating = vm.generating,
                 playing = anim.playing,
                 onBack = onBack,
@@ -180,6 +189,30 @@ fun EditorScreen(
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(horizontal = SketcherTokens.space12, vertical = SketcherTokens.space8),
+            )
+        }
+
+        renameText?.let { text ->
+            AlertDialog(
+                onDismissRequest = { renameText = null },
+                title = { Text("Rename project") },
+                text = {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { renameText = it.take(80) },
+                        singleLine = true,
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = text.isNotBlank(),
+                        onClick = {
+                            vm.renameProject(text)
+                            renameText = null
+                        },
+                    ) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { renameText = null }) { Text("Cancel") } },
             )
         }
 

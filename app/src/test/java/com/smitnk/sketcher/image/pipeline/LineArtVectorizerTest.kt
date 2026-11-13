@@ -90,7 +90,9 @@ class LineArtVectorizerTest {
         line(ink, 20, 180, 230, 180, 0.35f)
         val s = LineArtVectorizer.vectorize(ink, w, h, 1.0f, 3f, 100)
         assertEquals(2, s.size)
-        assertTrue(s.all { it.width in 3f * 0.6f - 1e-3f..3f * 1.6f + 1e-3f })
+        // width scales with image size (lineWidth is for 1024px) and spans 0.5..1.3x
+        val base = 3f * (256f / 1024f).coerceIn(0.6f, 2.2f)
+        assertTrue(s.all { it.width in base * 0.5f - 1e-3f..base * 1.3f + 1e-3f })
         val strong = s.first { it.points[1] < 100f }
         val weak = s.first { it.points[1] > 100f }
         assertTrue(strong.width > weak.width)
