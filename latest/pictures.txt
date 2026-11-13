@@ -1,0 +1,9 @@
+/sdcard/Pictures:
+total 8
+drwxrws--- 2 u0_a141 media_rw 4096 2026-11-13 07:08 Sketcher
+
+/sdcard/Pictures/Sketcher:
+total 1660
+-rwxrwx--- 1 u0_a141 media_rw   40277 2026-11-13 07:08 Sketcher_Outline_20261113_070800.png
+-rwxrwx--- 1 u0_a141 media_rw 1559794 2026-11-13 07:08 Sketcher_animation_20261113_070842.gif
+-rwxrwx--- 1 u0_a141 media_rw   82317 2026-11-13 07:08 Sketcher_drawing_20261113_070800.png
