@@ -98,7 +98,7 @@ object StrokeGenerator {
         val detail = settings.detail.coerceIn(0f, 1f)
         val gray0 = toGray(pixels, width * height)
         val (gray, w, h) = downscale(gray0, width, height, settings.maxSide)
-        val smooth = gaussianBlur(gray, w, h, 1.7f - 0.6f * detail)
+        val smooth = gaussianBlur(bilateral(gray, w, h, detail), w, h, 1.3f - 0.5f * detail)
 
         val outline = makeOutline(smooth, w, h, settings, detail)
             .map { Stroke(it, OUTLINE_COLOR, OUTLINE_WIDTH) }
@@ -210,6 +210,174 @@ object StrokeGenerator {
         return out
     }
 
+    /** Edge-preserving smoothing (two cheap bilateral passes): flattens noise and fine texture, keeps contours. */
+    private fun bilateral(src: FloatArray, w: Int, h: Int, detail: Float): FloatArray {
+        if (w < 8 || h < 8) return src
+        val sigR = 34f - 18f * detail
+        val lut = FloatArray(256) { exp(-(it * it) / (2f * sigR * sigR)) }
+        val r = 2
+        val sp = FloatArray(25)
+        for (dy in -r..r) for (dx in -r..r) sp[(dy + r) * 5 + dx + r] = exp(-(dx * dx + dy * dy) / (2f * 1.5f * 1.5f))
+        var cur = src
+        for (pass in 0 until 2) {
+            val out = FloatArray(w * h)
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    val i = y * w + x
+                    val c = cur[i]
+                    var acc = 0f
+                    var ws = 0f
+                    val inner = x >= r && y >= r && x < w - r && y < h - r
+                    for (dy in -r..r) {
+                        val yy = if (inner) y + dy else (y + dy).coerceIn(0, h - 1)
+                        for (dx in -r..r) {
+                            val xx = if (inner) x + dx else (x + dx).coerceIn(0, w - 1)
+                            val v = cur[yy * w + xx]
+                            val d = abs(v - c)
+                            val wt = sp[(dy + r) * 5 + dx + r] * lut[if (d > 255f) 255 else d.toInt()]
+                            acc += wt * v
+                            ws += wt
+                        }
+                    }
+                    out[i] = acc / ws
+                }
+            }
+            cur = out
+        }
+        return cur
+    }
+
+    private fun boxMean(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+        val tmp = FloatArray(w * h)
+        val out = FloatArray(w * h)
+        val inv = 1f / (2 * r + 1)
+        for (y in 0 until h) {
+            var acc = 0f
+            val row = y * w
+            for (k in -r..r) acc += src[row + k.coerceIn(0, w - 1)]
+            for (x in 0 until w) {
+                tmp[row + x] = acc * inv
+                acc += src[row + (x + r + 1).coerceIn(0, w - 1)] - src[row + (x - r).coerceIn(0, w - 1)]
+            }
+        }
+        for (x in 0 until w) {
+            var acc = 0f
+            for (k in -r..r) acc += tmp[k.coerceIn(0, h - 1) * w + x]
+            for (y in 0 until h) {
+                out[y * w + x] = acc * inv
+                acc += tmp[(y + r + 1).coerceIn(0, h - 1) * w + x] - tmp[(y - r).coerceIn(0, h - 1) * w + x]
+            }
+        }
+        return out
+    }
+
+    /** Per-pixel texture evidence: local edge density, structure-tensor coherence and gradient energy. */
+    private class TextureMaps(val density: FloatArray, val coherence: FloatArray, val energy: FloatArray, val mag: FloatArray)
+
+    private fun textureMaps(g: FloatArray, edges: FloatArray, w: Int, h: Int): TextureMaps {
+        val mag = FloatArray(w * h)
+        val jxx = FloatArray(w * h)
+        val jyy = FloatArray(w * h)
+        val jxy = FloatArray(w * h)
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            val i = y * w + x
+            val gx = (g[i + 1] - g[i - 1]) * 0.5f
+            val gy = (g[i + w] - g[i - w]) * 0.5f
+            mag[i] = sqrt(gx * gx + gy * gy)
+            jxx[i] = gx * gx
+            jyy[i] = gy * gy
+            jxy[i] = gx * gy
+        }
+        val tr = max(6, min(w, h) / 40)
+        val axx = boxMean(jxx, w, h, tr)
+        val ayy = boxMean(jyy, w, h, tr)
+        val axy = boxMean(jxy, w, h, tr)
+        val coh = FloatArray(w * h)
+        val en = FloatArray(w * h)
+        for (i in coh.indices) {
+            val t = axx[i] + ayy[i]
+            en[i] = sqrt(t)
+            val d = sqrt((axx[i] - ayy[i]) * (axx[i] - ayy[i]) + 4f * axy[i] * axy[i])
+            coh[i] = if (t > 1e-3f) d / t else 1f
+        }
+        val eb = FloatArray(w * h) { if (edges[it] > 0f) 1f else 0f }
+        val dens = boxMean(eb, w, h, tr)
+        return TextureMaps(dens, coh, en, mag)
+    }
+
+    /**
+     * Decides whether a traced chain is real contour or texture. Texture = chain lying in a region with many
+     * edges and no dominant orientation, or a short wiggly chain that does not stand out from local gradient
+     * energy. Long, strong, smooth chains survive anywhere.
+     */
+    private fun isTextureChain(c: FloatArray, tm: TextureMaps, w: Int, h: Int, detail: Float): Boolean {
+        val n = c.size / 2
+        if (n < 2) return true
+        // resample every ~3 px and measure length / turning
+        var len = 0f
+        for (k in 1 until n) len += hypot2(c[2 * k] - c[2 * k - 2], c[2 * k + 1] - c[2 * k - 1])
+        val step = 3f
+        val m = max(2, (len / step).toInt() + 1)
+        val rx = FloatArray(m)
+        val ry = FloatArray(m)
+        var seg = 1
+        var segStart = 0f
+        var segLen = hypot2(c[2] - c[0], c[3] - c[1])
+        for (q in 0 until m) {
+            val d = if (m == 1) 0f else len * q / (m - 1)
+            while (seg < n - 1 && d > segStart + segLen) {
+                segStart += segLen
+                seg++
+                segLen = hypot2(c[2 * seg] - c[2 * seg - 2], c[2 * seg + 1] - c[2 * seg - 1])
+            }
+            val t = if (segLen > 1e-3f) ((d - segStart) / segLen).coerceIn(0f, 1f) else 0f
+            rx[q] = c[2 * seg - 2] + (c[2 * seg] - c[2 * seg - 2]) * t
+            ry[q] = c[2 * seg - 1] + (c[2 * seg + 1] - c[2 * seg - 1]) * t
+        }
+        for (it in 0 until 2) for (q in 1 until m - 1) {
+            rx[q] = 0.25f * rx[q - 1] + 0.5f * rx[q] + 0.25f * rx[q + 1]
+            ry[q] = 0.25f * ry[q - 1] + 0.5f * ry[q] + 0.25f * ry[q + 1]
+        }
+        var turn = 0f
+        for (q in 1 until m - 1) {
+            val a = atan2(ry[q + 1] - ry[q], rx[q + 1] - rx[q]) - atan2(ry[q] - ry[q - 1], rx[q] - rx[q - 1])
+            var d = abs(a)
+            if (d > PI.toFloat()) d = 2f * PI.toFloat() - d
+            turn += d
+        }
+        val curv = if (len > 1f) turn / len else 0f // rad per px
+        // sample maps along chain
+        var dens = 0f
+        var coh = 0f
+        var ratio = 0f
+        for (k in 0 until n) {
+            val x = c[2 * k].roundToInt().coerceIn(1, w - 2)
+            val y = c[2 * k + 1].roundToInt().coerceIn(1, h - 2)
+            val i = y * w + x
+            dens += tm.density[i]
+            coh += tm.coherence[i]
+            var mg = 0f
+            for (dy in -1..1) for (dx in -1..1) mg = max(mg, tm.mag[i + dy * w + dx])
+            ratio += mg / (tm.energy[i] + 1.5f)
+        }
+        dens /= n
+        coh /= n
+        ratio /= n
+        val relax = 1.25f - 0.5f * detail
+        if (System.getenv("B5DBG") != null) System.err.println("CH ${c[0].toInt()} ${c[1].toInt()} len=${len.toInt()} curv=${curv} dens=${dens} coh=${coh} ratio=${ratio}")
+        // 1) squiggles: tight turning for their length
+        val closed = false
+        if (!closed && ratio < 2.9f && curv > 0.30f && len < 70f) return true
+        if (!closed && ratio < 2.9f && curv > 0.18f && len < 40f) return true
+        // 2) no dominant orientation around the chain = texture (grass, noise, fabric)
+        val smoothLong = (len > 100f * relax && curv < 0.05f && ratio > 2.0f) || ratio > 2.9f
+        if (coh < 0.36f && dens > 0.03f && !smoothLong) return true
+        if (!closed && coh < 0.5f && dens > 0.04f && len < 45f * relax && curv > 0.09f) return true
+        return false
+    }
+
+    private fun hypot2(a: Float, b: Float) = sqrt(a * a + b * b)
+
     // ---------------------------------------------------------------- outline pipeline
 
     private fun makeOutline(smooth: FloatArray, w: Int, h: Int, s: GeneratorSettings, detail: Float): List<FloatArray> {
@@ -225,13 +393,15 @@ object StrokeGenerator {
         pruneSpurs(skel, w, h, mergeRadius * 2 + 4)
 
         val minLen = max(3, (s.minStrokeLength * (1.6f - 0.8f * detail)).roundToInt())
-        val chains = traceChains(skel, strength, w, h, minLen, minLen * 3, high.high * 1.3f)
+        val chains = traceChains(skel, strength, w, h, minLen, minLen * 2, high.high * 1.15f)
         val gap = if (s.gapClose >= 0f) s.gapClose else 5f + 12f * detail
         val linked = bridgeGaps(linkEnds(chains, gap), gap * 0.8f)
 
         val eps = max(0.3f, s.rdpEpsilon * 0.75f)
+        val tm = textureMaps(smooth, high.strength, w, h)
         val smoothed = ArrayList<FloatArray>(linked.size)
         for (c in linked) {
+            if (isTextureChain(c, tm, w, h, detail)) continue
             val p = smoothChain(c, eps)
             if (p.size >= 4) smoothed.add(p)
         }
@@ -282,8 +452,8 @@ object StrokeGenerator {
         val half = mag.size / 2
         while (median < 2047 && acc + hist[median] < half) acc += hist[median++]
 
-        val high = min(320f, max(150f - 110f * detail, 3.2f * median))
-        val low = max(high * 0.4f, 1.5f * median)
+        val high = min(320f, max(125f - 100f * detail, 2.4f * median))
+        val low = max(high * 0.38f, 1.4f * median)
 
         val nms = FloatArray(w * h)
         for (y in 1 until h - 1) {

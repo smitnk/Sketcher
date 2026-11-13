@@ -39,6 +39,13 @@ class AnimationController {
         playing = true
     }
 
+    /** Scrub to [fraction] (0..1): pauses playback and shows the partial drawing at that progress. */
+    fun seek(fraction: Float) {
+        playing = false
+        active = true
+        progress = fraction.coerceIn(0f, 1f)
+    }
+
     fun showFinished() {
         playing = false
         active = false

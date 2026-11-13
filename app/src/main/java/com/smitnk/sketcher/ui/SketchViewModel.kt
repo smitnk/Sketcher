@@ -17,14 +17,17 @@ import com.smitnk.sketcher.export.ExportFormat
 import com.smitnk.sketcher.export.Exporter
 import com.smitnk.sketcher.export.GifExporter
 import com.smitnk.sketcher.export.VideoExporter
-import com.smitnk.sketcher.image.ColorStrokeGenerator
 import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.DrawMode
 import com.smitnk.sketcher.image.GeneratedDrawing
 import com.smitnk.sketcher.image.GeneratorSettings
 import com.smitnk.sketcher.image.ImageLoader
 import com.smitnk.sketcher.image.Stroke
-import com.smitnk.sketcher.image.StrokeGenerator
+import com.smitnk.sketcher.image.pipeline.LineSource
+import com.smitnk.sketcher.image.pipeline.OnnxLineArtModel
+import com.smitnk.sketcher.image.pipeline.PipelineSettings
+import com.smitnk.sketcher.image.pipeline.ShadingLevel
+import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.Project
 import kotlinx.coroutines.CancellationException
@@ -75,7 +78,75 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     val project = Project()
     val anim = AnimationController()
 
-    var settings by mutableStateOf(GeneratorSettings())
+    private var legacySettings by mutableStateOf(GeneratorSettings())
+
+    /** Legacy settings (used by the settings dialog); changes are mapped onto [pipelineSettings]. */
+    var settings: GeneratorSettings
+        get() = legacySettings
+        set(value) {
+            legacySettings = value
+            val p = pipelineSettings
+            pipelineSettings = p.copy(
+                detail = value.detail,
+                shading = if (value.mode == DrawMode.OUTLINE_SHADING) {
+                    if (p.shading == ShadingLevel.NONE) ShadingLevel.MEDIUM else p.shading
+                } else {
+                    ShadingLevel.NONE
+                },
+                colourFill = value.mode == DrawMode.COLOUR_FILL,
+                fillColors = value.fillColors.coerceIn(6, 16),
+                fillSpacing = value.fillSpacing,
+            )
+        }
+
+    var pipelineSettings by mutableStateOf(PipelineSettings())
+        private set
+
+    fun updatePipelineSettings(s: PipelineSettings) {
+        pipelineSettings = s
+    }
+
+    fun updatePipelineSettings(transform: (PipelineSettings) -> PipelineSettings) {
+        pipelineSettings = transform(pipelineSettings)
+    }
+
+    var generationStage by mutableStateOf("")
+        private set
+    var generationProgress by mutableFloatStateOf(0f)
+        private set
+
+    private var lineArtModel: OnnxLineArtModel? = null
+
+    private fun model(): OnnxLineArtModel =
+        lineArtModel ?: OnnxLineArtModel(app).also { lineArtModel = it }
+
+    override fun onCleared() {
+        lineArtModel?.close()
+        lineArtModel = null
+        super.onCleared()
+    }
+
+    /** Parses intent extras: engine = auto|ai|cartoon|classic, shading = none|light|medium|heavy. */
+    fun applyIntentOptions(engine: String?, shading: String?) {
+        val src = when (engine?.lowercase()) {
+            "auto" -> LineSource.AUTO
+            "ai" -> LineSource.AI
+            "cartoon" -> LineSource.CARTOON
+            "classic" -> LineSource.CLASSIC
+            else -> null
+        }
+        val sh = when (shading?.lowercase()) {
+            "none" -> ShadingLevel.NONE
+            "light" -> ShadingLevel.LIGHT
+            "medium" -> ShadingLevel.MEDIUM
+            "heavy" -> ShadingLevel.HEAVY
+            else -> null
+        }
+        pipelineSettings = pipelineSettings.copy(
+            lineSource = src ?: pipelineSettings.lineSource,
+            shading = sh ?: pipelineSettings.shading,
+        )
+    }
     var generating by mutableStateOf(false)
         private set
 
@@ -183,6 +254,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         autoVideo: Boolean = false,
         demo: String? = null,
         mode: String? = null,
+        engine: String? = null,
+        shading: String? = null,
+        testImage: String? = null,
     ) {
         if (autoVideo) pendingAutoVideo = true
         if (showLayers) pendingShowLayers = true
@@ -192,7 +266,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             "shading" -> settings = settings.copy(mode = DrawMode.OUTLINE_SHADING)
             "color" -> settings = settings.copy(mode = DrawMode.COLOUR_FILL)
         }
-        if (autodemo) runDemo(if (demo == "color") "demo_color.png" else "demo.png")
+        applyIntentOptions(engine, shading)
+        if (autodemo) runDemo(
+            when {
+                testImage != null -> "testimages/$testImage.jpg"
+                demo == "color" -> "demo_color.png"
+                else -> "demo.png"
+            }
+        )
     }
 
     private fun resetProject() {
@@ -222,23 +303,21 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (generating) return
         generating = true
         anim.showFinished()
+        val genStart = android.os.SystemClock.elapsedRealtime()
         viewModelScope.launch {
             try {
+                val ps = pipelineSettings
+                val m = model()
+                generationStage = "Starting"
+                generationProgress = 0f
                 val (drawing, scaledBg) = withContext(Dispatchers.Default) {
                     val w = bmp.width
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val st = settings.copy(includeShading = settings.mode == DrawMode.OUTLINE_SHADING)
-                    var d = StrokeGenerator.generate(pixels, w, h, st)
-                    if (st.mode == DrawMode.COLOUR_FILL) {
-                        val fill = ColorStrokeGenerator.generateFill(
-                            pixels, w, h, d.width, d.height, st.fillColors.coerceIn(6, 16), st.fillSpacing,
-                        )
-                        d = d.copy(
-                            outline = ColorStrokeGenerator.colorizeOutline(d.outline, pixels, w, h, d.width, d.height),
-                            fill = fill,
-                        )
+                    val d = SketchPipeline.run(pixels, w, h, ps, m) { stage, fraction ->
+                        generationStage = stage
+                        generationProgress = fraction
                     }
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
@@ -247,7 +326,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     }
                     d to bg
                 }
+                lastAppliedSettings = ps
                 applyDrawing(drawing, scaledBg)
+                android.util.Log.i(
+                    "SketcherGen",
+                    "GEN_DONE ms=${android.os.SystemClock.elapsedRealtime() - genStart} " +
+                        "outline=${drawing.outline.size} shading=${drawing.shading.size} fill=${drawing.fill.size} " +
+                        "size=${drawing.width}x${drawing.height} settings=$ps",
+                )
                 generationCount++
                 if (pendingAutoVideo) {
                     pendingAutoVideo = false
@@ -256,15 +342,20 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
+                android.util.Log.e("SketcherGen", "GEN_FAIL", t)
                 toast(
                     if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
                     else "Generation failed: ${t.message}",
                 )
             } finally {
                 generating = false
+                generationStage = ""
+                generationProgress = 0f
             }
         }
     }
+
+    private var lastAppliedSettings = PipelineSettings()
 
     private fun applyDrawing(drawing: GeneratedDrawing, scaledBackground: Bitmap?) {
         project.width = drawing.width
@@ -273,21 +364,20 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val outline = project.newLayer("Outline")
         outline.strokes.addAll(drawing.outline)
         val mine = project.newLayer("My Drawing")
+        val ps = lastAppliedSettings
         val stack = ArrayList<Layer>()
-        if (settings.mode == DrawMode.COLOUR_FILL) {
-            // Bottom -> top: Colour Fill, Outline, My Drawing. Outline is animated first.
+        if (ps.colourFill) {
+            // Bottom -> top: Colour Fill, Outline, (Shading), My Drawing. Outline is animated first.
             val fill = project.newLayer("Colour Fill")
             fill.strokes.addAll(drawing.fill)
             outline.animPriority = -1
             stack.add(fill)
-            stack.add(outline)
-        } else {
-            stack.add(outline)
-            if (drawing.shading.isNotEmpty() || settings.mode == DrawMode.OUTLINE_SHADING) {
-                val shading = project.newLayer("Shading")
-                shading.strokes.addAll(drawing.shading)
-                stack.add(shading)
-            }
+        }
+        stack.add(outline)
+        if (ps.shading != ShadingLevel.NONE) {
+            val shading = project.newLayer("Shading")
+            shading.strokes.addAll(drawing.shading)
+            stack.add(shading)
         }
         stack.add(mine)
         project.layers.clear()
@@ -295,7 +385,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.selectedIndex = stack.lastIndex
         project.backgroundVisible = false
         clearHistory()
-        val extra = if (settings.mode == DrawMode.COLOUR_FILL) "${drawing.fill.size} fill" else "${drawing.shading.size} shading"
+        val extra = if (ps.colourFill) "${drawing.fill.size} fill" else "${drawing.shading.size} shading"
         toast("${drawing.outline.size} outline + $extra strokes")
         anim.restart()
     }

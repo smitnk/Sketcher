@@ -8,19 +8,25 @@ import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.smitnk.sketcher.ui.SketchScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import com.smitnk.sketcher.ui.AppNavigation
+import com.smitnk.sketcher.ui.theme.SketcherTheme
 import com.smitnk.sketcher.ui.SketchViewModel
 
 class MainActivity : ComponentActivity() {
     private val vm: SketchViewModel by viewModels()
+    private var editorRequest by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val startInEditor = wantsEditor(intent)
         setContent {
-            MaterialTheme {
+            SketcherTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    SketchScreen()
+                    AppNavigation(startInEditor = startInEditor, editorRequest = editorRequest, vm = vm)
                 }
             }
         }
@@ -31,7 +37,14 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handle(intent)
+        if (wantsEditor(intent)) editorRequest++
     }
+
+    private fun wantsEditor(i: Intent?): Boolean = i != null && (
+        i.getBooleanExtra("autodemo", false) || i.getBooleanExtra("showlayers", false) ||
+            i.getBooleanExtra("autoexport", false) || i.getBooleanExtra("autovideo", false) ||
+            i.getStringExtra("demo") != null
+        )
 
     private fun handle(intent: Intent?) {
         if (intent == null) return
@@ -42,6 +55,9 @@ class MainActivity : ComponentActivity() {
             autoVideo = intent.getBooleanExtra("autovideo", false),
             demo = intent.getStringExtra("demo"),
             mode = intent.getStringExtra("mode"),
+            engine = intent.getStringExtra("engine"),
+            shading = intent.getStringExtra("shading"),
+            testImage = intent.getStringExtra("testimage"),
         )
     }
 }

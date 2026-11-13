@@ -6,4 +6,9 @@ import com.smitnk.sketcher.ui.editor.EditorScreen
 
 /** Kept for MainActivity; delegates to [EditorScreen]. */
 @Composable
-fun SketchScreen(vm: SketchViewModel = viewModel()) = EditorScreen(vm)
+fun SketchScreen(
+    vm: SketchViewModel = viewModel(),
+    onBack: () -> Unit = {},
+    projectTitle: String = "Untitled sketch",
+    onOpenSettings: (() -> Unit)? = null,
+) = EditorScreen(vm, onBack, projectTitle, onOpenSettings)

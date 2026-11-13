@@ -89,3 +89,16 @@ fun StyleSettingsDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/**
+ * Adapter for the new pipeline: same call shape as [StylePickerSheet]. EditorScreen can switch to this
+ * (or call [StylePickerSheet] directly) once the ViewModel holds a PipelineSettings.
+ */
+@Composable
+fun StyleSettingsDialog(
+    settings: com.smitnk.sketcher.image.pipeline.PipelineSettings,
+    onSettingsChange: (com.smitnk.sketcher.image.pipeline.PipelineSettings) -> Unit,
+    onGenerate: () -> Unit,
+    onDismiss: () -> Unit,
+    sourceThumbnail: androidx.compose.ui.graphics.ImageBitmap? = null,
+) = StylePickerSheet(settings, onSettingsChange, onGenerate, onDismiss, sourceThumbnail)
