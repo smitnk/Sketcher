@@ -46,6 +46,16 @@ class CartoonLineExtractorTest {
         assertTrue(CartoonLineExtractor.cartoonScore(cartoon(), w, h) > 0.6f)
     }
 
+    @Test fun shadedRenderOnFlatBackdropIsNotCartoon() {
+        val px = IntArray(w * h) { i ->
+            val x = i % w; val y = i / w
+            val dx = (x - 200) / 70.0; val dy = (y - 150) / 120.0
+            val e = dx * dx + dy * dy
+            if (e < 1.0) { val s = (60 + 160 * (1 - sqrt(e))).toInt(); rgb(s, 80 + s / 3, 210 - s / 2) } else rgb(205, 208, 216)
+        }
+        assertTrue(CartoonLineExtractor.cartoonScore(px, w, h) < 0.6f)
+    }
+
     @Test fun photoScoresLow() {
         assertTrue(CartoonLineExtractor.cartoonScore(photo(), w, h) < 0.4f)
     }

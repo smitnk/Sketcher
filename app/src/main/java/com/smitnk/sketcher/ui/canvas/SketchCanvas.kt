@@ -72,7 +72,7 @@ fun SketchCanvas(
     vt.insetBottom = insetBottomPx
     vt.margin = with(androidx.compose.ui.platform.LocalDensity.current) { SketcherTokens.space12.toPx() }
     val paperPaint = remember { android.graphics.Paint() }
-    val paperColor = SketcherTokens.colors.paper.toArgb()
+    val paperColor = com.smitnk.sketcher.ui.theme.LightExtraColors.paper.toArgb() // always light paper, both themes
     val layerCache = remember { Renderer.LayerCache() }
     DisposableEffect(layerCache) { onDispose { layerCache.release() } }
 

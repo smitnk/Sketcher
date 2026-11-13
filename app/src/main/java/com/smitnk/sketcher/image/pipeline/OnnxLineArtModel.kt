@@ -3,70 +3,148 @@ package com.smitnk.sketcher.image.pipeline
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import ai.onnxruntime.providers.NNAPIFlags
 import android.content.Context
+import android.util.Log
+import com.smitnk.sketcher.image.models.ModelSpec
+import com.smitnk.sketcher.image.models.ModelSpecs
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.EnumSet
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
+
+/** Execution provider preference. NNAPI_* differ only in flags: ORT cannot pick the NNAPI device. */
+enum class Accel { CPU, XNNPACK, NNAPI_GPU, NNAPI_NPU }
 
 /**
- * ONNX Runtime line-art model (informative-drawings). Input float32 [1,3,H,W] RGB 0..1,
- * output [1,1,H,W] where 1 = paper; ink = 1 - out. Throws on any failure so the pipeline can fall back.
+ * ONNX Runtime line-art model driven by a [ModelSpec] (normalisation, output polarity, size multiple).
+ * [infer] returns an ink map (1 = ink). Weights come from [modelFile] if given, else the spec's bundled asset.
+ * Throws on failure so the pipeline can fall back.
  */
 class OnnxLineArtModel(
     context: Context,
-    private val assetPath: String = "models/lineart.onnx",
-    /** Inference long side at normal detail; [HIGH_DETAIL_BONUS] px more when [detail] > 0.7. */
-    private val longSide: Int = 512,
-    /** Opt-in only: NNAPI is unreliable on some MediaTek drivers. Default is CPU (+XNNPACK). */
-    private val useNnapi: Boolean = false,
-    private val useXnnpack: Boolean = true,
+    private val spec: ModelSpec = ModelSpecs.INFORMATIVE,
+    private val modelFile: File? = null,
+    /** Inference long side (768 default; 1024 allowed). Rounded to the spec's size multiple. */
+    @Volatile var longSide: Int = DEFAULT_LONG_SIDE,
+    /** Null = last persisted choice, else XNNPACK. */
+    accel: Accel? = null,
 ) : LineArtModel, AutoCloseable {
 
     private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val lock = Any()
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
+    private var modelBytes: ByteArray? = null
+    private val failedAtRuntime = EnumSet.noneOf(Accel::class.java)
 
-    /** 0..1 detail setting; set before [infer] (>0.7 raises the inference resolution to 640). */
+    /** Requested provider. Changing it drops the current session; the next infer rebuilds it. */
+    @Volatile var accel: Accel = accel ?: savedAccel(appContext) ?: Accel.XNNPACK
+        set(value) {
+            if (value == field) return
+            field = value
+            synchronized(lock) { failedAtRuntime.clear(); closeSession() }
+        }
+
+    /** Provider actually running (null until a session exists). */
+    @Volatile var activeAccel: Accel? = null
+        private set
+
+    /** Why [accel] was not honoured (session creation or first run failed); null if it was. */
+    @Volatile var lastFallbackReason: String? = null
+        private set
+
+    /** Kept for API compatibility with the settings UI; the resolution is controlled by [longSide]. */
     @Volatile var detail: Float = 0.5f
 
     @Volatile private var warming = false
 
-    // Reused across calls (guarded by lock).
     private var inBuf: ByteBuffer? = null
     private var xi0 = IntArray(0)
     private var xi1 = IntArray(0)
     private var xw = FloatArray(0)
 
-    private fun ensureSession(): Pair<OrtEnvironment, OrtSession> {
-        val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
-        val s = session ?: run {
-            val bytes = appContext.assets.open(assetPath).use { it.readBytes() }
-            val threads = min(4, max(1, Runtime.getRuntime().availableProcessors()))
-            createSession(e, bytes, threads, xnnpack = useXnnpack && !useNnapi, nnapi = useNnapi)
-                ?: createSession(e, bytes, threads, xnnpack = false, nnapi = false)
-                ?: throw IllegalStateException("could not create ONNX session")
-        }.also { session = it }
-        return e to s
+    /** Persists and applies [a] as the user's choice. */
+    fun selectAccel(a: Accel) {
+        prefs.edit().putString(KEY_ACCEL, a.name).apply()
+        accel = a
     }
 
-    /** Returns null on failure so the caller can retry with plain CPU. */
-    private fun createSession(e: OrtEnvironment, bytes: ByteArray, threads: Int, xnnpack: Boolean, nnapi: Boolean): OrtSession? =
-        try {
-            val opts = OrtSession.SessionOptions()
-            opts.setIntraOpNumThreads(threads)
-            opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-            if (xnnpack) opts.addXnnpack(mapOf("intra_op_num_threads" to threads.toString()))
-            if (nnapi) opts.addNnapi()
-            e.createSession(bytes, opts)
-        } catch (t: Throwable) {
-            if (!xnnpack && !nnapi) throw t // plain CPU failed: genuine error
-            null
+    private fun threads() = min(4, max(1, Runtime.getRuntime().availableProcessors()))
+
+    private fun loadBytes(): ByteArray = modelBytes ?: run {
+        val b = when {
+            modelFile != null -> modelFile.readBytes()
+            spec.assetPath != null -> appContext.assets.open(spec.assetPath).use { it.readBytes() }
+            else -> throw IllegalStateException("model ${spec.id} has no file")
         }
+        modelBytes = b
+        b
+    }
+
+    /** Strict: throws if [a] cannot be created. */
+    private fun buildSession(e: OrtEnvironment, bytes: ByteArray, a: Accel): OrtSession {
+        val opts = OrtSession.SessionOptions()
+        try {
+            val t = threads()
+            opts.setIntraOpNumThreads(t)
+            opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            when (a) {
+                Accel.CPU -> Unit
+                Accel.XNNPACK -> opts.addXnnpack(mapOf("intra_op_num_threads" to t.toString()))
+                Accel.NNAPI_GPU -> opts.addNnapi(EnumSet.of(NNAPIFlags.USE_FP16, NNAPIFlags.CPU_DISABLED))
+                Accel.NNAPI_NPU -> opts.addNnapi(EnumSet.of(NNAPIFlags.USE_NCHW, NNAPIFlags.CPU_DISABLED))
+            }
+            return e.createSession(bytes, opts)
+        } finally {
+            opts.close()
+        }
+    }
+
+    private fun chain(): List<Accel> {
+        val order = when (accel) {
+            Accel.CPU -> listOf(Accel.CPU)
+            Accel.XNNPACK -> listOf(Accel.XNNPACK, Accel.CPU)
+            else -> listOf(accel, Accel.XNNPACK, Accel.CPU)
+        }
+        return order.filter { it == Accel.CPU || it !in failedAtRuntime }
+    }
+
+    private fun closeSession() {
+        try { session?.close() } catch (_: Throwable) {}
+        session = null
+        activeAccel = null
+    }
+
+    /** Caller holds [lock]. */
+    private fun ensureSession(): Pair<OrtEnvironment, OrtSession> {
+        val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
+        session?.let { return e to it }
+        val t0 = System.nanoTime()
+        val bytes = loadBytes()
+        var firstError: String? = null
+        for (a in chain()) {
+            try {
+                val s = buildSession(e, bytes, a)
+                session = s
+                activeAccel = a
+                lastFallbackReason = if (a == accel) null else firstError
+                Log.i(TAG, "session ${spec.id} accel=$a (wanted $accel) in ${(System.nanoTime() - t0) / 1_000_000} ms")
+                return e to s
+            } catch (t: Throwable) {
+                val msg = "$a failed: ${t.javaClass.simpleName}: ${t.message}"
+                Log.w(TAG, msg)
+                if (firstError == null) firstError = msg
+            }
+        }
+        lastFallbackReason = firstError
+        throw IllegalStateException("could not create ONNX session: $firstError")
+    }
 
     /**
      * Creates the session and runs a tiny dummy inference on a background thread so the first real
@@ -80,7 +158,7 @@ class OnnxLineArtModel(
                 synchronized(lock) {
                     val (env, session) = ensureSession()
                     val name = session.inputNames.iterator().next()
-                    val side = 64
+                    val side = max(64, spec.sizeMultiple)
                     val buf = ByteBuffer.allocateDirect(3 * side * side * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
                     OnnxTensor.createTensor(env, buf, longArrayOf(1, 3, side.toLong(), side.toLong())).use { t ->
                         session.run(mapOf(name to t)).close()
@@ -96,39 +174,100 @@ class OnnxLineArtModel(
 
     override fun infer(argb: IntArray, w: Int, h: Int): FloatArray = synchronized(lock) {
         require(w > 0 && h > 0 && argb.size >= w * h) { "bad image" }
-        val (env, session) = ensureSession()
-        val side = if (detail > 0.7f) longSide + HIGH_DETAIL_BONUS else longSide
-        val scale = side.toFloat() / max(w, h)
-        val tw = roundTo8(w * scale)
-        val th = roundTo8(h * scale)
+        val tStart = System.nanoTime()
+        val (tw, th) = spec.targetSize(w, h, longSide)
         val n = tw * th
         val fb = fillInput(argb, w, h, tw, th)
-        val inputName = session.inputNames.iterator().next()
+        val tPre = System.nanoTime()
         val out = FloatArray(n)
+        var attempts = 0
+        while (true) {
+            val (env, session) = ensureSession()
+            try {
+                runInto(env, session, fb, tw, th, out)
+                break
+            } catch (t: Throwable) {
+                val a = activeAccel
+                // A provider that built fine but fails to run: block it and rebuild down the chain.
+                if (a == null || a == Accel.CPU || ++attempts > 3) throw t
+                val msg = "$a run failed: ${t.javaClass.simpleName}: ${t.message}"
+                Log.w(TAG, msg)
+                failedAtRuntime.add(a)
+                closeSession()
+                lastFallbackReason = msg
+            }
+        }
+        val tRun = System.nanoTime()
+        for (i in 0 until n) out[i] = spec.inkFromOutput(out[i])
+        val res = if (tw == w && th == h) out else upsample(out, tw, th, w, h)
+        Log.i(
+            TAG,
+            "infer ${spec.id} ${w}x$h -> ${tw}x$th accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +
+                "run=${(tRun - tPre) / 1_000_000}ms post=${(System.nanoTime() - tRun) / 1_000_000}ms",
+        )
+        res
+    }
+
+    private fun runInto(env: OrtEnvironment, session: OrtSession, fb: FloatBuffer, tw: Int, th: Int, out: FloatArray) {
+        val inputName = session.inputNames.iterator().next()
+        fb.position(0)
         OnnxTensor.createTensor(env, fb, longArrayOf(1, 3, th.toLong(), tw.toLong())).use { tensor ->
             session.run(mapOf(inputName to tensor)).use { result ->
                 val ot = result.get(0) as OnnxTensor
                 val ofb = ot.floatBuffer
-                check(ofb.remaining() >= n) { "unexpected model output size ${ofb.remaining()}" }
-                ofb.get(out, 0, n)
+                check(ofb.remaining() >= out.size) { "unexpected model output size ${ofb.remaining()}" }
+                ofb.get(out, 0, out.size)
             }
         }
-        for (i in 0 until n) {
-            val v = out[i]
-            out[i] = 1f - (if (v < 0f) 0f else if (v > 1f) 1f else v)
+    }
+
+    /**
+     * Times every [Accel] on a flat gray [side]x[side] input: session creation must succeed, the first run
+     * is a warm-up, and the second run's milliseconds are reported. Failing providers are skipped.
+     * Blocking (seconds); call off the main thread. Does not touch the active session.
+     */
+    fun benchmark(side: Int = 512): Map<Accel, Long> = synchronized(lock) {
+        val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
+        val bytes = loadBytes()
+        val m = spec.sizeMultiple
+        val s = max(m, (side + m - 1) / m * m)
+        val plane = s * s
+        val fb = ByteBuffer.allocateDirect(3 * plane * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        for (i in 0 until 3 * plane) fb.put(i, 0.5f)
+        val out = FloatArray(plane)
+        val results = LinkedHashMap<Accel, Long>()
+        for (a in Accel.values()) {
+            try {
+                buildSession(e, bytes, a).use { sess ->
+                    runInto(e, sess, fb, s, s, out)
+                    val t0 = System.nanoTime()
+                    runInto(e, sess, fb, s, s, out)
+                    val ms = (System.nanoTime() - t0) / 1_000_000
+                    results[a] = ms
+                    Log.i(TAG, "benchmark ${spec.id} $a ${s}px: $ms ms")
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "benchmark $a skipped: ${t.javaClass.simpleName}: ${t.message}")
+            }
         }
-        if (tw == w && th == h) out else upsample(out, tw, th, w, h)
+        for ((a, ms) in results) prefs.edit().putLong(KEY_BENCH_PREFIX + a.name, ms).apply()
+        results
+    }
+
+    /** Runs [benchmark], selects (and persists) the fastest provider, returns it (null if none ran). */
+    fun autoSelectAccel(): Accel? {
+        val best = benchmark().minByOrNull { it.value }?.key ?: return null
+        selectAccel(best)
+        return best
     }
 
     override fun close() = synchronized(lock) {
-        try { session?.close() } catch (_: Throwable) {}
-        session = null
+        closeSession()
         inBuf = null
+        modelBytes = null
         // OrtEnvironment is a process-wide singleton; leave it open.
         env = null
     }
-
-    private fun roundTo8(v: Float): Int = max(8, (v / 8f).roundToInt() * 8)
 
     /** Bilinear resize + NCHW split straight into a reused direct buffer (no boxing, no per-call big arrays). */
     private fun fillInput(src: IntArray, w: Int, h: Int, tw: Int, th: Int): FloatBuffer {
@@ -153,7 +292,8 @@ class OnnxLineArtModel(
             xi1[x] = min(w - 1, x0 + 1)
             xw[x] = fx - x0
         }
-        val inv = 1f / 255f
+        val inv = spec.inputScale
+        val off = spec.inputOffset
         for (y in 0 until th) {
             val fy = ((y + 0.5f) * sy - 0.5f).coerceIn(0f, (h - 1).toFloat())
             val y0 = floor(fy).toInt()
@@ -172,7 +312,7 @@ class OnnxLineArtModel(
                 while (c < 3) {
                     val a = ((p00 shr sh) and 255) * (1 - ax) + ((p10 shr sh) and 255) * ax
                     val b = ((p01 shr sh) and 255) * (1 - ax) + ((p11 shr sh) and 255) * ax
-                    fb.put(c * plane + i, (a * (1 - ay) + b * ay) * inv)
+                    fb.put(c * plane + i, (a * (1 - ay) + b * ay) * inv + off)
                     sh -= 8
                     c++
                 }
@@ -182,8 +322,21 @@ class OnnxLineArtModel(
         return fb
     }
 
-    private companion object {
-        const val HIGH_DETAIL_BONUS = 128
+    companion object {
+        const val DEFAULT_LONG_SIDE = 768
+        const val PREFS = "sketcher_ml"
+        private const val KEY_ACCEL = "accel"
+        private const val KEY_BENCH_PREFIX = "bench_ms_"
+        private const val TAG = "SketcherML"
+
+        fun savedAccel(context: Context): Accel? =
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_ACCEL, null)?.let { n -> Accel.values().firstOrNull { it.name == n } }
+
+        /** Last benchmark result (ms) stored for [a], if any. */
+        fun savedBenchmarkMs(context: Context, a: Accel): Long? =
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getLong(KEY_BENCH_PREFIX + a.name, -1L).takeIf { it >= 0 }
     }
 
     private fun upsample(src: FloatArray, sw: Int, sh: Int, w: Int, h: Int): FloatArray {

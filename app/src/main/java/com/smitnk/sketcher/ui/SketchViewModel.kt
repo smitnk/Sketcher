@@ -434,6 +434,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             if (project.layers.isEmpty()) project.layers.add(project.newLayer("Layer 1"))
             project.background = loaded.source
             sourceBitmap = loaded.source
+            autoSource = sourceSerial // loaded auto layers belong to this project's own source
             if (loaded.source != null) model().warmUp()
             sourceThumbnail = loaded.source?.let { makeThumbnail(it) }
             if (snap.animationSeconds > 0f) anim.durationSec = snap.animationSeconds
@@ -641,6 +642,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.layers.clear()
         project.layers.add(project.newLayer("Layer 1"))
         project.selectedIndex = 0
+        project.background = null
+        sourceSerial++
+        autoSource = sourceSerial
         clearHistory()
         anim.showFinished()
     }
@@ -654,7 +658,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         null
     }
 
+    /** Increments for every newly imported/loaded source photo; auto layers remember which one produced them. */
+    private var sourceSerial = 0
+    private var autoSource = 0
+
     private fun setSource(bmp: Bitmap) {
+        sourceSerial++
         sourceBitmap = bmp
         sourceThumbnail = makeThumbnail(bmp)
         hasProject = true
@@ -753,7 +762,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (scaledBackground != null) project.background = scaledBackground
         val ps = lastAppliedSettings
         val previousSelected = project.selectedLayer
-        val result = project.layers.toMutableList()
+        // Never carry generated layers over from a different source photo.
+        val result = LayerReconcile.keepForGeneration(project.layers.toList(), autoSource, sourceSerial).toMutableList()
+        autoSource = sourceSerial
 
         // kind -> (default name, strokes or null when this run does not produce that kind), bottom to top.
         val wanted = listOf(

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +30,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -60,6 +68,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -69,6 +78,17 @@ import com.smitnk.sketcher.image.pipeline.ShadingLevel
 import com.smitnk.sketcher.image.pipeline.ShadingStyle
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.roundToInt
+
+/** UI model for one selectable line-art model (hoisted; no dependency on the model manager). */
+data class LineModelUi(
+    val id: String,
+    val name: String,
+    val subtitle: String,
+    val sizeLabel: String,
+    val installed: Boolean,
+    val downloading: Float? = null, // 0..1 while downloading
+    val recommended: Boolean = false,
+)
 
 private enum class StyleChoice { OUTLINE, SHADED, COLOUR }
 
@@ -98,6 +118,11 @@ fun StylePickerSheet(
     onGenerate: () -> Unit,
     onDismiss: () -> Unit,
     sourceThumbnail: ImageBitmap?,
+    models: List<LineModelUi> = emptyList(),
+    selectedModelId: String? = null,
+    onSelectModel: (String) -> Unit = {},
+    onDownloadModel: (String) -> Unit = {},
+    onOpenMlSettings: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val choice = settings.styleChoice()
@@ -126,13 +151,21 @@ fun StylePickerSheet(
                         )
                         Spacer(Modifier.size(SketcherTokens.space12))
                     }
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text("How should I draw it?", style = MaterialTheme.typography.headlineSmall)
                         Text(
                             "Pick a look, then fine-tune.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    if (onOpenMlSettings != null) {
+                        IconButton(
+                            onClick = onOpenMlSettings,
+                            modifier = Modifier.size(SketcherTokens.minTouchTarget),
+                        ) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Processing settings (GPU/CPU)")
+                        }
                     }
                 }
 
@@ -182,6 +215,30 @@ fun StylePickerSheet(
                                 maxLines = 1,
                                 textAlign = TextAlign.Center,
                             )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = models.isNotEmpty() &&
+                        (settings.lineSource == LineSource.AUTO || settings.lineSource == LineSource.AI),
+                    enter = fadeIn(tween(SketcherTokens.MotionMedium)) + expandVertically(tween(SketcherTokens.MotionMedium)),
+                    exit = fadeOut(tween(160)) + shrinkVertically(tween(160)),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                        SectionLabel("Line model")
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8),
+                        ) {
+                            for (m in models) {
+                                LineModelCard(
+                                    model = m,
+                                    selected = m.id == selectedModelId,
+                                    onSelect = { onSelectModel(m.id) },
+                                    onDownload = { onDownloadModel(m.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -299,6 +356,93 @@ fun StylePickerSheet(
                     .heightIn(min = 56.dp),
             ) {
                 Text("Draw it", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LineModelCard(
+    model: LineModelUi,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val borderColor by animateColorAsState(
+        if (selected) scheme.primary else scheme.outlineVariant, tween(160), label = "modelBorder",
+    )
+    val container by animateColorAsState(
+        if (selected) scheme.primaryContainer else scheme.surfaceContainerLowest, tween(160), label = "modelFill",
+    )
+    val progress = model.downloading
+    val shape = RoundedCornerShape(14.dp)
+    Surface(
+        modifier = Modifier
+            .width(168.dp)
+            .heightIn(min = 128.dp)
+            .semantics {
+                stateDescription = when {
+                    progress != null -> "Downloading ${(progress * 100).roundToInt()} percent"
+                    !model.installed -> "Not downloaded, ${model.sizeLabel}"
+                    selected -> "Selected"
+                    else -> "Installed"
+                }
+            }
+            .then(
+                if (model.installed && progress == null) {
+                    Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+                } else Modifier,
+            ),
+        shape = shape,
+        color = container,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
+    ) {
+        Column(
+            Modifier.padding(SketcherTokens.space12),
+            verticalArrangement = Arrangement.spacedBy(SketcherTokens.space4),
+        ) {
+            Text(
+                model.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+            )
+            if (model.recommended) {
+                Text("Recommended", style = MaterialTheme.typography.labelSmall, color = scheme.primary)
+            }
+            Text(
+                model.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.height(SketcherTokens.space4))
+            when {
+                progress != null -> {
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    )
+                    Text(
+                        "Downloading ${(progress.coerceIn(0f, 1f) * 100).roundToInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                !model.installed -> OutlinedButton(
+                    onClick = onDownload,
+                    contentPadding = PaddingValues(horizontal = SketcherTokens.space12),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget),
+                ) {
+                    Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(SketcherTokens.space4))
+                    Text(model.sizeLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
+                else -> Text(
+                    if (selected) "In use  \u00B7  ${model.sizeLabel}" else "Installed  \u00B7  ${model.sizeLabel}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                )
             }
         }
     }

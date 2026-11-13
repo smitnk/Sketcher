@@ -273,20 +273,9 @@ object Renderer {
         }
     }
 
-    /** Same budget logic as AnimationController.allowances, as a pure function of [progress] (0..1). */
-    fun allowancesFor(layers: List<Layer>, progress: Float): Map<Long, Float> {
-        var total = 0f
-        for (l in layers) if (l.visible && l.inAnimation) total += l.totalLength()
-        var budget = progress.coerceIn(0f, 1f) * total
-        val map = HashMap<Long, Float>()
-        for (l in layers.sortedBy { it.animPriority }) {
-            if (!l.visible || !l.inAnimation) continue
-            val len = l.totalLength()
-            map[l.id] = budget.coerceIn(0f, len)
-            budget -= len
-        }
-        return map
-    }
+    /** Same timeline as AnimationController.allowances (shared [LayerTimeline] cache), as a pure function of [progress]. */
+    fun allowancesFor(layers: List<Layer>, progress: Float): Map<Long, Float> =
+        com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress)
 
     /** Draws the animation state at [progress] (0..1), as the on-screen animation would. */
     fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float) {

@@ -1,0 +1,50 @@
+name: model-lab
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/model_lab/**"
+      - ".github/workflows/model-lab.yml"
+permissions:
+  contents: write
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install onnx onnxruntime onnxconverter-common pillow numpy opencv-python-headless
+      - name: Convert
+        run: python tools/model_lab/convert.py
+      - name: Evaluate
+        run: python tools/model_lab/evaluate.py app/src/debug/assets/testimages out out
+      - name: Publish
+        run: |
+          set -e
+          mkdir -p pub/sheets
+          cp -r out/sheets/. pub/sheets/
+          cp out/timings.csv out/sizes.txt pub/
+          gh release create models-v1 --repo "$GITHUB_REPOSITORY" --title "Line-art ONNX models" --notes "Converted ControlNet Annotators line-art models (see tools/model_lab/LICENSES.md)" || true
+          for f in out/*.onnx; do
+            sz=$(stat -c %s "$f")
+            if [ "$sz" -lt $((95*1024*1024)) ]; then cp "$f" pub/; fi
+            gh release upload models-v1 "$f" --repo "$GITHUB_REPOSITORY" --clobber
+          done
+          cd pub
+          git init -q -b models-lab
+          git config user.name "model-lab"; git config user.email "model-lab@users.noreply.github.com"
+          git add -A
+          git commit -qm "model-lab outputs"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" models-lab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-lab-out
+          path: out/

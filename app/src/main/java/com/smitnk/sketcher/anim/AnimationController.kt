@@ -8,7 +8,7 @@ import com.smitnk.sketcher.model.Layer
 
 /**
  * Reveals strokes progressively, layer by layer in animPriority order, then list order (index 0 first).
- * Progress is distributed over total stroke length, so long strokes take longer to draw.
+ * Progress maps onto a human-like timeline (see [DrawTimeline]): eased strokes, pen-lift pauses, faster shading.
  * The frame loop lives in the UI (withFrameNanos) and calls [advance].
  */
 class AnimationController {
@@ -67,16 +67,6 @@ class AnimationController {
      */
     fun allowances(layers: List<Layer>): Map<Long, Float>? {
         if (!active) return null
-        var total = 0f
-        for (l in layers) if (l.visible && l.inAnimation) total += l.totalLength()
-        var budget = progress * total
-        val map = HashMap<Long, Float>()
-        for (l in layers.sortedBy { it.animPriority }) { // stable: ties keep list order
-            if (!l.visible || !l.inAnimation) continue
-            val len = l.totalLength()
-            map[l.id] = budget.coerceIn(0f, len)
-            budget -= len
-        }
-        return map
+        return LayerTimeline.allowances(layers, progress)
     }
 }

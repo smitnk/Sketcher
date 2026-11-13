@@ -93,7 +93,7 @@ internal val LightExtraColors = SketcherExtraColors(
 )
 
 internal val DarkExtraColors = SketcherExtraColors(
-    paper = Color(0xFFF1EBDD),
+    paper = Color(0xFFFFFDF8), // canvas paper is light in both themes
     ink = Ink,
     canvasBackdrop = Color(0xFF0B0A08),
     floatingSurface = Color(0xF21C1A16),

@@ -16,17 +16,29 @@ object CartoonLineExtractor {
 
     // ------------------------------------------------------------------ public API
 
-    /** 0..1 likelihood that the image is a flat-colour cartoon with ink outlines (>= 0.6 = cartoon). */
+    /**
+     * 0..1 likelihood that the image is a flat-colour cartoon with ink outlines (>= 0.6 = cartoon).
+     * Measured on the subject only (the flat background connected to the border is excluded, so a 3D
+     * render or photo on a flat backdrop does not look like a cartoon) and requires dark ink lines
+     * along a meaningful share of the subject's strong edges (renders use shading, not ink).
+     */
     fun cartoonScore(argb: IntArray, w: Int, h: Int): Float {
         if (w < 8 || h < 8) return 0f
-        val f = features(argb, w, h)
+        val sub = SubjectCrop.detect(argb, w, h, 0.02f)
+        val f = features(argb, w, h, sub)
         val conc = ramp(f[0], 0.45f, 0.85f)     // dominant-colour concentration
         val flat = ramp(f[1], 0.55f, 0.90f)     // flat-pixel fraction
         val ink = bump(f[2], 0.004f, 0.015f, 0.18f, 0.40f) // thin dark pixel fraction
         val sharp = ramp(f[3], 0.35f, 0.75f)    // step-edge share among edge pixels
         // ink lines are required: without them it is a flat illustration, not an inked cartoon
         val s = 0.30f * conc + 0.30f * flat + 0.25f * ink + 0.15f * sharp
-        return (s * (0.35f + 0.65f * ink)).coerceIn(0f, 1f)
+        var score = s * (0.35f + 0.65f * ink)
+        if (sub.bgFraction > 0f) {
+            // clear backdrop: outlines must really enclose the shapes (shaded renders have few)
+            score *= ramp(f[4], 0.20f, 0.45f)
+        }
+        // subject-only features run lower than whole-frame ones: stretch so >= 0.6 stays the cartoon cut
+        return (score / 0.65f).coerceIn(0f, 1f)
     }
 
     /** Clean ink map, 0 = paper, 1 = ink. [detail] 0..1 lowers thresholds and adds region boundaries. */
@@ -502,49 +514,73 @@ object CartoonLineExtractor {
      * [0] dominant colour concentration (top-10 bins share), [1] flat-pixel fraction,
      * [2] thin dark ink pixel fraction, [3] step-edge share among edge pixels.
      */
-    internal fun features(argb: IntArray, w: Int, h: Int): FloatArray {
-        // box-downsample to <= 400 long side (also suppresses JPEG noise)
-        val sc = max(1, (max(w, h) + 399) / 400)
-        val sw = w / sc; val sh = h / sc
+    internal fun features(argb: IntArray, w: Int, h: Int): FloatArray = features(argb, w, h, SubjectCrop.full(w, h))
+
+    /** As above plus [4] = share of strong subject edges that have thin dark ink next to them. Subject only. */
+    internal fun features(argb: IntArray, w: Int, h: Int, sub: SubjectCrop.Result): FloatArray {
+        val cw = sub.cropW; val ch = sub.cropH
+        val mask = sub.bgMask
+        // box-downsample the crop to <= 400 long side (also suppresses JPEG noise)
+        val sc = max(1, (max(cw, ch) + 399) / 400)
+        val sw = max(1, cw / sc); val sh = max(1, ch / sc)
         val sn = sw * sh
         val rr = IntArray(sn); val gg = IntArray(sn); val bb = IntArray(sn)
+        val use = BooleanArray(sn)
         val k = sc * sc
         for (y in 0 until sh) for (x in 0 until sw) {
-            var sr = 0; var sg = 0; var sb = 0
+            var sr = 0; var sg = 0; var sb = 0; var bgc = 0
             for (yy in 0 until sc) for (xx in 0 until sc) {
-                val c = argb[(y * sc + yy) * w + x * sc + xx]
+                val idx = (sub.y0 + y * sc + yy) * w + sub.x0 + x * sc + xx
+                val c = argb[idx]
+                if (mask != null && mask[idx]) bgc++
                 sr += (c shr 16) and 255; sg += (c shr 8) and 255; sb += c and 255
             }
-            rr[y * sw + x] = sr / k; gg[y * sw + x] = sg / k; bb[y * sw + x] = sb / k
+            val i = y * sw + x
+            rr[i] = sr / k; gg[i] = sg / k; bb[i] = sb / k
+            use[i] = bgc * 2 < k
         }
+        var un = 0
+        for (u in use) if (u) un++
+        if (un < 16) return floatArrayOf(0f, 0f, 0f, 0f, 0f)
         // concentration: top-10 of 4096 (4-bit) bins
         val bins = IntArray(4096)
-        for (i in 0 until sn) bins[((rr[i] shr 4) shl 8) or ((gg[i] shr 4) shl 4) or (bb[i] shr 4)]++
+        for (i in 0 until sn) if (use[i]) bins[((rr[i] shr 4) shl 8) or ((gg[i] shr 4) shl 4) or (bb[i] shr 4)]++
         val sorted = bins.sortedArrayDescending()
         var top = 0
         for (i in 0 until 10) top += sorted[i]
-        val conc = top.toFloat() / sn
+        val conc = top.toFloat() / un
+
+        // thin dark ink map
+        val v = IntArray(sn) { max(rr[it], max(gg[it], bb[it])) }
+        val st = inkStrength(v, sw, sh, 0.5f)
+        var ink = 0
+        for (i in 0 until sn) if (use[i] && st[i] >= 0.5f) ink++
+        // ink dilated by 2 px
+        val nearInk = BooleanArray(sn)
+        for (y in 0 until sh) for (x in 0 until sw) if (st[y * sw + x] >= 0.5f) {
+            for (dy in -2..2) for (dx in -2..2) {
+                val yy = y + dy; val xx = x + dx
+                if (yy in 0 until sh && xx in 0 until sw) nearInk[yy * sw + xx] = true
+            }
+        }
 
         // flatness & edge sharpness from neighbour differences
-        var flat = 0; var edge = 0; var step = 0; var cnt = 0
+        var flat = 0; var edge = 0; var step = 0; var cnt = 0; var covered = 0
         for (y in 0 until sh - 1) for (x in 0 until sw - 1) {
             val i = y * sw + x
+            if (!use[i]) continue
             val g1 = max(abs(rr[i] - rr[i + 1]), max(abs(gg[i] - gg[i + 1]), abs(bb[i] - bb[i + 1])))
             val g2 = max(abs(rr[i] - rr[i + sw]), max(abs(gg[i] - gg[i + sw]), abs(bb[i] - bb[i + sw])))
             val g = max(g1, g2)
             cnt++
             if (g <= 6) flat++
-            if (g > 12) { edge++; if (g > 50) step++ }
+            if (g > 12) { edge++; if (g > 50) { step++; if (nearInk[i] || nearInk[i + 1] || nearInk[i + sw]) covered++ } }
         }
+        if (cnt == 0) return floatArrayOf(conc, 0f, 0f, 0f, 0f)
         val flatF = flat.toFloat() / cnt
         val sharp = if (edge == 0) 0f else step.toFloat() / edge
-
-        // thin dark ink fraction
-        val v = IntArray(sn) { max(rr[it], max(gg[it], bb[it])) }
-        val st = inkStrength(v, sw, sh, 0.5f)
-        var ink = 0
-        for (x in st) if (x >= 0.5f) ink++
-        return floatArrayOf(conc, flatF, ink.toFloat() / sn, sharp)
+        val cov = if (step == 0) 0f else covered.toFloat() / step
+        return floatArrayOf(conc, flatF, ink.toFloat() / un, sharp, cov)
     }
 
     // ------------------------------------------------------------------ helpers
