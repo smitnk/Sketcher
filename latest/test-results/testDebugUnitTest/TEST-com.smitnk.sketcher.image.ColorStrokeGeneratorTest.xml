@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T07:18:17" hostname="runnervmwuk1x" time="0.278">
+  <properties/>
+  <testcase name="outlineTakesImageColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.012"/>
+  <testcase name="fillStrokesCoverRegionsInTheirColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.084"/>
+  <testcase name="zigZagIsContinuous" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.029"/>
+  <testcase name="runsFastOnLargeImage" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.152"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

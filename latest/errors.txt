@@ -1,7 +1,4 @@
-> Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:176:29 No parameter with name 'contentPadding' found.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:179:29 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:181:55 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:386:24 Type 'androidx.compose.runtime.State<androidx.compose.ui.graphics.Color>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:391:22 Type 'androidx.compose.runtime.State<androidx.compose.ui.graphics.Color>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
-BUILD FAILED in 2m 8s
+e: The daemon has terminated unexpectedly on startup attempt #1 with error code: 0. The daemon process output:
+LineArtVectorizerTest > smallGapIsBridgedLargeGapIsNot FAILED
+> Task :app:testDebugUnitTest FAILED
+BUILD FAILED in 1m 9s
