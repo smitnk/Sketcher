@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
@@ -33,7 +34,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -75,6 +78,19 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
         if (uri != null) vm.loadImage(uri)
     }
 
+    LaunchedEffect(vm.generationCount) {
+        if (vm.generationCount > 0) {
+            if (vm.pendingShowLayers) {
+                vm.pendingShowLayers = false
+                showLayers = true
+            }
+            if (vm.pendingAutoExport) {
+                vm.pendingAutoExport = false
+                vm.autoExport()
+            }
+        }
+    }
+
     // ~60 fps animation clock, only runs while playing.
     LaunchedEffect(anim.playing) {
         if (anim.playing) {
@@ -95,6 +111,9 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
                     IconButton(onClick = {
                         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }) { Icon(Icons.Default.Image, contentDescription = "Import photo") }
+                    IconButton(onClick = { vm.runDemo() }) {
+                        Icon(Icons.Default.Face, contentDescription = "Try demo image")
+                    }
                     IconButton(onClick = { vm.generate() }, enabled = !vm.generating) {
                         Icon(Icons.Default.AutoFixHigh, contentDescription = "Generate strokes")
                     }
@@ -117,6 +136,19 @@ fun SketchScreen(vm: SketchViewModel = viewModel()) {
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             SketchCanvas(vm, Modifier.fillMaxSize())
+            if (!vm.hasProject && !vm.generating) {
+                Column(
+                    Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text("Import a photo or try the demo", style = MaterialTheme.typography.titleMedium)
+                    Button(onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }) { Text("Import photo") }
+                    OutlinedButton(onClick = { vm.runDemo() }) { Text("Try demo image") }
+                }
+            }
             if (vm.generating) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center),

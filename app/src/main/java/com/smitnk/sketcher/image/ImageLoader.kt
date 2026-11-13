@@ -10,6 +10,20 @@ import kotlin.math.max
 
 object ImageLoader {
 
+    /** Decodes a bundled asset, scaled so the longest side is <= [maxSide]. */
+    fun loadAsset(context: Context, name: String, maxSide: Int): Bitmap? = try {
+        val decoded = context.assets.open(name).use { BitmapFactory.decodeStream(it) }
+        if (decoded == null) null else {
+            val scale = minOf(1f, maxSide.toFloat() / max(decoded.width, decoded.height))
+            if (scale < 1f) Bitmap.createScaledBitmap(
+                decoded, (decoded.width * scale).toInt().coerceAtLeast(1),
+                (decoded.height * scale).toInt().coerceAtLeast(1), true,
+            ) else decoded
+        }
+    } catch (e: Exception) {
+        null
+    }
+
     /** Decodes [uri], applies EXIF rotation and scales so the longest side is <= [maxSide]. */
     fun load(context: Context, uri: Uri, maxSide: Int): Bitmap? {
         val resolver = context.contentResolver

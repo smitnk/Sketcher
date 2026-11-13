@@ -83,6 +83,16 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var liveTick by mutableIntStateOf(0)
         private set
 
+    /** True once a photo/demo has been loaded or strokes generated (hides the empty state). */
+    var hasProject by mutableStateOf(false)
+        private set
+
+    /** Bumped each time generation completes successfully. */
+    var generationCount by mutableIntStateOf(0)
+        private set
+    var pendingShowLayers by mutableStateOf(false)
+    var pendingAutoExport by mutableStateOf(false)
+
     private var sourceBitmap: Bitmap? = null
     private val undoStack = ArrayList<EditAction>()
     private val redoStack = ArrayList<EditAction>()
@@ -107,14 +117,39 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 toast("Could not open that image")
                 return@launch
             }
-            sourceBitmap = bmp
-            project.width = bmp.width
-            project.height = bmp.height
-            project.background = bmp
-            project.backgroundVisible = true
-            project.backgroundOpacity = 1f
+            setSource(bmp)
             toast("Photo loaded - tap Generate")
         }
+    }
+
+    /** Loads assets/demo.png and generates + animates it like an imported photo. */
+    fun runDemo() {
+        viewModelScope.launch {
+            val bmp = withContext(Dispatchers.IO) { ImageLoader.loadAsset(app, "demo.png", settings.maxSide) }
+            if (bmp == null) {
+                toast("Could not open demo image")
+                return@launch
+            }
+            setSource(bmp)
+            generate()
+        }
+    }
+
+    /** Called from MainActivity with the launch intent extras. */
+    fun handleIntentFlags(autodemo: Boolean, showLayers: Boolean, autoExport: Boolean) {
+        if (showLayers) pendingShowLayers = true
+        if (autoExport) pendingAutoExport = true
+        if (autodemo) runDemo()
+    }
+
+    private fun setSource(bmp: Bitmap) {
+        sourceBitmap = bmp
+        hasProject = true
+        project.width = bmp.width
+        project.height = bmp.height
+        project.background = bmp
+        project.backgroundVisible = true
+        project.backgroundOpacity = 1f
     }
 
     fun generate() {
@@ -134,6 +169,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 bmp.getPixels(pixels, 0, w, 0, 0, w, h)
                 val drawing = StrokeGenerator.generate(pixels, w, h, settings)
                 applyDrawing(drawing, bmp)
+                generationCount++
             } catch (e: Exception) {
                 toast("Generation failed: ${e.message}")
             } finally {
@@ -353,6 +389,25 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
             }
             toast(if (where != null) "Saved: $where" else "Export failed")
+        }
+    }
+
+    /** Exports all visible layers as PNG, then the Outline layer alone as transparent PNG. */
+    fun autoExport() {
+        val outline = project.layers.firstOrNull { it.name == "Outline" }
+        export(1, ExportFormat.PNG, false, false)
+        if (outline != null) {
+            viewModelScope.launch {
+                val where = withContext(Dispatchers.Default) {
+                    val bmp = Exporter.render(project, 1, transparent = true, onlyLayer = outline)
+                    try {
+                        Exporter.save(app, bmp, ExportFormat.PNG, "Outline")
+                    } finally {
+                        bmp.recycle()
+                    }
+                }
+                toast(if (where != null) "Saved: $where" else "Export failed")
+            }
         }
     }
 
