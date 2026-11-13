@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T13:49:07" hostname="runnervmwuk1x" time="1.026">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T14:51:56" hostname="runnervmccnms" time="0.999">
   <properties/>
-  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.164"/>
-  <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
-  <testcase name="faintRegionIsLiftedLocallyAndBlankPaperStaysClean" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.016"/>
+  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.155"/>
+  <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.003"/>
+  <testcase name="faintRegionIsLiftedLocallyAndBlankPaperStaysClean" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.03"/>
   <testcase name="autoCutAndStrongInkGuard" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
-  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.2"/>
+  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.239"/>
   <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
   <testcase name="cartoonFusionIsMaxOfAiAndCartoonPlusSilhouette" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.003"/>
-  <testcase name="cartoonRunsModelToo" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.637"/>
+  <testcase name="cartoonRunsModelToo" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.565"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

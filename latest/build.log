@@ -19,18 +19,18 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
+> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
 > Task :app:compressDebugAssets
 > Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugNativeLibs
+> Task :app:processDebugResources
 > Task :app:mergeLibDexDebug
-> Task :app:processDebugManifestForPackage
 
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libonnxruntime.so, libonnxruntime4j_jni.so.
 
-> Task :app:processDebugResources
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
@@ -61,8 +61,8 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:javaPreCompileDebugUnitTest
 > Task :app:mergeExtDexDebug
 > Task :app:compileDebugKotlin
-w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:627:13 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
 w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:628:13 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
+w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/generate/StylePickerSheet.kt:629:13 'fun quadraticBezierTo(x1: Float, y1: Float, x2: Float, y2: Float): Unit' is deprecated. Use quadraticTo() for consistency with cubicTo().
 
 > Task :app:compileDebugJavaWithJavac NO-SOURCE
 > Task :app:dexBuilderDebug
@@ -89,7 +89,7 @@ w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketc
 > Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
 > Task :app:processDebugUnitTestJavaRes
 > Task :app:testDebugUnitTest
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794577665540.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1794581438224.json
 
-BUILD SUCCESSFUL in 1m 27s
+BUILD SUCCESSFUL in 1m 24s
 67 actionable tasks: 67 executed

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T13:49:02" hostname="runnervmwuk1x" time="0.859">
+<testsuite name="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T14:51:51" hostname="runnervmccnms" time="0.644">
   <properties/>
-  <testcase name="outlineTakesImageColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.015"/>
-  <testcase name="fillStaysInsideOutlineAndOffPaper" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.268"/>
-  <testcase name="fillStrokesCoverRegionsInTheirColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.055"/>
-  <testcase name="zigZagIsContinuous" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.052"/>
-  <testcase name="gradientBecomesSmoothPerStrokeColours" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.131"/>
-  <testcase name="runsFastOnLargeImage" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.336"/>
+  <testcase name="outlineTakesImageColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.016"/>
+  <testcase name="fillStaysInsideOutlineAndOffPaper" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.243"/>
+  <testcase name="fillStrokesCoverRegionsInTheirColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.076"/>
+  <testcase name="zigZagIsContinuous" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.044"/>
+  <testcase name="gradientBecomesSmoothPerStrokeColours" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.078"/>
+  <testcase name="runsFastOnLargeImage" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.184"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

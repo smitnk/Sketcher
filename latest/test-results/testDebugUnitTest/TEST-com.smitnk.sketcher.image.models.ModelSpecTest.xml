@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T13:49:04" hostname="runnervmwuk1x" time="0.003">
+<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T14:51:53" hostname="runnervmccnms" time="0.014">
   <properties/>
   <testcase name="animeTanhOutputMapsToInk" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
   <testcase name="zeroOneInkIsLow" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="inkIsHighKeepsValue" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="inputNormalisation" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="targetSizeMultiple8Rounds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="maxPixelsCapHolds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.01"/>
   <testcase name="registryHasExpectedIdsAndOneSourceEach" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
-  <testcase name="targetSizeMultiple256RoundsUp" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="targetSizeMultiple256RoundsUp" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
