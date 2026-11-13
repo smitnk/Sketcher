@@ -60,7 +60,10 @@ object SketchPipeline {
         if (source == LineSource.AI) {
             progress("Running AI line-art model", 0.10f)
             try {
-                ink = model!!.infer(px, pw, ph)
+                // fur/grass -> smooth tone so the model draws contours, not every hair (high detail = less smoothing)
+                val modelIn = PreFilter.smoothTextures(px, pw, ph, 1f - 0.8f * settings.detail.coerceIn(0f, 1f))
+                check()
+                ink = model!!.infer(modelIn, pw, ph)
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {

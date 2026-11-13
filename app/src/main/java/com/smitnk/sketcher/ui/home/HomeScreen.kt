@@ -36,11 +36,21 @@ import androidx.compose.material.icons.outlined.Brush
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,6 +87,7 @@ fun HomeScreen(
     onTryDemo: () -> Unit,
     onOpenProject: (String) -> Unit = {},
     onDeleteProject: (String) -> Unit = {},
+    onRenameProject: (String) -> Unit = {},
     recentProjects: List<RecentProjectUi> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -125,7 +136,12 @@ fun HomeScreen(
                 item(span = { GridItemSpan(maxLineSpan) }) { EmptyRecent() }
             } else {
                 items(recentProjects, key = { it.id }) { p ->
-                    RecentCard(p, onClick = { onOpenProject(p.id) }, onLongClick = { onDeleteProject(p.id) })
+                    RecentCard(
+                        p,
+                        onClick = { onOpenProject(p.id) },
+                        onDelete = { onDeleteProject(p.id) },
+                        onRename = { onRenameProject(p.id) },
+                    )
                 }
             }
         }
@@ -257,15 +273,16 @@ private fun Step(icon: ImageVector, number: String, label: String, modifier: Mod
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecentCard(p: RecentProjectUi, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun RecentCard(p: RecentProjectUi, onClick: () -> Unit, onDelete: () -> Unit, onRename: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).combinedClickable(
             onClickLabel = "Open ${p.name}",
-            onLongClickLabel = "Delete ${p.name}",
-            onLongClick = onLongClick,
+            onLongClickLabel = "Project options for ${p.name}",
+            onLongClick = { menu = true },
             onClick = onClick,
         ),
     ) {
@@ -293,20 +310,43 @@ private fun RecentCard(p: RecentProjectUi, onClick: () -> Unit, onLongClick: () 
                     )
                 }
             }
-            Text(
-                p.name,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = SketcherTokens.space8),
-            )
-            Text(
-                p.updatedLabel,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f).padding(top = SketcherTokens.space4)) {
+                    Text(
+                        p.name,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        p.updatedLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box {
+                    IconButton(onClick = { menu = true }) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = "Project options for ${p.name}")
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                            onClick = { menu = false; onRename() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                            onClick = { menu = false; onDelete() },
+                        )
+                    }
+                }
+            }
         }
     }
 }

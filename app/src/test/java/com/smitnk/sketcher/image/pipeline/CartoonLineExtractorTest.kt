@@ -113,4 +113,21 @@ class CartoonLineExtractorTest {
         assertTrue(onRing > 0)
         assertTrue(ink[150 * w + 200] > 0.5f)
     }
+
+    @Test
+    fun speckleBlobsOnGrassDroppedButEnclosedPupilKept() {
+        val px = cartoon()
+        // 3x3-ish dark round speckles scattered on grass (cluster), and a pupil inside the disc
+        val rnd = Random(5)
+        fun blob(cx: Int, cy: Int, r: Int) {
+            for (y in cy - r..cy + r) for (x in cx - r..cx + r) if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r) px[y * w + x] = rgb(20, 25, 20)
+        }
+        val specks = ArrayList<IntArray>()
+        for (i in 0 until 20) { val x = 20 + rnd.nextInt(w - 40); val y = 230 + rnd.nextInt(55); blob(x, y, 2); specks.add(intArrayOf(x, y)) }
+        blob(190, 140, 7)
+        val ink = CartoonLineExtractor.inkMap(px, w, h, 0.5f)
+        assertTrue(ink[140 * w + 190] > 0.5f)
+        val kept = specks.count { (x, y) -> ink[y * w + x] > 0.5f }
+        assertTrue("kept $kept speckles", kept <= 2)
+    }
 }

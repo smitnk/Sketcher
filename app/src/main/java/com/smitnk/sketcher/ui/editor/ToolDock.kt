@@ -19,6 +19,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -149,7 +150,7 @@ fun ToolDock(
         shadowElevation = SketcherTokens.elevationFloating,
     ) {
         Column(Modifier.padding(horizontal = SketcherTokens.space8, vertical = SketcherTokens.space4)) {
-            // Row A: tool toggles (label only on the selected one).
+            // Row A: tool toggles (icon + label).
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
@@ -249,34 +250,28 @@ fun ToolDock(
 @Composable
 private fun ToolToggle(t: DockTool, selected: Boolean, onClick: () -> Unit) {
     val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    Row(
+    Column(
         modifier = Modifier
-            .height(SketcherTokens.minTouchTarget)
-            .animateContentSize(tween(160))
-            .clip(CircleShape)
+            .defaultMinSize(minWidth = SketcherTokens.minTouchTarget, minHeight = SketcherTokens.minTouchTarget)
+            .clip(MaterialTheme.shapes.medium)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = t.label }
-            .padding(vertical = 4.dp)
-            .clip(CircleShape)
             .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .padding(horizontal = if (selected) 12.dp else 10.dp)
-            .height(40.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         if (t.icon != null) {
             Icon(t.icon, contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
         } else {
             EraserGlyph(fg)
         }
-        if (selected) {
-            Text(
-                t.label,
-                color = fg,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
+        Text(
+            t.label,
+            color = fg,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+        )
     }
 }
 

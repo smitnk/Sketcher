@@ -198,6 +198,8 @@ object CartoonLineExtractor {
      * Keeps compact dark blobs (pupils, nose, buttons) that the thin-line black-hat drops.
      * Small blobs become solid dots, large ones a ring plus a centre dot.
      */
+    private class Blob(val px: IntArray, val x0: Int, val x1: Int, val y0: Int, val y1: Int, val nearInk: Boolean)
+
     private fun addDarkBlobs(v: IntArray, w: Int, h: Int, strength: FloatArray, mask: BooleanArray, out: FloatArray, d: Float) {
         val n = w * h
         val long = max(w, h)
@@ -214,6 +216,7 @@ object CartoonLineExtractor {
         val inkInt = IntArray(n) { if (mask[it]) 1 else 0 }
         val inkNear = slidingMax(inkInt, w, h, near)
         val seen = BooleanArray(n); val stack = IntArray(n); val comp = IntArray(n)
+        val cands = ArrayList<Blob>()
         for (s in 0 until n) {
             if (!dark[s] || seen[s]) continue
             var sp = 0; var cnt = 0
@@ -244,17 +247,57 @@ object CartoonLineExtractor {
             val nearInk = nearCnt > 0
             val ok = if (nearInk) contrast >= 45f && cnt >= minA else contrast >= 80f && cnt >= bigA
             if (!ok) continue
-            val rad = kotlin.math.sqrt(cnt / 3.14159f)
-            if (rad <= long * 0.02f) {
+            cands.add(Blob(comp.copyOf(cnt), x0, x1, y0, y1, nearInk))
+        }
+        // enclosure: flood-fill from the border over non-ink pixels; blobs reachable that way are background
+        val outside = BooleanArray(n)
+        run {
+            var sp = 0
+            fun push(p: Int) { if (!mask[p] && !outside[p]) { outside[p] = true; stack[sp++] = p } }
+            for (x in 0 until w) { push(x); push((h - 1) * w + x) }
+            for (y in 0 until h) { push(y * w); push(y * w + w - 1) }
+            while (sp > 0) {
+                val p = stack[--sp]; val x = p % w; val y = p / w
+                if (x > 0) push(p - 1); if (x < w - 1) push(p + 1); if (y > 0) push(p - w); if (y < h - 1) push(p + w)
+            }
+        }
+        val integ = IntArray((w + 1) * (h + 1))
+        for (y in 0 until h) { var row = 0; for (x in 0 until w) { if (mask[y * w + x]) row++; integ[(y + 1) * (w + 1) + x + 1] = integ[y * (w + 1) + x + 1] + row } }
+        fun inkIn(xa: Int, xb: Int, ya: Int, yb: Int): Int {
+            val x0 = xa.coerceIn(0, w - 1); val x1 = xb.coerceIn(0, w - 1); val y0 = ya.coerceIn(0, h - 1); val y1 = yb.coerceIn(0, h - 1)
+            return integ[(y1 + 1) * (w + 1) + x1 + 1] - integ[y0 * (w + 1) + x1 + 1] - integ[(y1 + 1) * (w + 1) + x0] + integ[y0 * (w + 1) + x0]
+        }
+        val win = max(2f, long * 0.03f)
+        for ((i, c) in cands.withIndex()) {
+            val cx = (c.x0 + c.x1) / 2; val cy = (c.y0 + c.y1) / 2
+            val r = kotlin.math.sqrt(c.px.size / 3.14159f)
+            val enclosed = !outside[cy * w + cx] && c.px.none { outside[it] }
+            val r2 = (2f * r).toInt() + 1
+            val touches = inkIn(c.x0 - r2, c.x1 + r2, c.y0 - r2, c.y1 + r2) > 0
+            if (!enclosed && !touches) continue
+            var similar = 0
+            for ((j, o) in cands.withIndex()) {
+                if (i == j) continue
+                val ox = (o.x0 + o.x1) / 2; val oy = (o.y0 + o.y1) / 2
+                if (kotlin.math.abs(ox - cx) > win || kotlin.math.abs(oy - cy) > win) continue
+                val ratio = o.px.size.toFloat() / c.px.size
+                if (ratio in 0.33f..3f) similar++
+            }
+            if (similar >= 4) continue
+            val cnt = c.px.size; val comp = c.px; val x0 = c.x0; val x1 = c.x1; val y0 = c.y0; val y1 = c.y1
+            val rad = r
+            if (cnt < n * 0.0001f) {
+                out[cy * w + cx] = 1f                 // tiny: one dot, no ring
+            } else if (rad <= long * 0.02f) {
                 for (k in 0 until cnt) out[comp[k]] = 1f
             } else {
-                val cx = (x0 + x1) / 2f; val cy = (y0 + y1) / 2f
+                val fcx = (x0 + x1) / 2f; val fcy = (y0 + y1) / 2f
                 for (k in 0 until cnt) {
                     val p = comp[k]; val x = p % w; val y = p / w
                     var edge = false
                     if (x == 0 || y == 0 || x == w - 1 || y == h - 1) edge = true
                     else if (!dark[p - 1] || !dark[p + 1] || !dark[p - w] || !dark[p + w]) edge = true
-                    val dx = x - cx; val dy = y - cy
+                    val dx = x - fcx; val dy = y - fcy
                     if (edge || dx * dx + dy * dy <= (0.3f * rad) * (0.3f * rad)) out[p] = 1f
                 }
             }

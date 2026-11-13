@@ -476,8 +476,56 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ import / generate
 
+    private var poseMode = false
+    private var settingsBeforePose: PipelineSettings? = null
+
+    /** Pose renders: clean outline only, no shading, ignore background. Off restores the previous settings. */
+    fun setPoseMode(on: Boolean) {
+        if (on) {
+            if (!poseMode) settingsBeforePose = pipelineSettings
+            poseMode = true
+            pipelineSettings = pipelineSettings.copy(
+                lineSource = LineSource.AUTO,
+                shading = ShadingLevel.NONE,
+                detail = 0.45f,
+                ignoreBackground = true,
+            )
+        } else if (poseMode) {
+            poseMode = false
+            settingsBeforePose?.let { pipelineSettings = it }
+            settingsBeforePose = null
+        }
+    }
+
+    /** "<prefix> <n>" with n one above the highest existing "<prefix> <k>" in the recent list. */
+    private fun autoName(prefix: String): String {
+        val max = recentProjects.mapNotNull { r ->
+            r.name.removePrefix("$prefix ").takeIf { r.name.startsWith("$prefix ") }?.trim()?.toIntOrNull()
+        }.maxOrNull() ?: 0
+        return "$prefix ${max + 1}"
+    }
+
+    private fun displayNameOf(uri: Uri): String? = try {
+        app.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }?.substringBeforeLast('.')?.trim()?.take(80)?.takeIf { it.isNotEmpty() }
+    } catch (t: Throwable) {
+        null
+    }
+
+    fun renameProjectById(id: String, name: String) {
+        val n = name.trim().take(80)
+        if (n.isEmpty()) return
+        if (id == currentProjectId) projectName = n
+        viewModelScope.launch {
+            withContext(NonCancellable) { saveMutex.withLock { repo.rename(id, n) } }
+            refreshRecent()
+        }
+    }
+
     fun loadImage(uri: Uri) {
         viewModelScope.launch {
+            val picked = withContext(Dispatchers.IO) { displayNameOf(uri) }
             val bmp = withContext(Dispatchers.IO) {
                 try {
                     ImageLoader.load(app, uri, settings.maxSide)
@@ -493,6 +541,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             flushPendingSave()
             resetProject()
+            projectName = picked ?: autoName(if (poseMode) "Pose" else "Sketch")
             setSource(bmp)
             model().warmUp()
             styleSheetRequest = true
@@ -517,6 +566,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             flushPendingSave()
             resetProject()
+            projectName = if (recentProjects.none { it.name == "Demo" }) "Demo" else autoName("Demo")
             setSource(bmp)
             model().warmUp()
             generate()
@@ -535,6 +585,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             project.background = null
             project.width = 1024
             project.height = 1024
+            projectName = autoName("Sketch")
         }
     }
 
