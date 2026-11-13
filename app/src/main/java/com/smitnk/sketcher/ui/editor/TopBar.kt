@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
@@ -71,6 +72,7 @@ fun TopBar(
     modifier: Modifier = Modifier,
     onSettings: (() -> Unit)? = null,
     onRename: (() -> Unit)? = null,
+    onProcessing: (() -> Unit)? = null,
 ) {
     val colors = SketcherTokens.colors
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -105,7 +107,7 @@ fun TopBar(
                 TopAction(Icons.Default.Layers, "Layers", onLayers)
                 TopAction(Icons.Default.FileDownload, "Export", onExport, primary = true)
                 Spacer(Modifier.width(SketcherTokens.space2))
-                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename)
+                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename, onProcessing)
             }
         }
     }
@@ -144,6 +146,7 @@ private fun OverflowMenu(
     onGenerate: () -> Unit,
     onSettings: (() -> Unit)?,
     onRename: (() -> Unit)?,
+    onProcessing: (() -> Unit)?,
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
@@ -171,6 +174,13 @@ private fun OverflowMenu(
                 text = { Text("Rename project") },
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                 onClick = { open = false; onRename() },
+            )
+        }
+        if (onProcessing != null) {
+            DropdownMenuItem(
+                text = { Text("Processing (GPU/CPU)") },
+                leadingIcon = { Icon(Icons.Default.Memory, contentDescription = null) },
+                onClick = { open = false; onProcessing() },
             )
         }
         if (onSettings != null) {

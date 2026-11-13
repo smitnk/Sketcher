@@ -161,6 +161,7 @@ class ProjectRepository(context: Context) {
                 Layer(ls.id, ls.name).also { l ->
                     l.visible = ls.visible
                     l.opacity = ls.opacity
+                    applyInk(l, ls)
                     val brushes = com.smitnk.sketcher.image.BrushType.values()
                     for (st in ls.strokes) {
                         l.strokes.add(

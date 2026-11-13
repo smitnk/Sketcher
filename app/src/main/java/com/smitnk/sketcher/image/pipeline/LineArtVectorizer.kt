@@ -92,6 +92,28 @@ object LineArtVectorizer {
         return out
     }
 
+    /**
+     * Thins [mask] in place (border pixels are cleared) and traces every skeleton chain, without pruning or
+     * filtering, as lightly smoothed polylines (pixel-centre coordinates). Isolated single pixels yield no chain.
+     */
+    internal fun traceMask(mask: BooleanArray, w: Int, h: Int): List<FloatArray> {
+        if (w < 8 || h < 8) return emptyList()
+        for (x in 0 until w) { mask[x] = false; mask[(h - 1) * w + x] = false }
+        for (y in 0 until h) { mask[y * w] = false; mask[y * w + w - 1] = false }
+        thin(mask, w, h)
+        val chains = Graph.build(mask, w, h).strokes()
+        val out = ArrayList<FloatArray>(chains.size)
+        for (c in chains) {
+            val n = c.size
+            if (n < 2) continue
+            var pts = FloatArray(n * 2)
+            for (i in 0 until n) { pts[i * 2] = (c[i] % w) + 0.5f; pts[i * 2 + 1] = (c[i] / w) + 0.5f }
+            pts = rdp(movingAverage(pts, 2), 0.5f)
+            out.add(pts)
+        }
+        return out
+    }
+
     private class Cand(var pts: FloatArray, val len: Float, val mean: Float, val score: Float, val tex: Boolean = false, val tscore: Float = 0f)
 
     // ------------------------------------------------------------------ local normalisation

@@ -11,3 +11,4 @@ build/
 *.aab
 *.keystore
 *.jks
+__pycache__/

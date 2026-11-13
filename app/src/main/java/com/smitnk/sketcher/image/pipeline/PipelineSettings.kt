@@ -4,6 +4,9 @@ enum class LineSource { AUTO, AI, CARTOON, CLASSIC }       // AUTO: cartoon dete
 enum class ShadingLevel { NONE, LIGHT, MEDIUM, HEAVY }
 enum class ShadingStyle { HATCH, CROSS_HATCH, SCRIBBLE }
 
+/** PENCIL_REVEAL keeps the exact AI/cartoon ink raster and animates it with reveal strokes; CLEAN_VECTOR draws vector pen strokes. */
+enum class OutlineStyle { PENCIL_REVEAL, CLEAN_VECTOR }
+
 data class PipelineSettings(
     val lineSource: LineSource = LineSource.AUTO,
     val detail: Float = 0.5f,            // 0..1 more/less lines
@@ -16,6 +19,7 @@ data class PipelineSettings(
     val ignoreBackground: Boolean = true, // don't shade flat/background regions
     val maxStrokes: Int = 4000,
     val workingSize: Int = 1024,          // long side for vector output
+    val outlineStyle: OutlineStyle = OutlineStyle.PENCIL_REVEAL,
 )
 
 fun interface LineArtModel {                 // B1 implements OnnxLineArtModel (android) ; tests use fakes

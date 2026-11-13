@@ -27,6 +27,18 @@ class Layer(val id: Long, name: String) {
     /** Animation order: lower plays first; ties keep list (bottom-to-top) order. */
     var animPriority by mutableIntStateOf(0)
 
+    /**
+     * Pencil-reveal ink (ARGB_8888, ink-black, alpha = ink, drawing size). When set, [strokes] are only reveal
+     * paths (width [revealWidthPx]) that uncover the texture as they animate; they are never drawn themselves.
+     */
+    var inkTexture: Bitmap? = null
+        set(v) { field = v; inkRev++ }
+
+    var revealWidthPx by mutableFloatStateOf(0f)
+
+    /** Bumped whenever [inkTexture] changes (set or erased in place) so caches and the screen redraw. */
+    var inkRev by mutableIntStateOf(0)
+
     fun totalLength(): Float {
         var total = 0f
         for (s in strokes) total += s.length

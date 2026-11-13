@@ -3,6 +3,7 @@ package com.smitnk.sketcher.ui
 import android.app.Application
 import android.graphics.Bitmap
 import android.content.ContentUris
+import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -34,6 +35,10 @@ import com.smitnk.sketcher.image.GeneratorSettings
 import com.smitnk.sketcher.image.ImageLoader
 import com.smitnk.sketcher.image.Stroke
 import com.smitnk.sketcher.image.pipeline.LineSource
+import com.smitnk.sketcher.image.models.ModelManager
+import com.smitnk.sketcher.image.models.ModelSpec
+import com.smitnk.sketcher.image.models.ModelSpecs
+import com.smitnk.sketcher.image.pipeline.Accel
 import com.smitnk.sketcher.image.pipeline.OnnxLineArtModel
 import com.smitnk.sketcher.image.pipeline.PipelineSettings
 import com.smitnk.sketcher.image.pipeline.ShadingLevel
@@ -41,6 +46,7 @@ import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
+import com.smitnk.sketcher.ui.generate.LineModelUi
 import com.smitnk.sketcher.ui.home.RecentProjectUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -49,11 +55,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -97,8 +106,18 @@ private class EraseAction(val layer: Layer, val removed: List<Pair<Int, Stroke>>
     }
 }
 
+/** Eraser stroke on a pencil-reveal layer: swaps full copies of the ink texture (simple, exact). */
+private class InkEraseAction(val layer: Layer, val before: Bitmap, val after: Bitmap) : EditAction {
+    private fun copy(b: Bitmap) = b.copy(Bitmap.Config.ARGB_8888, true)
+    override fun undo() { layer.inkTexture = copy(before) }
+    override fun redo() { layer.inkTexture = copy(after) }
+}
+
 private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
 private const val AUTOSAVE_DELAY_MS = 2000L
+private const val KEY_MODEL_ID = "model_id"
+private const val KEY_ACCEL_CHOICE = "accel_choice"
+private const val KEY_AUTO_DONE = "auto_accel_done"
 
 class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -142,10 +161,258 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var generationProgress by mutableFloatStateOf(0f)
         private set
 
+    // ------------------------------------------------------------------ line-art models / processing
+
+    private val models = ModelManager(app)
+    private val mlPrefs = app.getSharedPreferences(OnnxLineArtModel.PREFS, Context.MODE_PRIVATE)
     private var lineArtModel: OnnxLineArtModel? = null
 
+    /** Id of the line model in use (persisted). Falls back to the bundled model when the file is missing. */
+    var selectedLineModelId by mutableStateOf(
+        mlPrefs.getString(KEY_MODEL_ID, null)?.takeIf { ModelSpecs.byId(it) != null } ?: ModelSpecs.DEFAULT_ID,
+    )
+        private set
+
+    // Bundled models are available at once; downloaded ones are checked on IO (file access) after start.
+    private var installedModelIds by mutableStateOf(models.list().filter { it.isBundled }.map { it.id }.toSet())
+    private var downloadProgress by mutableStateOf<Map<String, Float>>(emptyMap())
+    private val downloadJobs = HashMap<String, Job>()
+
+    /** Rows for the style picker's model cards. */
+    val lineModels: List<LineModelUi>
+        get() = models.list().map { s ->
+            LineModelUi(
+                id = s.id,
+                name = s.name,
+                subtitle = when (s.id) {
+                    "informative" -> "Built-in, balanced"
+                    "realistic" -> "ControlNet lineart, detailed"
+                    "coarse" -> "Bold simple lines, great for poses"
+                    "anime" -> "Best for 3D/anime characters; large download"
+                    else -> s.description
+                },
+                sizeLabel = when {
+                    s.isBundled -> "Built-in"
+                    s.sizeBytes != null -> "${(s.sizeBytes / (1024 * 1024)).coerceAtLeast(1)} MB"
+                    s.id == "anime" -> "Large download"
+                    else -> "Download"
+                },
+                installed = s.id in installedModelIds,
+                downloading = downloadProgress[s.id],
+                recommended = s.id == ModelSpecs.DEFAULT_ID,
+            )
+        }
+
+    var showMlSettings by mutableStateOf(false)
+        private set
+
+    fun openMlSettings() {
+        refreshMlStatus()
+        showMlSettings = true
+    }
+    fun closeMlSettings() { showMlSettings = false }
+
+    private fun refreshInstalledModels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ids = models.list().filter { models.isAvailable(it.id) }.map { it.id }.toSet()
+            withContext(Dispatchers.Main) {
+                installedModelIds = ids
+                // The persisted pick may have been deleted externally: never leave a missing model selected.
+                if (selectedLineModelId !in ids) selectedLineModelId = ModelSpecs.DEFAULT_ID
+            }
+        }
+    }
+
+    private fun closeInBackground(m: OnnxLineArtModel?) {
+        // close() waits for a running inference; never block the main thread on it.
+        if (m != null) Thread({ try { m.close() } catch (e: Throwable) { android.util.Log.w("SketcherModel", "close failed", e) } }, "model-close").start()
+    }
+
+    private fun buildModel(): OnnxLineArtModel {
+        val spec = ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE
+        val useSpec = if (models.isAvailable(spec.id)) spec else ModelSpecs.INFORMATIVE
+        return OnnxLineArtModel(app, useSpec, models.file(useSpec.id), longSide = OnnxLineArtModel.DEFAULT_LONG_SIDE)
+    }
+
     private fun model(): OnnxLineArtModel =
-        lineArtModel ?: OnnxLineArtModel(app).also { lineArtModel = it }
+        lineArtModel ?: buildModel().also { lineArtModel = it }
+
+    /** Switches the line model (only if installed); the old instance is closed off the main thread. */
+    fun selectLineModel(id: String) {
+        if (id == selectedLineModelId || id !in installedModelIds) return
+        mlPrefs.edit().putString(KEY_MODEL_ID, id).apply()
+        selectedLineModelId = id
+        val old = lineArtModel
+        lineArtModel = null
+        closeInBackground(old)
+    }
+
+    fun downloadLineModel(id: String) {
+        val spec = models.spec(id) ?: return
+        if (spec.isBundled || id in installedModelIds || downloadJobs.containsKey(id)) return
+        downloadProgress = downloadProgress + (id to 0f)
+        downloadJobs[id] = viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    models.download(
+                        id,
+                        onProgress = { done, total ->
+                            val f = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
+                            downloadProgress = downloadProgress + (id to f)
+                        },
+                        shouldCancel = { !isActive },
+                    )
+                }
+                installedModelIds = installedModelIds + id
+                selectLineModel(id)
+                toast("${spec.name} model ready")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: InterruptedIOException) {
+                // cancelled
+            } catch (e: IOException) {
+                toast("Download failed: ${e.message}")
+            } catch (t: Throwable) {
+                toast("Download failed: ${t.message}")
+            } finally {
+                downloadProgress = downloadProgress - id
+                downloadJobs.remove(id)
+            }
+        }
+    }
+
+    fun cancelDownload(id: String) {
+        downloadJobs[id]?.cancel()
+    }
+
+    // Accelerator choice: "auto" | "cpu" | "xnnpack" | "nnapi_gpu" | "nnapi_npu".
+    var selectedAccel by mutableStateOf(mlPrefs.getString(KEY_ACCEL_CHOICE, null) ?: "auto")
+        private set
+
+    var benchmarking by mutableStateOf(false)
+        private set
+
+    /** id -> ms; null = provider failed; missing key = not run. Seeded from the last saved benchmark. */
+    var benchmarkResults by mutableStateOf<Map<String, Long?>>(
+        Accel.values().mapNotNull { a ->
+            OnnxLineArtModel.savedBenchmarkMs(app, a)?.let { accelId(a) to it as Long? }
+        }.toMap(),
+    )
+        private set
+
+    var lastInferenceMs by mutableStateOf<Long?>(null)
+        private set
+    var activeAccelLabel by mutableStateOf<String?>(null)
+        private set
+    var fallbackReason by mutableStateOf<String?>(null)
+        private set
+
+    val accelOptions: List<Pair<String, String>> = listOf(
+        "auto" to "Auto (fastest)",
+        "cpu" to "CPU",
+        "xnnpack" to "CPU + XNNPACK",
+        "nnapi_gpu" to "GPU (NNAPI)",
+        "nnapi_npu" to "NPU (NNAPI)",
+    )
+
+    private fun accelId(a: Accel) = when (a) {
+        Accel.CPU -> "cpu"
+        Accel.XNNPACK -> "xnnpack"
+        Accel.NNAPI_GPU -> "nnapi_gpu"
+        Accel.NNAPI_NPU -> "nnapi_npu"
+    }
+
+    private fun accelLabel(a: Accel) = accelOptions.first { it.first == accelId(a) }.second
+
+    /** Concrete provider for a choice id; "auto" = fastest saved benchmark result, else XNNPACK. */
+    private fun resolveAccel(id: String): Accel =
+        Accel.values().firstOrNull { accelId(it) == id }
+            ?: Accel.values()
+                .mapNotNull { a -> OnnxLineArtModel.savedBenchmarkMs(app, a)?.let { a to it } }
+                .minByOrNull { it.second }?.first
+            ?: Accel.XNNPACK
+
+    fun selectAccel(id: String) {
+        if (accelOptions.none { it.first == id }) return
+        selectedAccel = id
+        mlPrefs.edit().putString(KEY_ACCEL_CHOICE, id).apply()
+        applyAccelInBackground()
+    }
+
+    /** Applies the chosen accelerator to the live model. The setter waits for a running inference, so use IO. */
+    private fun applyAccelInBackground() {
+        val a = resolveAccel(selectedAccel)
+        val m = lineArtModel
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (m != null) m.selectAccel(a) else mlPrefs.edit().putString("accel", a.name).apply()
+            } catch (t: Throwable) {
+                android.util.Log.w("SketcherModel", "accel change failed", t)
+            }
+        }
+    }
+
+    /** Pulls lastInferenceMs / activeAccel / fallbackReason from the live model into UI state. */
+    private fun refreshMlStatus() {
+        val m = lineArtModel ?: return
+        lastInferenceMs = m.lastInferenceMs
+        activeAccelLabel = m.activeAccel?.let { accelLabel(it) }
+        fallbackReason = m.lastFallbackReason
+    }
+
+    /**
+     * Times every provider on a private model instance (so generation is never blocked by the model lock),
+     * stores the results, and applies the fastest if the choice is "auto".
+     */
+    fun runBenchmark() {
+        if (benchmarking) return
+        benchmarking = true
+        val spec = ModelSpecs.byId(selectedLineModelId)?.takeIf { models.isAvailable(it.id) } ?: ModelSpecs.INFORMATIVE
+        viewModelScope.launch {
+            try {
+                val res = withContext(Dispatchers.Default) { benchmarkOnPrivateModel(spec) }
+                benchmarkResults = Accel.values().associate { accelId(it) to res[it] }
+                if (selectedAccel == "auto") applyAccelInBackground()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                toast("Speed test failed: ${t.message}")
+            } finally {
+                benchmarking = false
+            }
+        }
+    }
+
+    private fun benchmarkOnPrivateModel(spec: ModelSpec): Map<Accel, Long> {
+        val m = OnnxLineArtModel(app, spec, models.file(spec.id))
+        try {
+            return m.benchmark()
+        } finally {
+            m.close()
+        }
+    }
+
+    /** First launch only: benchmark once in the background (never touches the live model's lock), then persist. */
+    private fun autoSelectAccelOnFirstLaunch() {
+        if (mlPrefs.getBoolean(KEY_AUTO_DONE, false)) return
+        viewModelScope.launch {
+            try {
+                val res = withContext(Dispatchers.Default) { benchmarkOnPrivateModel(ModelSpecs.INFORMATIVE) }
+                mlPrefs.edit().putBoolean(KEY_AUTO_DONE, true).apply()
+                benchmarkResults = Accel.values().associate { accelId(it) to res[it] }
+                if (selectedAccel == "auto") applyAccelInBackground()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                android.util.Log.w("SketcherModel", "first-launch benchmark failed", t)
+            }
+        }
+    }
+
+    init {
+        refreshInstalledModels()
+        autoSelectAccelOnFirstLaunch()
+    }
 
     override fun onCleared() {
         // Best-effort final save: snapshot now (main thread), write on a scope that outlives viewModelScope.
@@ -164,10 +431,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
         }
         generateJob?.cancel()
-        // close() waits for a running inference; never block the main thread on it.
         val m = lineArtModel
         lineArtModel = null
-        if (m != null) Thread({ try { m.close() } catch (e: Throwable) { android.util.Log.w("SketcherModel", "close failed", e) } }, "model-close").start()
+        closeInBackground(m)
         super.onCleared()
     }
 
@@ -690,6 +956,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val ps = pipelineSettings
                 val m = model()
                 m.detail = ps.detail
+                m.longSide = SketchPipeline.modelSide(ps.detail)
                 generationStage = "Starting"
                 generationProgress = 0f
                 val (drawing, scaledBg) = withContext(Dispatchers.Default) {
@@ -710,6 +977,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
                 if (gen != projectGen) return@launch // another project was opened meanwhile
                 lastAppliedSettings = ps
+                refreshMlStatus()
                 applyDrawing(drawing, scaledBg)
                 android.util.Log.i(
                     "SketcherGen",
@@ -786,6 +1054,16 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             layer.strokes.clear()
             layer.strokes.addAll(strokes)
+            if (kind == LayerKind.AUTO_OUTLINE) {
+                val inkPx = drawing.outlineInk
+                if (inkPx != null && drawing.inkW > 0 && drawing.inkH > 0 && inkPx.size >= drawing.inkW * drawing.inkH) {
+                    layer.inkTexture = Bitmap.createBitmap(inkPx, drawing.inkW, drawing.inkH, Bitmap.Config.ARGB_8888)
+                    layer.revealWidthPx = drawing.revealWidth
+                } else {
+                    layer.inkTexture = null
+                    layer.revealWidthPx = 0f
+                }
+            }
             layer.animPriority = if (kind == LayerKind.AUTO_OUTLINE && ps.colourFill) -1 else 0
         }
         if (result.none { it.kind == LayerKind.MANUAL }) {
@@ -858,6 +1136,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val layer = project.selectedLayer ?: return false
         if (layer.locked || !layer.visible) return false
         if (anim.active) anim.showFinished()
+        if (layer.inkTexture != null) {
+            if (tool == Tool.BRUSH) {
+                toast("This is a pencil-texture layer - draw on another layer, or use the eraser")
+                return false
+            }
+            inkBefore = layer.inkTexture?.copy(Bitmap.Config.ARGB_8888, true)
+            lastEraseX = Float.NaN
+        }
         liveLayer = layer
         liveCount = 0
         erased = ArrayList()
@@ -887,6 +1173,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 layer.strokes.add(stroke)
                 pushUndo(AddStrokeAction(layer, stroke))
             }
+        } else if (layer.inkTexture != null) {
+            val before = inkBefore
+            val after = layer.inkTexture
+            if (before != null && after != null && inkErased) pushUndo(InkEraseAction(layer, before, after.copy(Bitmap.Config.ARGB_8888, true)))
+            inkBefore = null
+            inkErased = false
         } else if (erased.isNotEmpty()) {
             pushUndo(EraseAction(layer, erased))
         }
@@ -921,8 +1213,35 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         liveCount++
     }
 
+    private var inkBefore: Bitmap? = null
+    private var inkErased = false
+    private var lastEraseX = Float.NaN
+    private var lastEraseY = 0f
+    private val clearPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+        style = android.graphics.Paint.Style.STROKE
+        strokeCap = android.graphics.Paint.Cap.ROUND
+    }
+
+    /** Eraser on a pencil-reveal layer: CLEAR along the path into the (mutable) ink texture. */
+    private fun eraseInk(layer: Layer, x: Float, y: Float) {
+        var tex = layer.inkTexture ?: return
+        if (!tex.isMutable) {
+            tex = tex.copy(Bitmap.Config.ARGB_8888, true)
+            layer.inkTexture = tex
+        }
+        val radius = max(brushSize * 1.5f, 6f)
+        clearPaint.strokeWidth = radius * 2f
+        val c = android.graphics.Canvas(tex)
+        if (lastEraseX.isNaN()) c.drawPoint(x, y, clearPaint) else c.drawLine(lastEraseX, lastEraseY, x, y, clearPaint)
+        lastEraseX = x; lastEraseY = y
+        inkErased = true
+        layer.inkRev++
+    }
+
     private fun eraseAt(x: Float, y: Float) {
         val layer = liveLayer ?: return
+        if (layer.inkTexture != null) { eraseInk(layer, x, y); return }
         val radius = max(brushSize * 1.5f, 6f)
         var i = 0
         while (i < layer.strokes.size) {
@@ -1010,6 +1329,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 it.locked = src.locked
                 it.kind = src.kind
                 it.strokes.addAll(src.strokes.toList())
+                it.revealWidthPx = src.revealWidthPx
+                it.inkTexture = src.inkTexture?.takeIf { b -> !b.isRecycled }?.copy(Bitmap.Config.ARGB_8888, false)
             }
         }
 

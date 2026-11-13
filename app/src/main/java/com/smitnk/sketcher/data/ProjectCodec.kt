@@ -27,6 +27,9 @@ class LayerSnapshot(
     val strokes: List<StrokeSnapshot>,
     /** LayerKind ordinal (3 = MANUAL). */
     val kind: Int = LayerKind.MANUAL.ordinal,
+    /** v3: pencil-reveal ink texture as PNG bytes (null = none) and its reveal-stroke width. */
+    val inkPng: ByteArray? = null,
+    val revealWidthPx: Float = 0f,
 )
 
 class ProjectSnapshot(
@@ -40,9 +43,10 @@ class ProjectSnapshot(
     val animationSeconds: Float = 0f,
 )
 
-/** Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte. */
+/** Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an optional per-layer ink PNG. */
 object ProjectCodec {
-    const val VERSION = 2
+    const val VERSION = 3
+    private const val MAX_INK_BYTES = 200_000_000
     private const val MAX_DIM = 8192
     private const val MIN_LAYER_BYTES = 20
     private const val MIN_STROKE_BYTES = 20
@@ -81,6 +85,15 @@ object ProjectCodec {
                 out.writeInt(st.points.size)
                 for (f in st.points) out.writeFloat(f)
             }
+            val png = l.inkPng
+            if (png != null && png.isNotEmpty()) {
+                out.writeBoolean(true)
+                out.writeFloat(l.revealWidthPx)
+                out.writeInt(png.size)
+                out.write(png)
+            } else {
+                out.writeBoolean(false)
+            }
         }
         out.flush()
         return bos.toByteArray()
@@ -101,7 +114,7 @@ object ProjectCodec {
         inp.readFully(magic)
         if (!magic.contentEquals(MAGIC)) throw IOException("Not a Sketcher project")
         val version = inp.readInt()
-        if (version != 1 && version != VERSION) throw IOException("Unsupported project version $version")
+        if (version !in 1..VERSION) throw IOException("Unsupported project version $version")
         val width = inp.readInt()
         val height = inp.readInt()
         val selected = inp.readInt()
@@ -139,7 +152,16 @@ object ProjectCodec {
                 for (i in 0 until n) pts[i] = inp.readFloat()
                 strokes.add(StrokeSnapshot(pts, color, w, brush, alpha))
             }
-            layers.add(LayerSnapshot(id, name, visible, opacity, locked, inAnim, prio, strokes, kind))
+            var inkPng: ByteArray? = null
+            var reveal = 0f
+            if (version >= 3 && inp.readBoolean()) {
+                reveal = inp.readFloat()
+                val n = inp.readInt()
+                if (n !in 1..MAX_INK_BYTES || n > inp.available()) throw IOException("Corrupt ink texture")
+                inkPng = ByteArray(n)
+                inp.readFully(inkPng)
+            }
+            layers.add(LayerSnapshot(id, name, visible, opacity, locked, inAnim, prio, strokes, kind, inkPng, reveal))
         }
         return ProjectSnapshot(width, height, layers, selected, bgVisible, bgOpacity, animSeconds)
     }

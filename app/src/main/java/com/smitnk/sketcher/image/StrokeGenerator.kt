@@ -52,6 +52,14 @@ data class GeneratedDrawing(
     val shading: List<Stroke>,
     /** Colour fill strokes (only in colour mode). */
     val fill: List<Stroke> = emptyList(),
+    /**
+     * Optional full-image ink raster for the outline ("pencil reveal"): ARGB, ink-black with alpha = ink,
+     * [inkW] x [inkH] (= [width] x [height]). The outline strokes then act as reveal paths of width [revealWidth].
+     */
+    val outlineInk: IntArray? = null,
+    val inkW: Int = 0,
+    val inkH: Int = 0,
+    val revealWidth: Float = 0f,
 )
 
 data class GeneratorSettings(

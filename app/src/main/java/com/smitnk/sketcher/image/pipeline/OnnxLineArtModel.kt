@@ -62,6 +62,10 @@ class OnnxLineArtModel(
     /** Kept for API compatibility with the settings UI; the resolution is controlled by [longSide]. */
     @Volatile var detail: Float = 0.5f
 
+    /** Wall time of the last successful [infer] in ms (pre + run + post); null until one ran. */
+    @Volatile var lastInferenceMs: Long? = null
+        private set
+
     @Volatile private var warming = false
 
     private var inBuf: ByteBuffer? = null
@@ -176,15 +180,21 @@ class OnnxLineArtModel(
         require(w > 0 && h > 0 && argb.size >= w * h) { "bad image" }
         val tStart = System.nanoTime()
         val (tw, th) = spec.targetSize(w, h, longSide)
-        val n = tw * th
-        val fb = fillInput(argb, w, h, tw, th)
+        // NNAPI only accelerates fixed shapes: letterbox (white) into a square canvas so the shape never varies.
+        // Fallback providers reuse the same canvas, which is harmless (white paper = no ink).
+        val square = accel == Accel.NNAPI_GPU || accel == Accel.NNAPI_NPU
+        val cw = if (square) max(tw, th) else tw
+        val ch = if (square) max(tw, th) else th
+        val ox = (cw - tw) / 2
+        val oy = (ch - th) / 2
+        val fb = fillInput(argb, w, h, tw, th, cw, ch, ox, oy)
         val tPre = System.nanoTime()
-        val out = FloatArray(n)
+        val raw = FloatArray(cw * ch)
         var attempts = 0
         while (true) {
             val (env, session) = ensureSession()
             try {
-                runInto(env, session, fb, tw, th, out)
+                runInto(env, session, fb, cw, ch, raw)
                 break
             } catch (t: Throwable) {
                 val a = activeAccel
@@ -198,11 +208,19 @@ class OnnxLineArtModel(
             }
         }
         val tRun = System.nanoTime()
-        for (i in 0 until n) out[i] = spec.inkFromOutput(out[i])
+        // Crop the content window out of the (possibly padded) output and convert to ink.
+        val out = FloatArray(tw * th)
+        for (y in 0 until th) {
+            val src = (y + oy) * cw + ox
+            val dst = y * tw
+            for (x in 0 until tw) out[dst + x] = spec.inkFromOutput(raw[src + x])
+        }
         val res = if (tw == w && th == h) out else upsample(out, tw, th, w, h)
+        val totalMs = (System.nanoTime() - tStart) / 1_000_000
+        lastInferenceMs = totalMs
         Log.i(
             TAG,
-            "infer ${spec.id} ${w}x$h -> ${tw}x$th accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +
+            "infer ${spec.id} ${w}x$h -> ${tw}x$th (canvas ${cw}x$ch) accel=$activeAccel pre=${(tPre - tStart) / 1_000_000}ms " +
                 "run=${(tRun - tPre) / 1_000_000}ms post=${(System.nanoTime() - tRun) / 1_000_000}ms",
         )
         res
@@ -269,9 +287,12 @@ class OnnxLineArtModel(
         env = null
     }
 
-    /** Bilinear resize + NCHW split straight into a reused direct buffer (no boxing, no per-call big arrays). */
-    private fun fillInput(src: IntArray, w: Int, h: Int, tw: Int, th: Int): FloatBuffer {
-        val plane = tw * th
+    /**
+     * Bilinear resize of [src] to [tw]x[th] + NCHW split into a reused direct buffer, placed at ([ox],[oy]) of a
+     * [cw]x[ch] canvas. Canvas area outside the content is white (paper).
+     */
+    private fun fillInput(src: IntArray, w: Int, h: Int, tw: Int, th: Int, cw: Int, ch: Int, ox: Int, oy: Int): FloatBuffer {
+        val plane = cw * ch
         val bytes = 3 * plane * 4
         var bb = inBuf
         if (bb == null || bb.capacity() < bytes) {
@@ -281,6 +302,10 @@ class OnnxLineArtModel(
         bb.clear()
         val fb = bb.asFloatBuffer()
         fb.limit(3 * plane)
+        if (cw != tw || ch != th) {
+            val white = 255f * spec.inputScale + spec.inputOffset
+            for (i in 0 until 3 * plane) fb.put(i, white)
+        }
 
         if (xi0.size < tw) { xi0 = IntArray(tw); xi1 = IntArray(tw); xw = FloatArray(tw) }
         val sx = w.toFloat() / tw
@@ -300,7 +325,7 @@ class OnnxLineArtModel(
             val ay = fy - y0
             val r0 = y0 * w
             val r1 = min(h - 1, y0 + 1) * w
-            val row = y * tw
+            val row = (y + oy) * cw + ox
             for (x in 0 until tw) {
                 val ax = xw[x]
                 val a0 = r0 + xi0[x]; val a1 = r0 + xi1[x]

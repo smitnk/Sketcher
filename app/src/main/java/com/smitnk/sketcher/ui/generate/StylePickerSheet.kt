@@ -73,6 +73,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.image.pipeline.LineSource
+import com.smitnk.sketcher.image.pipeline.OutlineStyle
 import com.smitnk.sketcher.image.pipeline.PipelineSettings
 import com.smitnk.sketcher.image.pipeline.ShadingLevel
 import com.smitnk.sketcher.image.pipeline.ShadingStyle
@@ -260,6 +261,38 @@ fun StylePickerSheet(
                     onChange = { onSettingsChange(settings.copy(lineWidth = it)) },
                     valueText = "%.1f px".format(settings.lineWidth),
                 )
+                val pencil = settings.outlineStyle == OutlineStyle.PENCIL_REVEAL
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = SketcherTokens.minTouchTarget)
+                        .selectable(
+                            selected = pencil,
+                            role = Role.Switch,
+                            onClick = {
+                                onSettingsChange(
+                                    settings.copy(
+                                        outlineStyle = if (pencil) OutlineStyle.CLEAN_VECTOR else OutlineStyle.PENCIL_REVEAL,
+                                    ),
+                                )
+                            },
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (pencil) "Pencil texture (exact AI lines)" else "Clean vector lines",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            if (pencil) "Keeps every pencil mark and reveals it as it draws"
+                            else "Simplified smooth pen strokes",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = pencil, onCheckedChange = null)
+                }
 
                 AnimatedVisibility(
                     visible = choice == StyleChoice.SHADED,

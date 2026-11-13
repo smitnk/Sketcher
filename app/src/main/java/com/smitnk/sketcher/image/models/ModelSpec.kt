@@ -89,18 +89,18 @@ object ModelSpecs {
     val REALISTIC = ModelSpec(
         id = "realistic", name = "Realistic",
         description = "ControlNet lineart annotator. Detailed lines for photos.",
-        fileName = "lineart_realistic.onnx",
+        fileName = "lineart_realistic_fp16.onnx",
         inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
         inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 8,
-        downloadUrl = "$BASE/lineart_realistic.onnx",
+        downloadUrl = "$BASE/lineart_realistic_fp16.onnx",
     )
     val COARSE = ModelSpec(
         id = "coarse", name = "Coarse",
         description = "ControlNet coarse lineart. Bolder, simpler lines.",
-        fileName = "lineart_coarse.onnx",
+        fileName = "lineart_coarse_fp16.onnx",
         inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
         inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 8,
-        downloadUrl = "$BASE/lineart_coarse.onnx",
+        downloadUrl = "$BASE/lineart_coarse_fp16.onnx",
     )
     val ANIME = ModelSpec(
         id = "anime", name = "Anime",

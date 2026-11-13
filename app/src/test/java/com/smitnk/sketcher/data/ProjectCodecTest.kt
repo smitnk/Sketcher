@@ -79,6 +79,22 @@ class ProjectCodecTest {
         return bos.toByteArray()
     }
 
+    @Test fun inkTextureRoundTrips() {
+        val png = byteArrayOf(1, 2, 3, 4, 5)
+        val snap = ProjectSnapshot(
+            10, 10,
+            listOf(
+                LayerSnapshot(1L, "Outline", true, 1f, false, true, 0, emptyList(), LayerKind.AUTO_OUTLINE.ordinal, png, 11f),
+                LayerSnapshot(2L, "Plain", true, 1f, false, true, 0, emptyList()),
+            ),
+            0, true, 1f,
+        )
+        val back = ProjectCodec.decode(ProjectCodec.encode(snap))
+        assertArrayEquals(png, back.layers[0].inkPng)
+        assertEquals(11f, back.layers[0].revealWidthPx, 0f)
+        assertEquals(null, back.layers[1].inkPng)
+    }
+
     @Test fun version1InfersKindFromName() {
         val s = ProjectCodec.decode(v1Bytes())
         assertEquals(4, s.layers.size)

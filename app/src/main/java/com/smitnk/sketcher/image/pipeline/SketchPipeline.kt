@@ -124,9 +124,56 @@ object SketchPipeline {
             check()
         }
 
+        // Pencil reveal: keep the exact ink raster; the strokes become reveal paths (+ coverage strokes for dropped ink).
+        var inkArgb: IntArray? = null
+        var revealWidth = 0f
+        val usesInk = (source == LineSource.AI || source == LineSource.CARTOON) && ink != null
+        if (settings.outlineStyle == OutlineStyle.PENCIL_REVEAL && usesInk && !(settings.colourFill && source != LineSource.CARTOON)) {
+            progress("Pencil texture", 0.95f)
+            val vis = inkVisibility(ink!!, pw, ph, sub, bgMask)
+            val r = revealRadius(settings.lineWidth, pw, ph)
+            outline = outline + InkCoverage.coverageStrokes(vis, pw, ph, outline, r, COVER_THRESHOLD, settings.lineWidth)
+            inkArgb = visibilityToArgb(vis)
+            revealWidth = 2f * r
+            check()
+        }
+
         progress("Done", 1f)
-        GeneratedDrawing(pw, ph, outline, shading, fill)
+        GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth)
     }
+
+    /** Ink visibility (alpha) at/above which a pixel must be revealed by some reveal stroke. */
+    internal const val COVER_THRESHOLD = 0.15f
+
+    /** Reveal-stroke radius in working pixels: 2.5 x the (size-scaled) line width. */
+    internal fun revealRadius(lineWidth: Float, pw: Int, ph: Int): Float =
+        2.5f * lineWidth * (max(pw, ph) / 1024f).coerceIn(0.6f, 2.2f)
+
+    /**
+     * Full-image ink (0..1) -> visible ink alpha: paper noise removed, background zeroed, and a thin margin along
+     * the subject crop's edge cleared (the model draws a frame line there; the vectoriser drops it as well).
+     */
+    internal fun inkVisibility(ink: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, bgMask: BooleanArray?): FloatArray {
+        val out = FloatArray(pw * ph)
+        val m = max(3, (0.004f * max(sub.x1 - sub.x0, sub.y1 - sub.y0)).roundToInt())
+        val x0 = sub.x0 + m; val x1 = min(pw, sub.x1) - m
+        val y0 = sub.y0 + m; val y1 = min(ph, sub.y1) - m
+        for (y in max(0, y0) until y1) {
+            for (x in max(0, x0) until x1) {
+                val i = y * pw + x
+                if (bgMask != null && bgMask[i]) continue
+                out[i] = ((ink[i] - INK_LO) / (INK_HI - INK_LO)).coerceIn(0f, 1f)
+            }
+        }
+        return out
+    }
+
+    private const val INK_LO = 0.06f
+    private const val INK_HI = 0.95f
+
+    /** Ink-black ARGB with alpha = visibility. */
+    internal fun visibilityToArgb(vis: FloatArray): IntArray =
+        IntArray(vis.size) { (((vis[it] * 255f).roundToInt().coerceIn(0, 255)) shl 24) }
 
 
     /** Model input long side: 768 normally, 1024 at high detail (OnnxLineArtModel.longSide must be >= this). */

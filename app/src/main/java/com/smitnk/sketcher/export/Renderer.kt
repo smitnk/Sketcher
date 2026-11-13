@@ -25,6 +25,16 @@ object Renderer {
         val path = Path()
         val rect = RectF()
         val bgPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = android.graphics.Color.BLACK
+        }
+        val inkPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+        val inkInPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
+            xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        }
     }
 
     private val scratchTl = object : ThreadLocal<Scratch>() {
@@ -88,7 +98,10 @@ object Renderer {
                 -1
             }
             val strokes = layer.strokes
-            for (i in 0 until strokes.size) {
+            val ink = layer.inkTexture
+            if (ink != null && !ink.isRecycled) {
+                drawInkLayer(canvas, sc, layer, ink, width, height, budget)
+            } else for (i in 0 until strokes.size) {
                 if (budget <= 0f) break
                 val stroke = strokes[i]
                 drawStroke(canvas, paint, path, stroke, budget)
@@ -99,6 +112,58 @@ object Renderer {
             }
             if (saved >= 0) canvas.restoreToCount(saved)
         }
+    }
+
+    /**
+     * Pencil-reveal layer: fully revealed -> just the texture; partial -> one offscreen pass where the reveal
+     * strokes (width revealWidthPx) are drawn as a mask and the texture is drawn through it (SRC_IN).
+     */
+    private fun drawInkLayer(canvas: Canvas, sc: Scratch, layer: Layer, ink: Bitmap, width: Int, height: Int, budget: Float) {
+        if (budget <= 0f) return
+        sc.rect.set(0f, 0f, width.toFloat(), height.toFloat())
+        val strokes = layer.strokes
+        if (budget >= layer.totalLength() - 0.01f || strokes.isEmpty()) {
+            canvas.drawBitmap(ink, null, sc.rect, sc.inkPaint)
+            return
+        }
+        val path = sc.path
+        path.rewind()
+        var remaining = budget
+        for (i in 0 until strokes.size) {
+            if (remaining <= 0f) break
+            val st = strokes[i]
+            if (st.points.size < 2) continue
+            appendPath(path, st.points, remaining)
+            remaining -= st.length
+        }
+        val sv = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
+        sc.maskPaint.strokeWidth = max(1f, layer.revealWidthPx)
+        canvas.drawPath(path, sc.maskPaint)
+        canvas.drawBitmap(ink, null, sc.rect, sc.inkInPaint)
+        canvas.restoreToCount(sv)
+        path.rewind()
+    }
+
+    /** Appends the polyline (cut off after [limit]) as a new sub-path of [path]. */
+    private fun appendPath(path: Path, p: FloatArray, limit: Float) {
+        path.moveTo(p[0], p[1])
+        var remaining = limit
+        var i = 2
+        while (i < p.size) {
+            val dx = p[i] - p[i - 2]
+            val dy = p[i + 1] - p[i - 1]
+            val d = sqrt(dx * dx + dy * dy)
+            if (d <= remaining) {
+                path.lineTo(p[i], p[i + 1])
+                remaining -= d
+            } else {
+                val t = remaining / d
+                path.lineTo(p[i - 2] + dx * t, p[i - 1] + dy * t)
+                break
+            }
+            i += 2
+        }
+        if (p.size == 2) path.lineTo(p[0], p[1])
     }
 
     /**
@@ -197,6 +262,8 @@ object Renderer {
                 tmp[o + 2] = (if (l.visible) 1L shl 32 else 0L) or (l.opacity.toBits().toLong() and 0xFFFFFFFFL)
                 tmp[o + 3] = if (sz > 0) System.identityHashCode(st[0]).toLong() else 0L
                 tmp[o + 4] = if (sz > 0) System.identityHashCode(st[sz - 1]).toLong() else 0L
+                val tex = l.inkTexture
+                tmp[o + 5] = if (tex != null) System.identityHashCode(tex).toLong() * 1_000_003L + l.inkRev else 0L
             }
         }
 
@@ -229,11 +296,11 @@ object Renderer {
         private fun appendOnly(k: Int, s: Float, layers: List<Layer>, need: Int): Boolean {
             val top = HEADER + REC * (k - 1)
             for (i in 0 until top) if (tmp[i] != sig[i]) return false
-            if (tmp[top] != sig[top] || tmp[top + 2] != sig[top + 2] || tmp[top + 3] != sig[top + 3]) return false
+            if (tmp[top] != sig[top] || tmp[top + 2] != sig[top + 2] || tmp[top + 3] != sig[top + 3] || tmp[top + 5] != sig[top + 5]) return false
             val l = layers[k - 1]
             val oldSize = sig[top + 1].toInt()
             val st = l.strokes
-            if (!l.visible || (l.opacity * 255f).roundToInt() < 255 || oldSize <= 0 || st.size <= oldSize) return false
+            if (!l.visible || l.inkTexture != null || (l.opacity * 255f).roundToInt() < 255 || oldSize <= 0 || st.size <= oldSize) return false
             if (System.identityHashCode(st[oldSize - 1]).toLong() != sig[top + 4]) return false
             val sc = scratchTl.get()!!
             sc.paint.style = Paint.Style.STROKE
@@ -267,7 +334,7 @@ object Renderer {
 
         private companion object {
             const val HEADER = 3
-            const val REC = 5
+            const val REC = 6
             const val MAX_SIDE = 4096
             const val MAX_PIXELS = 10_000_000L
         }

@@ -46,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,6 +89,7 @@ fun HomeScreen(
     onOpenProject: (String) -> Unit = {},
     onDeleteProject: (String) -> Unit = {},
     onRenameProject: (String) -> Unit = {},
+    onAbout: (() -> Unit)? = null,
     recentProjects: List<RecentProjectUi> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -142,6 +144,13 @@ fun HomeScreen(
                         onDelete = { onDeleteProject(p.id) },
                         onRename = { onRenameProject(p.id) },
                     )
+                }
+            }
+            if (onAbout != null) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    TextButton(onClick = onAbout, modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget)) {
+                        Text("About & licences")
+                    }
                 }
             }
         }

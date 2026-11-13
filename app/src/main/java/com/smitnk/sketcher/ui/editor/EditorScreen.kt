@@ -60,6 +60,7 @@ import com.smitnk.sketcher.ui.export.ExportDialog
 import com.smitnk.sketcher.ui.export.ExportProgressDialog
 import com.smitnk.sketcher.ui.generate.StylePickerSheet
 import com.smitnk.sketcher.ui.layers.LayersPanel
+import com.smitnk.sketcher.ui.settings.MlSettingsSheet
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -202,6 +203,7 @@ fun EditorScreen(
                 onDemo = { vm.runDemo() },
                 onGenerate = { vm.generate() },
                 onSettings = onOpenSettings,
+                onProcessing = { vm.openMlSettings() },
                 modifier = Modifier
                     .onSizeChanged { topBarPx = it.height }
                     .statusBarsPadding()
@@ -367,6 +369,26 @@ fun EditorScreen(
             },
             onDismiss = { showSettings = false },
             sourceThumbnail = vm.sourceThumbnail,
+            models = vm.lineModels,
+            selectedModelId = vm.selectedLineModelId,
+            onSelectModel = { vm.selectLineModel(it) },
+            onDownloadModel = { vm.downloadLineModel(it) },
+            onOpenMlSettings = { vm.openMlSettings() },
+        )
+    }
+
+    if (vm.showMlSettings) {
+        MlSettingsSheet(
+            accelOptions = vm.accelOptions,
+            selectedAccel = vm.selectedAccel,
+            onSelectAccel = { vm.selectAccel(it) },
+            benchmarkResults = vm.benchmarkResults,
+            benchmarking = vm.benchmarking,
+            onRunBenchmark = { vm.runBenchmark() },
+            lastInferenceMs = vm.lastInferenceMs,
+            activeAccelLabel = vm.activeAccelLabel,
+            fallbackReason = vm.fallbackReason,
+            onDismiss = { vm.closeMlSettings() },
         )
     }
 

@@ -16,10 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.smitnk.sketcher.ui.about.AboutScreen
 import com.smitnk.sketcher.ui.home.HomeScreen
 import com.smitnk.sketcher.ui.home.RecentProjectUi
 
-private enum class Screen { HOME, EDITOR }
+private enum class Screen { HOME, EDITOR, ABOUT }
 
 /**
  * State-based navigation: Home <-> Editor (no navigation library).
@@ -76,11 +77,16 @@ fun AppNavigation(
             },
             recentProjects = vm.recentProjects,
             onDeleteProject = { id -> deleteTarget = vm.recentProjects.firstOrNull { it.id == id } },
+            onAbout = { screen = Screen.ABOUT },
             onRenameProject = { id ->
                 renameTarget = vm.recentProjects.firstOrNull { it.id == id }
                 renameText = renameTarget?.name ?: ""
             },
         )
+        Screen.ABOUT -> {
+            BackHandler { screen = Screen.HOME }
+            AboutScreen(onBack = { screen = Screen.HOME })
+        }
         Screen.EDITOR -> {
             val leave = {
                 vm.saveAndRefresh()
