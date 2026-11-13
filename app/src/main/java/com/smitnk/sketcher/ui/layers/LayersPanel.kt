@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
-package com.smitnk.sketcher.ui
+package com.smitnk.sketcher.ui.layers
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,9 +51,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.model.Layer
 
+import com.smitnk.sketcher.model.Project
+
 @Composable
-fun LayersSheet(vm: SketchViewModel, onDismiss: () -> Unit) {
-    val project = vm.project
+fun LayersPanel(
+    project: Project,
+    onAddLayer: () -> Unit,
+    onSelectLayer: (Layer) -> Unit,
+    onMoveLayer: (Layer, Int) -> Unit,
+    onDeleteLayer: (Layer) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var renaming by remember { mutableStateOf<Layer?>(null) }
 
     ModalBottomSheet(
@@ -63,7 +71,7 @@ fun LayersSheet(vm: SketchViewModel, onDismiss: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Layers", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                FilledTonalButton(onClick = { vm.addLayer() }) {
+                FilledTonalButton(onClick = onAddLayer) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text("Add layer")
@@ -90,10 +98,12 @@ fun LayersSheet(vm: SketchViewModel, onDismiss: () -> Unit) {
             LazyColumn(Modifier.weight(1f, fill = false)) {
                 items(project.layers.reversed(), key = { it.id }) { layer ->
                     LayerRow(
-                        vm = vm,
                         layer = layer,
                         selected = project.selectedLayer === layer,
+                        onSelect = { onSelectLayer(layer) },
                         onRename = { renaming = layer },
+                        onMove = { delta -> onMoveLayer(layer, delta) },
+                        onDelete = { onDeleteLayer(layer) },
                     )
                 }
             }
@@ -118,7 +128,14 @@ fun LayersSheet(vm: SketchViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun LayerRow(vm: SketchViewModel, layer: Layer, selected: Boolean, onRename: () -> Unit) {
+private fun LayerRow(
+    layer: Layer,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onRename: () -> Unit,
+    onMove: (Int) -> Unit,
+    onDelete: () -> Unit,
+) {
     val container = if (selected) MaterialTheme.colorScheme.primaryContainer
     else MaterialTheme.colorScheme.surfaceVariant
     Card(
@@ -126,7 +143,7 @@ private fun LayerRow(vm: SketchViewModel, layer: Layer, selected: Boolean, onRen
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { vm.selectLayer(layer) },
+            .clickable { onSelect() },
     ) {
         Column(Modifier.padding(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -138,9 +155,9 @@ private fun LayerRow(vm: SketchViewModel, layer: Layer, selected: Boolean, onRen
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 )
                 SmallIcon(Icons.Default.Edit, "Rename", onRename)
-                SmallIcon(Icons.Default.ArrowUpward, "Move up", { vm.moveLayer(layer, +1) })
-                SmallIcon(Icons.Default.ArrowDownward, "Move down", { vm.moveLayer(layer, -1) })
-                SmallIcon(Icons.Default.Delete, "Delete", { vm.deleteLayer(layer) })
+                SmallIcon(Icons.Default.ArrowUpward, "Move up", { onMove(+1) })
+                SmallIcon(Icons.Default.ArrowDownward, "Move down", { onMove(-1) })
+                SmallIcon(Icons.Default.Delete, "Delete", onDelete)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SmallIcon(

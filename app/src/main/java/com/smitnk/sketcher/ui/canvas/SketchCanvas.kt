@@ -1,4 +1,4 @@
-package com.smitnk.sketcher.ui
+package com.smitnk.sketcher.ui.canvas
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import com.smitnk.sketcher.export.Renderer
+import com.smitnk.sketcher.ui.SketchViewModel
 import kotlin.math.min
 
 /** View transform: zoom 1 = drawing fits the screen, pan in screen pixels. */
