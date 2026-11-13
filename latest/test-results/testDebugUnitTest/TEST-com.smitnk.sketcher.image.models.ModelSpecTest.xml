@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:28:25" hostname="runnervmwuk1x" time="0.002">
+<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:39:49" hostname="runnervmccnms" time="0.003">
   <properties/>
-  <testcase name="animeTanhOutputMapsToInk" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
+  <testcase name="animeTanhOutputMapsToInk" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="zeroOneInkIsLow" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="inkIsHighKeepsValue" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>

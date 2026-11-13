@@ -10,70 +10,109 @@ INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
 INSTRUMENTATION_STATUS: current=1
 INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
 INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: stack=java.lang.NullPointerException: Attempt to invoke interface method 'void androidx.compose.runtime.MutableState.setValue(java.lang.Object)' on a null object reference
+	at com.smitnk.sketcher.ui.SketchViewModel.setRecentProjects(SketchViewModel.kt:1717)
+	at com.smitnk.sketcher.ui.SketchViewModel.access$setRecentProjects(SketchViewModel.kt:122)
+	at com.smitnk.sketcher.ui.SketchViewModel$refreshRecent$1.invokeSuspend(SketchViewModel.kt:654)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.internal.DispatchedContinuationKt.resumeCancellableWith(DispatchedContinuation.kt:359)
+	at kotlinx.coroutines.intrinsics.CancellableKt.startCoroutineCancellable(Cancellable.kt:26)
+	at kotlinx.coroutines.CoroutineStart.invoke(CoroutineStart.kt:358)
+	at kotlinx.coroutines.AbstractCoroutine.start(AbstractCoroutine.kt:124)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.launch(Builders.common.kt:52)
+	at kotlinx.coroutines.BuildersKt.launch(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.launch$default(Builders.common.kt:43)
+	at kotlinx.coroutines.BuildersKt.launch$default(Unknown Source:1)
+	at com.smitnk.sketcher.ui.SketchViewModel.refreshRecent(SketchViewModel.kt:653)
+	at com.smitnk.sketcher.ui.SketchViewModel.<init>(SketchViewModel.kt:559)
+	at java.lang.reflect.Constructor.newInstance0(Native Method)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:343)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:307)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:299)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:273)
+	at androidx.lifecycle.SavedStateViewModelFactory.create(SavedStateViewModelFactory.kt:128)
+	at androidx.lifecycle.ViewModelProvider$Factory.create(ViewModelProvider.android.kt:158)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl_androidKt.createViewModel(ViewModelProviderImpl.android.kt:34)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl.getViewModel$lifecycle_viewmodel_release(ViewModelProviderImpl.kt:65)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl.getViewModel$lifecycle_viewmodel_release$default(ViewModelProviderImpl.kt:47)
+	at androidx.lifecycle.ViewModelProvider.get(ViewModelProvider.android.kt:91)
+	at androidx.lifecycle.ViewModelLazy.getValue(ViewModelLazy.kt:51)
+	at androidx.lifecycle.ViewModelLazy.getValue(ViewModelLazy.kt:35)
+	at com.smitnk.sketcher.MainActivity.getVm(MainActivity.kt:19)
+	at com.smitnk.sketcher.MainActivity.handle(MainActivity.kt:51)
+	at com.smitnk.sketcher.MainActivity.onCreate(MainActivity.kt:33)
+	at android.app.Activity.performCreate(Activity.java:8051)
+	at android.app.Activity.performCreate(Activity.java:8031)
+	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1329)
+	at androidx.test.runner.MonitoringInstrumentation.callActivityOnCreate(MonitoringInstrumentation.java:766)
+	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:3608)
+	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:3792)
+	at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:103)
+	at android.app.servertransaction.TransactionExecutor.executeCallbacks(TransactionExecutor.java:135)
+	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:95)
+	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2210)
+	at android.os.Handler.dispatchMessage(Handler.java:106)
+	at android.os.Looper.loopOnce(Looper.java:201)
+	at android.os.Looper.loop(Looper.java:288)
+	at android.app.ActivityThread.main(ActivityThread.java:7839)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1003)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [StandaloneCoroutine{Cancelling}@3d962b0, Dispatchers.Main.immediate]
+
+INSTRUMENTATION_STATUS: stream=
+Process crashed while executing exportSheetShowsVideoOption(com.smitnk.sketcher.EditorFlowTest):
+java.lang.NullPointerException: Attempt to invoke interface method 'void androidx.compose.runtime.MutableState.setValue(java.lang.Object)' on a null object reference
+	at com.smitnk.sketcher.ui.SketchViewModel.setRecentProjects(SketchViewModel.kt:1717)
+	at com.smitnk.sketcher.ui.SketchViewModel.access$setRecentProjects(SketchViewModel.kt:122)
+	at com.smitnk.sketcher.ui.SketchViewModel$refreshRecent$1.invokeSuspend(SketchViewModel.kt:654)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+	at kotlinx.coroutines.internal.DispatchedContinuationKt.resumeCancellableWith(DispatchedContinuation.kt:359)
+	at kotlinx.coroutines.intrinsics.CancellableKt.startCoroutineCancellable(Cancellable.kt:26)
+	at kotlinx.coroutines.CoroutineStart.invoke(CoroutineStart.kt:358)
+	at kotlinx.coroutines.AbstractCoroutine.start(AbstractCoroutine.kt:124)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.launch(Builders.common.kt:52)
+	at kotlinx.coroutines.BuildersKt.launch(Unknown Source:1)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.launch$default(Builders.common.kt:43)
+	at kotlinx.coroutines.BuildersKt.launch$default(Unknown Source:1)
+	at com.smitnk.sketcher.ui.SketchViewModel.refreshRecent(SketchViewModel.kt:653)
+	at com.smitnk.sketcher.ui.SketchViewModel.<init>(SketchViewModel.kt:559)
+	at java.lang.reflect.Constructor.newInstance0(Native Method)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:343)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:307)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:299)
+	at androidx.lifecycle.ViewModelProvider$AndroidViewModelFactory.create(ViewModelProvider.android.kt:273)
+	at androidx.lifecycle.SavedStateViewModelFactory.create(SavedStateViewModelFactory.kt:128)
+	at androidx.lifecycle.ViewModelProvider$Factory.create(ViewModelProvider.android.kt:158)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl_androidKt.createViewModel(ViewModelProviderImpl.android.kt:34)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl.getViewModel$lifecycle_viewmodel_release(ViewModelProviderImpl.kt:65)
+	at androidx.lifecycle.viewmodel.ViewModelProviderImpl.getViewModel$lifecycle_viewmodel_release$default(ViewModelProviderImpl.kt:47)
+	at androidx.lifecycle.ViewModelProvider.get(ViewModelProvider.android.kt:91)
+	at androidx.lifecycle.ViewModelLazy.getValue(ViewModelLazy.kt:51)
+	at androidx.lifecycle.ViewModelLazy.getValue(ViewModelLazy.kt:35)
+	at com.smitnk.sketcher.MainActivity.getVm(MainActivity.kt:19)
+	at com.smitnk.sketcher.MainActivity.handle(MainActivity.kt:51)
+	at com.smitnk.sketcher.MainActivity.onCreate(MainActivity.kt:33)
+	at android.app.Activity.performCreate(Activity.java:8051)
+	at android.app.Activity.performCreate(Activity.java:8031)
+	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1329)
+	at androidx.test.runner.MonitoringInstrumentation.callActivityOnCreate(MonitoringInstrumentation.java:766)
+	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:3608)
+	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:3792)
+	at android.app.servertransaction.LaunchActivityItem.execute(LaunchActivityItem.java:103)
+	at android.app.servertransaction.TransactionExecutor.executeCallbacks(TransactionExecutor.java:135)
+	at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:95)
+	at android.app.ActivityThread$H.handleMessage(ActivityThread.java:2210)
+	at android.os.Handler.dispatchMessage(Handler.java:106)
+	at android.os.Looper.loopOnce(Looper.java:201)
+	at android.os.Looper.loop(Looper.java:288)
+	at android.app.ActivityThread.main(ActivityThread.java:7839)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1003)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [StandaloneCoroutine{Cancelling}@3d962b0, Dispatchers.Main.immediate]
+
 INSTRUMENTATION_STATUS: test=exportSheetShowsVideoOption
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=2
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=
-INSTRUMENTATION_STATUS: test=outlinePlusShadingCreatesShadingLayer
-INSTRUMENTATION_STATUS_CODE: 1
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=2
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=.
-INSTRUMENTATION_STATUS: test=outlinePlusShadingCreatesShadingLayer
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=3
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=
-INSTRUMENTATION_STATUS: test=drawingWithPenEnablesUndo
-INSTRUMENTATION_STATUS_CODE: 1
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=3
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=.
-INSTRUMENTATION_STATUS: test=drawingWithPenEnablesUndo
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=4
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=
-INSTRUMENTATION_STATUS: test=layersPanelListsOutlineAndMyDrawing
-INSTRUMENTATION_STATUS_CODE: 1
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=4
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=.
-INSTRUMENTATION_STATUS: test=layersPanelListsOutlineAndMyDrawing
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=5
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=
-INSTRUMENTATION_STATUS: test=homeShowsActionsAndDemoOpensEditor
-INSTRUMENTATION_STATUS_CODE: 1
-INSTRUMENTATION_STATUS: class=com.smitnk.sketcher.EditorFlowTest
-INSTRUMENTATION_STATUS: current=5
-INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
-INSTRUMENTATION_STATUS: numtests=5
-INSTRUMENTATION_STATUS: stream=.
-INSTRUMENTATION_STATUS: test=homeShowsActionsAndDemoOpensEditor
-INSTRUMENTATION_STATUS_CODE: 0
-INSTRUMENTATION_RESULT: stream=
-
-Time: 84.12
-
-OK (5 tests)
-
-
-INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0

@@ -1,0 +1,57 @@
+11-13 11:48:24.524   522   824 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 11:48:24.533   763   809 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=27 suggestType=3
+11-13 11:48:24.548   522   556 W ActivityManager: ProcessRecord{a2257e7 0:com.smitnk.sketcher/u0a145} is attached to a previous process 8238
+11-13 11:48:24.672   522   816 V ActivityManager: Got obituary of 8238:com.smitnk.sketcher
+11-13 11:48:24.688   522   565 I ActivityManager: Start proc 8348:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-13 11:48:25.375  8348  8348 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-13 11:48:26.681   522   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s156ms
+11-13 11:48:27.173   522   816 W InputManager-JNI: Input channel object 'df0d731 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-13 11:48:28.310  8348  8378 I SketcherML: session informative accel=XNNPACK (wanted XNNPACK) in 1106 ms
+11-13 11:48:29.296  8348  8358 I smitnk.sketche: Compiler allocated 4251KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
+11-13 11:48:29.305  8348  8358 I smitnk.sketche: Compiler allocated 4743KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
+11-13 11:48:29.682  8348  8348 I SketcherGen: GEN_DONE ms=3015 outline=72 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-13 11:48:30.172  8348  8358 I smitnk.sketche: JIT allocated 58KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-13 11:48:30.173  8348  8358 I smitnk.sketche: Compiler allocated 7524KB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-13 11:48:30.648  8348  8391 D ProfileInstaller: Installing profile for com.smitnk.sketcher
+11-13 11:48:33.866   522   550 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@8496b0
+11-13 11:48:45.270   522   824 I ActivityManager: Force stopping com.smitnk.sketcher appid=10145 user=0: from pid 8405
+11-13 11:48:45.271   522   824 I ActivityManager: Killing 8348:com.smitnk.sketcher/u0a145 (adj 0): stop com.smitnk.sketcher due to from pid 8405
+11-13 11:48:45.271   522   824 W ActivityTaskManager: Force removing ActivityRecord{e48c8ec u0 com.smitnk.sketcher/.MainActivity t27 f}}: app died, no saved state
+11-13 11:48:45.272   522   824 W InputManager-JNI: Input channel object '81fa195 com.smitnk.sketcher/com.smitnk.sketcher.MainActivity (client)' was disposed without first being removed with the input manager!
+11-13 11:48:45.317   522   816 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 11:48:45.324   763   809 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=28 suggestType=3
+11-13 11:48:45.341   522  2867 V ActivityManager: Got obituary of 8348:com.smitnk.sketcher
+11-13 11:48:45.357   522   565 I ActivityManager: Start proc 8415:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-13 11:48:45.827  8415  8415 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-13 11:48:47.134   522   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +1s815ms
+11-13 11:48:47.515   522  2675 W InputManager-JNI: Input channel object '5bc1dd3 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-13 11:48:48.751  8415  8445 I SketcherML: session informative accel=XNNPACK (wanted XNNPACK) in 880 ms
+11-13 11:48:49.931  8415  8415 I SketcherGen: GEN_DONE ms=2690 outline=45 shading=0 fill=0 size=768x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-13 11:48:50.273  8415  8422 I smitnk.sketche: JIT allocated 58KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-13 11:48:50.274  8415  8422 I smitnk.sketche: Compiler allocated 7524KB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-13 11:48:50.901  1459  1479 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/.pending-1795175330-Sketcher_drawing_20261113_114850.png. Uid: 10145
+11-13 11:48:50.948  1459  1479 D MediaProvider: Moving /storage/emulated/0/Pictures/Sketcher/.pending-1795175330-Sketcher_drawing_20261113_114850.png to /storage/emulated/0/Pictures/Sketcher/Sketcher_drawing_20261113_114850.png
+11-13 11:48:51.148  1459  1479 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/.pending-1795175331-Sketcher_Outline_20261113_114851.png. Uid: 10145
+11-13 11:48:51.226  1459  1479 D MediaProvider: Moving /storage/emulated/0/Pictures/Sketcher/.pending-1795175331-Sketcher_Outline_20261113_114851.png to /storage/emulated/0/Pictures/Sketcher/Sketcher_Outline_20261113_114851.png
+11-13 11:48:52.036  8415  8452 D ProfileInstaller: Installing profile for com.smitnk.sketcher
+11-13 11:48:54.152   522  2921 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@f3b5bbc
+11-13 11:49:01.958  1459  4014 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_Outline_20261113_114851.png. Uid: 10118
+11-13 11:49:01.966  1459  1479 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_drawing_20261113_114850.png. Uid: 10118
+11-13 11:49:10.518   522   824 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-13 11:49:12.121  8415  8415 I SketcherGen: GEN_DONE ms=1557 outline=45 shading=0 fill=0 size=768x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-13 11:49:13.481  1459  7323 I MediaProvider: Open with lower FS for /storage/emulated/0/Movies/Sketcher/.pending-1795175352-Sketcher_animation_20261113_114912.mp4. Uid: 10145
+11-13 11:49:16.319   522   817 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@a3d5416
+11-13 11:49:34.155  1459  7267 D MediaProvider: Moving /storage/emulated/0/Movies/Sketcher/.pending-1795175352-Sketcher_animation_20261113_114912.mp4 to /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4
+11-13 11:49:34.600  1459  7267 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/.pending-1795175374-Sketcher_animation_20261113_114934.gif. Uid: 10145
+11-13 11:49:36.387  1459  7267 D MediaProvider: Moving /storage/emulated/0/Pictures/Sketcher/.pending-1795175374-Sketcher_animation_20261113_114934.gif to /storage/emulated/0/Pictures/Sketcher/Sketcher_animation_20261113_114934.gif
+11-13 11:49:46.448  1459  7267 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_animation_20261113_114934.gif. Uid: 10118
+11-13 11:49:46.449  1459  7267 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_animation_20261113_114934.gif. Uid: 10118
+11-13 11:49:46.451  1459  7267 I MediaProvider: Open with lower FS for /storage/emulated/0/Pictures/Sketcher/Sketcher_animation_20261113_114934.gif. Uid: 10118
+11-13 11:49:46.508  1459  8947 I MediaProvider: Open with lower FS for /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118
+11-13 11:49:46.556  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.559  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.564  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.579  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.598  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.614  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false
+11-13 11:49:46.642  1459  8947 D MediaProvider: Open with FUSE. FilePath: /storage/emulated/0/Movies/Sketcher/Sketcher_animation_20261113_114912.mp4. Uid: 10118. Media Capabilities Uid: 0. ShouldRedact: false. ShouldTranscode: false

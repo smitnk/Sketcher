@@ -2,64 +2,64 @@
 == astronaut outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:32:57.690  6183  6183 I SketcherGen: GEN_DONE ms=18916 outline=360 shading=0 fill=0 size=512x512 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:43:10.792  3402  3402 I SketcherGen: GEN_DONE ms=25836 outline=703 shading=0 fill=0 size=512x512 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== astronaut shading:medium (GEN_DONE seen=1)'
 == astronaut shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:33:26.494  6708  6708 I SketcherGen: GEN_DONE ms=7437 outline=360 shading=134 fill=0 size=512x512 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:44:03.698  5237  5237 I SketcherGen: GEN_DONE ms=32098 outline=703 shading=134 fill=0 size=512x512 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== coffee outline:none (GEN_DONE seen=1)'
 == coffee outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:33:50.694  6837  6837 I SketcherGen: GEN_DONE ms=4319 outline=257 shading=0 fill=0 size=600x400 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:44:47.670  6990  6990 I SketcherGen: GEN_DONE ms=23745 outline=795 shading=0 fill=0 size=600x400 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== coffee shading:medium (GEN_DONE seen=1)'
 == coffee shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:34:13.269  6908  6908 I SketcherGen: GEN_DONE ms=4727 outline=257 shading=70 fill=0 size=600x400 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:45:10.719  7626  7626 I SketcherGen: GEN_DONE ms=4103 outline=795 shading=70 fill=0 size=600x400 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== chelsea outline:none (GEN_DONE seen=1)'
 == chelsea outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:34:35.848  6990  6990 I SketcherGen: GEN_DONE ms=4583 outline=234 shading=0 fill=0 size=451x300 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:45:32.665  7703  7703 I SketcherGen: GEN_DONE ms=3411 outline=1176 shading=0 fill=0 size=451x300 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== chelsea shading:medium (GEN_DONE seen=1)'
 == chelsea shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:34:59.107  7066  7066 I SketcherGen: GEN_DONE ms=5068 outline=234 shading=137 fill=0 size=451x300 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:45:53.947  7777  7777 I SketcherGen: GEN_DONE ms=4259 outline=1176 shading=137 fill=0 size=451x300 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== cartoon outline:none (GEN_DONE seen=1)'
 == cartoon outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:35:19.170  7140  7140 I SketcherGen: GEN_DONE ms=2729 outline=28 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:46:15.606  7871  7871 I SketcherGen: GEN_DONE ms=2981 outline=72 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== cartoon shading:medium (GEN_DONE seen=1)'
 == cartoon shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:35:41.437  7206  7206 I SketcherGen: GEN_DONE ms=4123 outline=28 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:46:36.366  7940  7940 I SketcherGen: GEN_DONE ms=3135 outline=72 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== toy_grass outline:none (GEN_DONE seen=1)'
 == toy_grass outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:36:06.482  7284  7284 I SketcherGen: GEN_DONE ms=6576 outline=273 shading=0 fill=0 size=812x783 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:46:59.449  8009  8009 I SketcherGen: GEN_DONE ms=5766 outline=1735 shading=0 fill=0 size=812x783 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== toy_grass shading:medium (GEN_DONE seen=1)'
 == toy_grass shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:36:31.603  7392  7392 I SketcherGen: GEN_DONE ms=6333 outline=273 shading=213 fill=0 size=812x783 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:47:22.921  8091  8091 I SketcherGen: GEN_DONE ms=6082 outline=1735 shading=213 fill=0 size=812x783 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== rocket outline:none (GEN_DONE seen=1)'
 == rocket outline:none (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:36:54.458  7469  7469 I SketcherGen: GEN_DONE ms=3920 outline=269 shading=0 fill=0 size=640x427 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:47:46.268  8166  8166 I SketcherGen: GEN_DONE ms=4459 outline=896 shading=0 fill=0 size=640x427 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== rocket shading:medium (GEN_DONE seen=1)'
 == rocket shading:medium (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:37:18.000  7542  7542 I SketcherGen: GEN_DONE ms=5187 outline=269 shading=262 fill=0 size=640x427 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:48:08.503  8238  8238 I SketcherGen: GEN_DONE ms=4432 outline=896 shading=262 fill=0 size=640x427 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=MEDIUM, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
 + echo '== cartoon color (GEN_DONE seen=1)'
 == cartoon color (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-13 11:37:38.803  7615  7615 I SketcherGen: GEN_DONE ms=3406 outline=28 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024)
+11-13 11:48:29.682  8348  8348 I SketcherGen: GEN_DONE ms=3015 outline=72 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)

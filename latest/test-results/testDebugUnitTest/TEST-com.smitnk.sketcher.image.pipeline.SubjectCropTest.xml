@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SubjectCropTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:28:27" hostname="runnervmwuk1x" time="0.07">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SubjectCropTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T11:39:51" hostname="runnervmccnms" time="0.046">
   <properties/>
-  <testcase name="noisyPhotoReturnsFullFrame" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.015"/>
-  <testcase name="findsSubjectOnGradientBackdrop" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.017"/>
-  <testcase name="letterboxBarsWithStatusGlyphsAreStripped" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.036"/>
+  <testcase name="noisyPhotoReturnsFullFrame" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.012"/>
+  <testcase name="findsSubjectOnGradientBackdrop" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.009"/>
+  <testcase name="letterboxBarsWithStatusGlyphsAreStripped" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.025"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
