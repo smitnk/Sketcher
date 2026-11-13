@@ -1,0 +1,21 @@
+name: Fetch models
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/fetch-models.yml']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download open-source models to models branch
+        run: |
+          mkdir m && cd m
+          curl -fL -o informative_drawings_lineart.onnx https://huggingface.co/rocca/informative-drawings-line-art-onnx/resolve/main/model.onnx
+          curl -fL -o README_source.md https://huggingface.co/rocca/informative-drawings-line-art-onnx/resolve/main/README.md || true
+          ls -la
+          git init -q && git checkout -q -b models
+          git config user.name sketcher-ci && git config user.email ci@users.noreply.github.com
+          git add -A && git commit -qm "models"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" models
