@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-13T13:12:37" hostname="runnervmccnms" time="0.196">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T13:49:07" hostname="runnervmwuk1x" time="1.026">
   <properties/>
-  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.097"/>
-  <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.164"/>
+  <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
+  <testcase name="faintRegionIsLiftedLocallyAndBlankPaperStaysClean" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.016"/>
   <testcase name="autoCutAndStrongInkGuard" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
-  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.095"/>
-  <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.2"/>
+  <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
+  <testcase name="cartoonFusionIsMaxOfAiAndCartoonPlusSilhouette" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.003"/>
+  <testcase name="cartoonRunsModelToo" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.637"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

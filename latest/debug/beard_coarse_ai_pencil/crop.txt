@@ -1,8 +1,8 @@
 crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=AI
 model=coarse
-accelActive=GPU (NNAPI) fallback=null
-inferenceMs=3415 (wrapped=4151) genMs=5451
+accelActive=NPU (NNAPI) fallback=null
+inferenceMs=3311 (wrapped=4053) genMs=5488
 ink: min=0.0 mean=0.1037098896851031 max=0.999999 (300x768)
 strokes: outline=877 shading=0 fill=0
 inkW=516 inkH=1024 drawing=516x1024 revealWidth=11.0

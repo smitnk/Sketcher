@@ -1,9 +1,9 @@
 crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=AI
 model=anime
-accelActive=GPU (NNAPI) fallback=null
-inferenceMs=1326 (wrapped=2134) genMs=3332
+accelActive=NPU (NNAPI) fallback=null
+inferenceMs=1602 (wrapped=2383) genMs=4022
 ink: min=0.0 mean=0.01421383207145238 max=0.9799827 (300x768)
-strokes: outline=228 shading=0 fill=0
+strokes: outline=320 shading=0 fill=0
 inkW=516 inkH=1024 drawing=516x1024 revealWidth=11.0
 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)

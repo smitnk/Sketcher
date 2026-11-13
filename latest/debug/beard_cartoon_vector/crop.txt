@@ -1,9 +1,9 @@
 crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=CARTOON
 model=coarse
-accelActive=GPU (NNAPI) fallback=null
-inferenceMs=null (wrapped=0) genMs=2165
-ink: no raw ink (non-AI source)
-strokes: outline=48 shading=0 fill=0
+accelActive=NPU (NNAPI) fallback=null
+inferenceMs=3606 (wrapped=3606) genMs=6000
+ink: min=0.0 mean=0.1037098896851031 max=0.999999 (300x768)
+strokes: outline=184 shading=0 fill=0
 inkW=0 inkH=0 drawing=516x1024 revealWidth=0.0
 settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=CLEAN_VECTOR)
