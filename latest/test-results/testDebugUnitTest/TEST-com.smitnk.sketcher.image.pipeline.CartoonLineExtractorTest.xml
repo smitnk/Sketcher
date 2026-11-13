@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:32:15" hostname="runnervmwuk1x" time="0.62">
+  <properties/>
+  <testcase name="tinyImagesDoNotCrash" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.001"/>
+  <testcase name="cartoonScoresHigh" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.033"/>
+  <testcase name="pupilKeptAsSolidDot" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.188"/>
+  <testcase name="speckleBlobsOnGrassDroppedButEnclosedPupilKept" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.167"/>
+  <testcase name="inkFollowsOutlineAndIgnoresTexture" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.036"/>
+  <testcase name="regionBoundaryAppearsOnlyWithHighDetail" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.078"/>
+  <testcase name="darkBlueNoisyOutlineIsInk" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.046"/>
+  <testcase name="photoScoresLow" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.068"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,12 +1,1 @@
-> Task :app:compileDebugUnitTestKotlin FAILED
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:4:15 Unresolved reference 'test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:5:15 Unresolved reference 'test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:6:15 Unresolved reference 'test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:12:6 Unresolved reference 'Test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:14:9 Unresolved reference 'assertEquals'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:17:6 Unresolved reference 'Test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:34:9 Unresolved reference 'assertTrue'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:35:9 Unresolved reference 'assertTrue'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:38:6 Unresolved reference 'Test'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/image/pipeline/PreFilterTest.kt:44:9 Unresolved reference 'assertTrue'.
-BUILD FAILED in 54s
+BUILD SUCCESSFUL in 59s
