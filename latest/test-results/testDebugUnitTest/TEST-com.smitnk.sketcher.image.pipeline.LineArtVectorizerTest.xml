@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T08:05:30" hostname="runnervmwuk1x" time="0.318">
+  <properties/>
+  <testcase name="crossingLinesRunStraightThrough" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.039"/>
+  <testcase name="widthStaysInRangeAndStrongerInkIsThicker" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.011"/>
+  <testcase name="runsFastAtWorkingSize" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.232"/>
+  <testcase name="circleBecomesFewSmoothStrokesNearTheRing" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.007"/>
+  <testcase name="emptyInkGivesNoStrokes" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.005"/>
+  <testcase name="smallGapIsBridgedLargeGapIsNot" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.007"/>
+  <testcase name="longestStrokeIsDrawnFirst" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.004"/>
+  <testcase name="maxStrokesCapKeepsLongest" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.005"/>
+  <testcase name="faintLinesAreDroppedAtLowDetailAndKeptAtHigh" classname="com.smitnk.sketcher.image.pipeline.LineArtVectorizerTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
