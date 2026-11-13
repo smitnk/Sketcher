@@ -1,6 +1,7 @@
 package com.smitnk.sketcher.image.pipeline
 
 import kotlinx.coroutines.runBlocking
+import kotlin.math.max
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +34,28 @@ class SketchPipelineTest {
         SketchPipeline.normaliseInk(ink)
         assertTrue(ink[0] > 0.95f)
         assertTrue("grey wash must not turn into visible mud: ${ink[1]}", ink[1] < 0.12f)
+    }
+
+    @Test fun faintRegionIsLiftedLocallyAndBlankPaperStaysClean() {
+        val w = 400; val h = 200
+        val ink = FloatArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val line = (y % 10 == 0)
+            if (x < 200 && line) ink[y * w + x] = 0.95f          // strong region (sets global hi)
+            if (x in 240..360 && line) ink[y * w + x] = 0.15f    // faint region
+            // x in 200..239 and 361..399: blank paper with tiny noise
+            if ((x in 200..239 || x >= 361) && (x + y) % 7 == 0) ink[y * w + x] = 0.02f
+        }
+        val before = ink.copyOf()
+        SketchPipeline.normaliseInk(ink, null, w, h)
+        val faint = ink[100 * w + 300]
+        assertTrue("faint line lifted: $faint", faint > 0.45f)
+        assertTrue("strong line kept", ink[100 * w + 100] > 0.95f)
+        assertEquals("blank paper clean", 0f, ink[(100 + 1) * w + 390], 0f)
+        assertTrue(before[100 * w + 300] < 0.2f)
+        var maxBlank = 0f
+        for (y in 0 until h) for (x in 380 until 400) maxBlank = max(maxBlank, ink[y * w + x])
+        assertEquals("paper far from ink stays zero", 0f, maxBlank, 0f)
     }
 
     @Test fun autoCutAndStrongInkGuard() {
@@ -80,5 +103,32 @@ class SketchPipelineTest {
                 i += 2
             }
         }
+    }
+
+    @Test fun cartoonFusionIsMaxOfAiAndCartoonPlusSilhouette() {
+        val pw = 100; val ph = 100
+        val bg = BooleanArray(pw * ph) { val x = it % pw; val y = it / pw; x < 20 || x >= 80 || y < 20 || y >= 80 }
+        val sub = SubjectCrop.Result(pw, ph, 0, 0, pw, ph, bg, 0.64f)
+        val ai = FloatArray(pw * ph).also { it[50 * pw + 40] = 0.6f; it[50 * pw + 50] = 0.2f }
+        val cm = FloatArray(pw * ph).also { it[50 * pw + 50] = 0.9f }
+        val out = SketchPipeline.fuseCartoonInk(ai, cm, pw, ph, sub)
+        assertEquals(0.6f, out[50 * pw + 40], 1e-6f)      // AI detail kept
+        assertEquals(0.9f, out[50 * pw + 50], 1e-6f)      // cartoon outline wins
+        assertEquals(1f, out[50 * pw + 20], 1e-6f)        // silhouette on the subject edge
+        assertEquals(0f, out[50 * pw + 5], 0f)            // backdrop untouched
+        val noAi = SketchPipeline.fuseCartoonInk(null, cm, pw, ph, sub)
+        assertEquals(0.9f, noAi[50 * pw + 50], 1e-6f); assertEquals(0f, noAi[50 * pw + 40], 0f)
+    }
+
+    @Test fun cartoonRunsModelToo() = runBlocking {
+        var called = false
+        val model = LineArtModel { _, mw, mh -> called = true; FloatArray(mw * mh) }
+        SketchPipeline.run(scene(), w, h, PipelineSettings(lineSource = LineSource.CARTOON), model)
+        assertTrue(called)
+        assertEquals("CARTOON", SketchPipeline.lastLineSource)
+        called = false
+        SketchPipeline.run(scene(), w, h, PipelineSettings(lineSource = LineSource.CARTOON), null)
+        assertTrue(!called)
+        assertEquals("CARTOON", SketchPipeline.lastLineSource)
     }
 }

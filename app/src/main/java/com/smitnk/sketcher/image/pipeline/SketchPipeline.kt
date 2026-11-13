@@ -78,6 +78,7 @@ object SketchPipeline {
         var outline: List<Stroke>? = null
         val bgMask = if (settings.ignoreBackground) sub.bgMask else null
         var aiStrokes: List<Stroke>? = null
+        var fusedInk = false
         fun runAi() {
             progress("Running AI line-art model", 0.10f)
             try {
@@ -105,7 +106,22 @@ object SketchPipeline {
             if (settings.lineSource == LineSource.AUTO && model != null && !hasStrongInk(cm, pw, ph, sub, bgMask)) {
                 runAi()
             } else {
-                ink = cm
+                // Fusion: AI ink supplies interior detail, the cartoon extractor bold outlines / pupils / region
+                // edges, plus a bold outer silhouette. Without a model (or if it fails) cartoon-only.
+                var ai: FloatArray? = null
+                if (model != null) {
+                    progress("Running AI line-art model", 0.20f)
+                    try {
+                        ai = runModelOnSubject(argb, w, h, pw, ph, sub, bgMask, settings, model, tm).first
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (t: Throwable) {
+                        lastError = t
+                    }
+                    check()
+                }
+                ink = fuseCartoonInk(ai, cm, pw, ph, sub, px)
+                fusedInk = ai != null
             }
         }
         lastLineSource = source.name
@@ -155,7 +171,7 @@ object SketchPipeline {
         val usesInk = (source == LineSource.AI || source == LineSource.CARTOON) && ink != null
         if (settings.outlineStyle == OutlineStyle.PENCIL_REVEAL && usesInk && !(settings.colourFill && source != LineSource.CARTOON)) {
             progress("Pencil texture", 0.95f)
-            val vis = inkVisibility(ink!!, pw, ph, sub, bgMask, normalised = source == LineSource.AI)
+            val vis = inkVisibility(ink!!, pw, ph, sub, bgMask, normalised = source == LineSource.AI || fusedInk)
             val r = revealRadius(settings.lineWidth, pw, ph)
             val base = outline
             outline = base + tm.time("coverage") { InkCoverage.coverageStrokes(vis, pw, ph, base, r, COVER_THRESHOLD, settings.lineWidth) }
@@ -219,16 +235,96 @@ object SketchPipeline {
         return area > 0 && strong >= MIN_STRONG_INK * area
     }
 
+    /**
+     * CARTOON ink = max(aiInk, cartoonInk) (aiInk optional, already normalised) plus the subject's outer contour
+     * (boundary of [sub]'s background mask) as bold ink. Returns a new array; inputs are untouched.
+     */
+    internal fun fuseCartoonInk(ai: FloatArray?, cartoon: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, argb: IntArray? = null): FloatArray {
+        val out = FloatArray(pw * ph) { if (ai != null) max(ai[it], cartoon[it]) else cartoon[it] }
+        val bg = sub.bgMask?.let { if (argb != null) tightenBg(it, argb, pw, ph) else it } ?: return out
+        val r = max(1, (max(pw, ph) / 600f).roundToInt())
+        val m = 3
+        val x0 = max(sub.x0 + m, 1); val x1 = min(sub.x1 - m, pw - 1)
+        val y0 = max(sub.y0 + m, 1); val y1 = min(sub.y1 - m, ph - 1)
+        for (y in y0 until y1) for (x in x0 until x1) {
+            val i = y * pw + x
+            if (bg[i] || !(bg[i - 1] || bg[i + 1] || bg[i - pw] || bg[i + pw])) continue
+            for (dy in -r..r) for (dx in -r..r) {
+                val xx = x + dx; val yy = y + dy
+                if (xx < 0 || yy < 0 || xx >= pw || yy >= ph) continue
+                val j = yy * pw + xx
+                if (!bg[j]) out[j] = 1f
+            }
+        }
+        return out
+    }
+
+    /**
+     * The backdrop mask is coarse (blocky, a few px loose). Pixels just inside its boundary whose colour matches the
+     * nearby backdrop (mean of backdrop pixels in a box) are reclassified as backdrop, so the contour hugs the figure.
+     */
+    internal fun tightenBg(bg: BooleanArray, argb: IntArray, pw: Int, ph: Int): BooleanArray {
+        val n = pw * ph; val W = pw + 1
+        val cnt = IntArray(W * (ph + 1)); val sr = LongArray(W * (ph + 1)); val sg = LongArray(W * (ph + 1)); val sb = LongArray(W * (ph + 1))
+        for (y in 0 until ph) for (x in 0 until pw) {
+            val i = y * pw + x; val k = (y + 1) * W + x + 1; val a = y * W + x + 1; val b = (y + 1) * W + x; val c = y * W + x
+            val c0 = argb[i]; val f = if (bg[i]) 1 else 0
+            cnt[k] = cnt[a] + cnt[b] - cnt[c] + f
+            sr[k] = sr[a] + sr[b] - sr[c] + f * ((c0 shr 16) and 255)
+            sg[k] = sg[a] + sg[b] - sg[c] + f * ((c0 shr 8) and 255)
+            sb[k] = sb[a] + sb[b] - sb[c] + f * (c0 and 255)
+        }
+        // distance (chebyshev, capped) of non-bg pixels to the mask: band = within B px of a bg pixel
+        val B = max(4, (max(pw, ph) / 80f).roundToInt()); val R = 2 * B
+        val out = bg.copyOf()
+        for (y in 0 until ph) for (x in 0 until pw) {
+            val i = y * pw + x
+            if (bg[i]) continue
+            val xa = max(0, x - B); val xb = min(pw, x + B + 1); val ya = max(0, y - B); val yb = min(ph, y + B + 1)
+            fun box(t: IntArray) = t[yb * W + xb] - t[ya * W + xb] - t[yb * W + xa] + t[ya * W + xa]
+            if (box(cnt) == 0) continue
+            val xa2 = max(0, x - R); val xb2 = min(pw, x + R + 1); val ya2 = max(0, y - R); val yb2 = min(ph, y + R + 1)
+            fun boxL(t: LongArray) = t[yb2 * W + xb2] - t[ya2 * W + xb2] - t[yb2 * W + xa2] + t[ya2 * W + xa2]
+            val c2 = (cnt[yb2 * W + xb2] - cnt[ya2 * W + xb2] - cnt[yb2 * W + xa2] + cnt[ya2 * W + xa2]).toLong()
+            if (c2 == 0L) continue
+            val p = argb[i]
+            val d = max(kotlin.math.abs(((p shr 16) and 255) - (boxL(sr) / c2).toInt()),
+                max(kotlin.math.abs(((p shr 8) and 255) - (boxL(sg) / c2).toInt()), kotlin.math.abs((p and 255) - (boxL(sb) / c2).toInt())))
+            if (d <= 14) out[i] = true
+        }
+        // drop isolated flips: a non-bg pixel needs >= 3 non-bg 4-neighbours-in-3x3 majority to stay, bg fills holes
+        val sm = out.copyOf()
+        for (y in 1 until ph - 1) for (x in 1 until pw - 1) {
+            var c = 0
+            for (dy in -1..1) for (dx in -1..1) if (out[(y + dy) * pw + x + dx]) c++
+            sm[y * pw + x] = c >= 5
+        }
+        return sm
+    }
+
     private const val NORM_LO = 0.04f
     private const val NORM_GAMMA = 0.7f
 
+    /** Local contrast stage: target level of a tile's 97th-percentile ink, gain cap, "is ink" floor, min ink pixels. */
+    private const val LOCAL_TARGET = 0.9f
+    private const val LOCAL_MAX_GAIN = 4f
+    private const val LOCAL_FLOOR = 0.10f
+    private const val LOCAL_MIN_PIX = 10
+    /** Raw-ink hi (99.5th percentile) at/below which a model counts as thin+faint and gets 3x3 thickening; fades out by +0.1. */
+    private const val THIN_HI = 0.50f
+
     /**
-     * Normalises AI ink in place by the 99.5th percentile of [ink] (the subject: pixels with [valid] true, or all
-     * when null) so thin / light models (anime, informative) read as clearly as heavy ones, then applies gamma.
-     * hi is clamped to [0.35, 0.95]: the gain never exceeds ~3.2x on faint models and never dims strong ones, and
-     * a noise floor that scales with hi stops coarse/informative models' grey wash from turning muddy.
+     * Normalises AI ink in place so thin / light models (anime, informative) read as clearly as heavy ones.
+     * 1) Global: percentile (99.5th) of the subject ([valid] true, or all when null) -> hi, clamped to [0.35, 0.95]; a
+     *    noise floor scaling with hi; then gamma.
+     * 2) Local (only when [w]x[h] match [ink]): a few very dark spots (glasses, eyes) set the global hi, leaving the
+     *    body lines faint. Per tile (~max(w,h)/14 px) the 97th percentile of the ink pixels is lifted to
+     *    [LOCAL_TARGET] (gain 1..[LOCAL_MAX_GAIN], never dims), gains bilinear-interpolated between tile centres
+     *    weighted by whether a tile has ink at all, so blank paper keeps gain 1 and stays clean. Models whose
+     *    raw ink is faint overall (hi <= [THIN_HI], i.e. hairline output like anime) also get 3x3 max-blend
+     *    thickening, otherwise 1px lines at 0.4 ink stay hard to see on a phone.
      */
-    internal fun normaliseInk(ink: FloatArray, valid: BooleanArray? = null) {
+    internal fun normaliseInk(ink: FloatArray, valid: BooleanArray? = null, w: Int = 0, h: Int = 0) {
         val bins = IntArray(1001)
         var n = 0
         for (i in ink.indices) {
@@ -245,6 +341,66 @@ object SketchPipeline {
         for (i in ink.indices) {
             val v = ((ink[i] - lo) * inv).coerceIn(0f, 1f)
             ink[i] = if (v <= 0f) 0f else Math.pow(v.toDouble(), NORM_GAMMA.toDouble()).toFloat()
+        }
+        if (w > 0 && h > 0 && w * h == ink.size) localContrast(ink, w, h, valid, ((THIN_HI + 0.1f - hi) / 0.1f).coerceIn(0f, 1f))
+    }
+
+    private fun localContrast(ink: FloatArray, w: Int, h: Int, valid: BooleanArray?, thick: Float) {
+        val t = max(40, (max(w, h) / 14f).roundToInt())
+        val nx = (w + t - 1) / t; val ny = (h + t - 1) / t
+        val tg = FloatArray(nx * ny); val tw = FloatArray(nx * ny)
+        val hist = IntArray(101)
+        for (ty in 0 until ny) for (tx in 0 until nx) {
+            java.util.Arrays.fill(hist, 0)
+            var cnt = 0
+            for (y in ty * t until min(h, (ty + 1) * t)) for (x in tx * t until min(w, (tx + 1) * t)) {
+                val i = y * w + x
+                if (valid != null && !valid[i]) continue
+                val v = ink[i]
+                if (v > LOCAL_FLOOR) { hist[(v.coerceAtMost(1f) * 100f).toInt()]++; cnt++ }
+            }
+            if (cnt < LOCAL_MIN_PIX) continue
+            val want = (cnt * 0.03f).toInt()
+            var a = 0; var q = 100
+            while (q > 0) { a += hist[q]; if (a > want) break; q-- }
+            val p97 = max(0.05f, (q + 0.5f) / 100f)
+            tg[ty * nx + tx] = (LOCAL_TARGET / p97).coerceIn(1f, LOCAL_MAX_GAIN)
+            tw[ty * nx + tx] = 1f
+        }
+        // gain map: weighted bilinear interpolation between tile centres
+        val gain = FloatArray(w * h)
+        val xi0 = IntArray(w); val xi1 = IntArray(w); val xf = FloatArray(w)
+        for (x in 0 until w) {
+            val gx = ((x + 0.5f) / t - 0.5f).coerceIn(0f, (nx - 1).toFloat())
+            xi0[x] = min(gx.toInt(), max(nx - 2, 0)); xi1[x] = min(xi0[x] + 1, nx - 1); xf[x] = gx - xi0[x]
+        }
+        for (y in 0 until h) {
+            val gy = ((y + 0.5f) / t - 0.5f).coerceIn(0f, (ny - 1).toFloat())
+            val y0 = min(gy.toInt(), max(ny - 2, 0)); val y1 = min(y0 + 1, ny - 1); val fy = gy - y0
+            for (x in 0 until w) {
+                val fx = xf[x]
+                val a = y0 * nx + xi0[x]; val bI = y0 * nx + xi1[x]; val c = y1 * nx + xi0[x]; val d = y1 * nx + xi1[x]
+                val w00 = (1 - fy) * (1 - fx) * tw[a]; val w01 = (1 - fy) * fx * tw[bI]
+                val w10 = fy * (1 - fx) * tw[c]; val w11 = fy * fx * tw[d]
+                val den = w00 + w01 + w10 + w11
+                gain[y * w + x] = if (den > 0.05f) {
+                    max(1f, (w00 * tg[a] + w01 * tg[bI] + w10 * tg[c] + w11 * tg[d]) / den)
+                } else 1f
+            }
+        }
+        val src = ink.copyOf()
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = y * w + x
+            val g = gain[i]
+            var v = src[i] * g
+            if (thick > 0f) {
+                var m = 0f
+                for (yy in max(0, y - 1)..min(h - 1, y + 1)) for (xx in max(0, x - 1)..min(w - 1, x + 1)) {
+                    val s = src[yy * w + xx]; if (s > m) m = s
+                }
+                v = max(v, thick * 0.75f * min(1f, m * g))
+            }
+            ink[i] = v.coerceIn(0f, 1f)
         }
     }
 
@@ -297,7 +453,7 @@ object SketchPipeline {
             }
         }
         // percentile-normalise inside the subject (bg already zeroed) before vectorising and for the pencil texture
-        normaliseInk(ink, valid)
+        normaliseInk(ink, valid, mw, mh)
         var strokes = tm.time("vectorize") { LineArtVectorizer.vectorize(ink, mw, mh, (settings.detail + 0.2f).coerceAtMost(1f), settings.lineWidth, settings.maxStrokes) }
         strokes = dropBorderStrokes(strokes, mw, mh)
         val ws = (sx + sy) * 0.5f
