@@ -1,9 +1,9 @@
 package com.smitnk.sketcher.image.pipeline
 
 import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 
 class PreFilterTest {
     private fun px(g: Int) = (0xFF shl 24) or (g shl 16) or (g shl 8) or g
@@ -31,8 +31,8 @@ class PreFilterTest {
             for (y in 30 until 90) for (x in x0 until x1) { val v = lum(o[y * w + x]).toDouble(); s += v; s2 += v * v; n++ }
             return s2 / n - (s / n) * (s / n)
         }
-        assertTrue(variance(20, 60) < 1500.0, "texture variance should fall from ~3600")
-        assertTrue(lum(o[60 * w + 125]) > 220 && lum(o[60 * w + 100]) < 80, "block edge preserved")
+        assertTrue("texture variance should fall from ~3600", variance(20, 60) < 1500.0)
+        assertTrue("block edge preserved", lum(o[60 * w + 125]) > 220 && lum(o[60 * w + 100]) < 80)
     }
 
     @Test fun fastEnough() {
