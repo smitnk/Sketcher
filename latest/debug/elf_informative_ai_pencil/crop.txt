@@ -1,9 +1,0 @@
-crop: x0=154 y0=190 x1=498 y1=1024 of 734x1024 bgFraction=0.82500523
-lineSource=AI
-model=informative
-accelActive=CPU + XNNPACK fallback=null
-inferenceMs=13090 (wrapped=13629) genMs=15719
-ink: min=0.0 mean=0.0506171795824862 max=0.9268768 (317x768)
-strokes: outline=437 shading=0 fill=0
-inkW=734 inkH=1024 drawing=734x1024 revealWidth=11.0
-settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)

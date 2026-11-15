@@ -1,1 +1,6 @@
-BUILD SUCCESSFUL in 1m 5s
+> Task :app:compileDebugKotlin FAILED
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/frames/FrameActionsSheet.kt:64:73 No value passed for parameter 'onClick'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/frames/FrameActionsSheet.kt:64:84 Argument type mismatch: actual type is 'kotlin.Function0<kotlin.Unit>', but 'kotlin.Boolean' was expected.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/frames/FrameActionsSheet.kt:65:77 No value passed for parameter 'onClick'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/frames/FrameActionsSheet.kt:65:96 Argument type mismatch: actual type is 'kotlin.Function0<kotlin.Unit>', but 'kotlin.Boolean' was expected.
+BUILD FAILED in 38s
