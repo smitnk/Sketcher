@@ -61,8 +61,8 @@ fun FrameActionsSheet(
                 modifier = Modifier.semantics { heading() }.padding(bottom = SketcherTokens.space8),
             )
             ActionRow(Icons.Default.ContentCopy, "Duplicate", true, onDuplicate)
-            ActionRow(Icons.AutoMirrored.Filled.ArrowBack, "Move left", index > 0) { onMove(-1) }
-            ActionRow(Icons.AutoMirrored.Filled.ArrowForward, "Move right", index < count - 1) { onMove(1) }
+            ActionRow(Icons.AutoMirrored.Filled.ArrowBack, "Move left", index > 0, onClick = { onMove(-1) })
+            ActionRow(Icons.AutoMirrored.Filled.ArrowForward, "Move right", index < count - 1, onClick = { onMove(1) })
             ActionRow(Icons.Default.Delete, "Delete…", count > 1, onDelete, danger = true)
         }
     }
