@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // An automation intent must not wipe a project being edited (unless it carries a debug label).
+        if (wantsEditor(intent) && !vm.acceptsAutomation(intent.getStringExtra("label"))) return
         handle(intent)
         if (wantsEditor(intent)) editorRequest++
     }

@@ -102,4 +102,16 @@ class SubjectCropTest {
         assertTrue(r.isFull)
         assertFalse(r.hasBackground)
     }
+
+    @Test fun alphaMaskIsUsedDirectlyAndNeverLetterboxed() {
+        // black "figure" pixels fill > 60% of the frame edge rows: must not be eaten as bars when alpha is known
+        val bg = BooleanArray(w * h) { val x = it % w; val y = it / w; val inFig = (x in 50..350 && y in 100..500); !inFig }
+        val px = IntArray(w * h) { if (bg[it]) -1 else rgb(0, 0, 0) }
+        val r = SubjectCrop.detect(px, w, h, alphaBg = bg)
+        assertTrue(r.x0 <= 50 && r.x1 >= 351 && r.y0 <= 100 && r.y1 >= 501)
+        assertTrue(r.bgMask!![5 * w + 5]); assertFalse(r.bgMask!![300 * w + 200])
+        // without alpha the 97% dark rule does not strip rows that cross a figure
+        val fig = IntArray(w * h) { val x = it % w; val y = it / w; if (x in 40..360 && y in 5..595 && (x + y) % 7 != 0) rgb(0, 0, 0) else rgb(200, 180, 160) }
+        assertEquals(null, SubjectCrop.letterbox(fig, w, h))
+    }
 }

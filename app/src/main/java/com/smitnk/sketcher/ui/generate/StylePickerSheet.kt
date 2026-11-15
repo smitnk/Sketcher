@@ -52,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,14 +100,19 @@ private fun PipelineSettings.styleChoice(): StyleChoice = when {
     else -> StyleChoice.OUTLINE
 }
 
-private fun PipelineSettings.withStyle(choice: StyleChoice): PipelineSettings = when (choice) {
+/** [lastShading] is the level to restore when going back to Shaded (Shaded -> Outline -> Shaded keeps it). */
+private fun PipelineSettings.withStyle(choice: StyleChoice, lastShading: ShadingLevel): PipelineSettings = when (choice) {
     StyleChoice.OUTLINE -> copy(colourFill = false, shading = ShadingLevel.NONE)
     StyleChoice.SHADED -> copy(
         colourFill = false,
-        shading = if (shading == ShadingLevel.NONE) ShadingLevel.MEDIUM else shading,
+        shading = if (shading == ShadingLevel.NONE) lastShading else shading,
     )
     StyleChoice.COLOUR -> copy(colourFill = true, shading = ShadingLevel.NONE)
 }
+
+/** colourFill and shading are mutually exclusive: colour fill wins. */
+private fun PipelineSettings.legal(): PipelineSettings =
+    if (colourFill && shading != ShadingLevel.NONE) copy(shading = ShadingLevel.NONE) else this
 
 /**
  * "How should I draw this?" sheet: pick a style card, tweak line engine / detail / width and the
@@ -124,9 +130,16 @@ fun StylePickerSheet(
     onSelectModel: (String) -> Unit = {},
     onDownloadModel: (String) -> Unit = {},
     onOpenMlSettings: (() -> Unit)? = null,
+    /** True while a drawing is running: "Draw it" is disabled and shows progress. */
+    generating: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    @Suppress("NAME_SHADOWING")
+    val settings = settings.legal()
     val choice = settings.styleChoice()
+    val lastShadingRef = remember { arrayOf(ShadingLevel.MEDIUM) } // plain holder: no state write in composition
+    if (settings.shading != ShadingLevel.NONE) lastShadingRef[0] = settings.shading
+    val lastShading = lastShadingRef[0]
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -175,21 +188,21 @@ fun StylePickerSheet(
                         label = "Outline only",
                         kind = StyleChoice.OUTLINE,
                         selected = choice == StyleChoice.OUTLINE,
-                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.OUTLINE)) },
+                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.OUTLINE, lastShading)) },
                         modifier = Modifier.weight(1f),
                     )
                     StyleCard(
                         label = "Outline + Shading",
                         kind = StyleChoice.SHADED,
                         selected = choice == StyleChoice.SHADED,
-                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.SHADED)) },
+                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.SHADED, lastShading)) },
                         modifier = Modifier.weight(1f),
                     )
                     StyleCard(
                         label = "Colour fill",
                         kind = StyleChoice.COLOUR,
                         selected = choice == StyleChoice.COLOUR,
-                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.COLOUR)) },
+                        onClick = { onSettingsChange(settings.withStyle(StyleChoice.COLOUR, lastShading)) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -262,7 +275,8 @@ fun StylePickerSheet(
                     valueText = "%.1f px".format(settings.lineWidth),
                 )
                 val pencil = settings.outlineStyle == OutlineStyle.PENCIL_REVEAL
-                Row(
+                // Pencil texture only applies to AI-derived lines; Classic edges never use it.
+                if (settings.lineSource != LineSource.CLASSIC) Row(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = SketcherTokens.minTouchTarget)
@@ -378,6 +392,7 @@ fun StylePickerSheet(
 
             Button(
                 onClick = onGenerate,
+                enabled = !generating,
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -388,7 +403,7 @@ fun StylePickerSheet(
                     .padding(horizontal = SketcherTokens.screenMargin, vertical = SketcherTokens.space12)
                     .heightIn(min = 56.dp),
             ) {
-                Text("Draw it", style = MaterialTheme.typography.titleMedium)
+                Text(if (generating) "Drawing..." else "Draw it", style = MaterialTheme.typography.titleMedium)
             }
         }
     }

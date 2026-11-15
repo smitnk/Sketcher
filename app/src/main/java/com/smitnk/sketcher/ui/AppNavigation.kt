@@ -38,12 +38,20 @@ fun AppNavigation(
     // 'pose' hint: set when the picker was opened from "Pose render"; applied via vm.setPoseMode before loading.
     var poseHint by rememberSaveable { mutableStateOf(false) }
 
+    // Single-flight guard: a second tap/pick while a load is starting is ignored until we are back on Home.
+    // TODO: once vm.projectLoad (Empty/Loading/Ready/Failed) exists, switch to EDITOR on Ready and clear this on Failed.
+    var loadInFlight by rememberSaveable { mutableStateOf(false) }
+    var pickerOpen by remember { mutableStateOf(false) }
+
     var deleteTarget by remember { mutableStateOf<RecentProjectUi?>(null) }
     var renameTarget by remember { mutableStateOf<RecentProjectUi?>(null) }
     var renameText by remember { mutableStateOf("") }
 
     LaunchedEffect(screen) {
-        if (screen == Screen.HOME) vm.refreshRecent()
+        if (screen == Screen.HOME) {
+            loadInFlight = false
+            vm.refreshRecent()
+        }
     }
 
     LaunchedEffect(editorRequest) {
@@ -51,15 +59,20 @@ fun AppNavigation(
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            vm.setPoseMode(poseHint)
-            vm.loadImage(uri)
+        pickerOpen = false
+        if (uri != null && !loadInFlight) {
+            loadInFlight = true
+            vm.loadImage(uri, pose = poseHint) // pose travels with the request; every other load resets it
             screen = Screen.EDITOR
         }
+        poseHint = false
     }
     val launchPicker = { pose: Boolean ->
-        poseHint = pose
-        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        if (!pickerOpen && !loadInFlight) {
+            pickerOpen = true
+            poseHint = pose
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
     }
 
     when (screen) {
@@ -67,13 +80,18 @@ fun AppNavigation(
             onImportPhoto = { launchPicker(false) },
             onImportPose = { launchPicker(true) },
             onTryDemo = {
-                vm.setPoseMode(false)
-                vm.runDemo() // starts a fresh project (resets layers, then generates)
-                screen = Screen.EDITOR
+                if (!loadInFlight) {
+                    loadInFlight = true
+                    vm.runDemo() // starts a fresh project (resets layers, then generates); pose off
+                    screen = Screen.EDITOR
+                }
             },
             onOpenProject = { id ->
-                vm.openProject(id)
-                screen = Screen.EDITOR
+                if (!loadInFlight) {
+                    loadInFlight = true
+                    vm.openProject(id) // pose off
+                    screen = Screen.EDITOR
+                }
             },
             recentProjects = vm.recentProjects,
             onDeleteProject = { id -> deleteTarget = vm.recentProjects.firstOrNull { it.id == id } },

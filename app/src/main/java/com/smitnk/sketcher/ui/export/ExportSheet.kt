@@ -30,6 +30,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gif
 import androidx.compose.material.icons.outlined.Image
@@ -78,6 +79,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.export.Exporter
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.PI
 import kotlin.math.roundToInt
@@ -102,6 +104,11 @@ fun ExportDialog(
     durationSec: Float? = null,
     resolutionNote: String? = null,
     onExportLayersSeparately: ((scale: Int, format: ExportFormat, transparent: Boolean) -> Unit)? = null,
+    blockedReason: String? = null,
+    workingWidth: Int = 0,
+    workingHeight: Int = 0,
+    originalWidth: Int = 0,
+    originalHeight: Int = 0,
 ) {
     var mode by remember { mutableStateOf(ExportMode.IMAGE) }
     var scale by remember { mutableIntStateOf(1) }
@@ -202,6 +209,26 @@ fun ExportDialog(
                         label = { Text("×2") },
                         modifier = Modifier.defaultMinSize(minHeight = SketcherTokens.minTouchTarget),
                     )
+                    FilterChip(
+                        selected = scale == 4,
+                        onClick = { scale = 4 },
+                        label = { Text("×4") },
+                        modifier = Modifier.defaultMinSize(minHeight = SketcherTokens.minTouchTarget),
+                    )
+                    FilterChip(
+                        selected = scale == Exporter.SCALE_ORIGINAL,
+                        onClick = { scale = Exporter.SCALE_ORIGINAL },
+                        label = { Text("Original") },
+                        modifier = Modifier.defaultMinSize(minHeight = SketcherTokens.minTouchTarget),
+                    )
+                }
+                if (workingWidth > 0 && workingHeight > 0) {
+                    val (ow, oh) = Exporter.targetSize(workingWidth, workingHeight, scale, originalWidth, originalHeight)
+                    Text(
+                        "Output: $ow x $oh px" + if (scale != 1) ". Lines are re-drawn sharp at this size." else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
 
                 val pngOnly = format == ExportFormat.PNG
@@ -252,9 +279,12 @@ fun ExportDialog(
                 Text(
                     when (scope) {
                         LayerScope.SEPARATE ->
-                            if (onExportLayersSeparately != null) "Each layer separately, one transparent file per layer"
+                            if (onExportLayersSeparately != null) {
+                                if (format == ExportFormat.JPEG) "Each layer separately; JPEG has no transparency, so each layer is saved on paper"
+                                else "Each layer separately, one transparent file per layer"
+                            }
                             else "Each layer separately is not available yet"
-                        LayerScope.SELECTED -> "Selected layer only: \"$selectedLayerName\" as a transparent PNG"
+                        LayerScope.SELECTED -> "Selected layer only: \"$selectedLayerName\" as a transparent PNG (JPEG is not used here)"
                         LayerScope.ALL -> "All visible layers together"
                     },
                     style = MaterialTheme.typography.bodySmall,
@@ -282,7 +312,11 @@ fun ExportDialog(
                 Text(destination, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
+            if (blockedReason != null) {
+                Text(blockedReason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            }
             Button(
+                enabled = blockedReason == null,
                 onClick = {
                     when (mode) {
                         ExportMode.IMAGE -> when (scope) {
@@ -375,6 +409,7 @@ fun ExportProgressDialog(
     savedUri: Uri? = null,
     savedMime: String = "image/*",
     onDone: () -> Unit = onCancel,
+    title: String? = null,
 ) {
     val p = progress.coerceIn(0f, 1f)
     val context = LocalContext.current
@@ -394,13 +429,13 @@ fun ExportProgressDialog(
             ) {
                 if (done) {
                     Icon(
-                        Icons.Outlined.CheckCircle,
+                        if (title == null) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline,
                         contentDescription = null,
-                        tint = SketcherTokens.colors.success,
+                        tint = if (title == null) SketcherTokens.colors.success else MaterialTheme.colorScheme.error,
                         modifier = Modifier.height(48.dp),
                     )
                     Text(
-                        "Export complete",
+                        title ?: "Export complete",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.semantics { heading() },

@@ -15,6 +15,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.util.EnumSet
 import java.util.concurrent.Callable
+import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -53,9 +54,6 @@ object MlLog {
     fun w(msg: String, t: Throwable? = null) { if (t != null) Log.w(TAG, "$msg [${mem()}]", t) else Log.w(TAG, "$msg [${mem()}]") }
 }
 
-/** The AI step did not finish in time (hung driver / far too slow); callers fall back to the bundled model. */
-class InferenceTimeoutException(message: String) : RuntimeException(message)
-
 /**
  * ONNX Runtime line-art model driven by a [ModelSpec] (normalisation, output polarity, size multiple).
  * [infer] returns an ink map (1 = ink). Weights come from [modelFile] if given, else the spec's bundled asset.
@@ -64,7 +62,9 @@ class InferenceTimeoutException(message: String) : RuntimeException(message)
  * Safety rules (a phone-level UI crash was traced to GPU/NNAPI + fp16 + big inputs + several sessions):
  *  - at most ONE OrtSession exists process-wide (a global lock; creating one evicts the previous owner's);
  *  - NNAPI is never used for fp16 models or for inputs above [NNAPI_MAX_PIXELS];
- *  - every inference runs on a dedicated thread with a [TIMEOUT_MS] watchdog;
+ *  - every inference runs on a dedicated thread with a [TIMEOUT_MS] watchdog; a stuck run is terminated and, if it
+ *    still does not release, the global lock is replaced (circuit breaker) so later runs never wait on it;
+ *  - [close] is terminal: a closed instance never builds a session again;
  *  - input size is capped by [ModelSpec.maxPixels] and never padded to a square.
  */
 class OnnxLineArtModel(
@@ -83,6 +83,27 @@ class OnnxLineArtModel(
     private var session: OrtSession? = null
     private val failedAtRuntime = EnumSet.noneOf(Accel::class.java)
     @Volatile private var runOptions: OrtSession.RunOptions? = null
+    @Volatile private var closed = false
+    @Volatile private var cancelRequested = false
+    @Volatile private var accelDirty = false
+
+    /** True once [close] was called; terminal. */
+    val isClosed: Boolean get() = closed
+
+    @Volatile private var runToken = 0L
+
+    /** Call at the start of a generation: clears a previous [cancelRun]; returns the token for [cancelRun]. */
+    @Synchronized fun beginRun(): Long { cancelRequested = false; return ++runToken }
+
+    /**
+     * Asks the running (or next) [infer] to stop; ORT's run is terminated, blocked waiters return quickly.
+     * With a [token] from [beginRun], a stale canceller (an older run) cannot cancel a newer one.
+     */
+    @Synchronized fun cancelRun(token: Long = runToken) {
+        if (token != runToken) return
+        cancelRequested = true
+        terminateRun()
+    }
 
     val specId: String get() = spec.id
     val specName: String get() = spec.name
@@ -93,7 +114,8 @@ class OnnxLineArtModel(
         set(value) {
             if (value == field) return
             field = value
-            locked { failedAtRuntime.clear(); closeSession() }
+            accelDirty = true
+            tryApplyAccel() // never throws; if the engine is busy the next run applies it under the lock
         }
 
     /** Provider actually running (null until a session exists). */
@@ -131,10 +153,31 @@ class OnnxLineArtModel(
     private fun threads() = min(4, max(1, Runtime.getRuntime().availableProcessors()))
 
     private inline fun <T> locked(waitMs: Long = LOCK_WAIT_MS, block: () -> T): T {
-        if (!GLOBAL.tryLock(waitMs, TimeUnit.MILLISECONDS)) {
-            throw IllegalStateException("AI engine busy (a previous run is stuck)")
-        }
-        try { return block() } finally { GLOBAL.unlock() }
+        val l = GLOBAL
+        if (!l.tryLock(waitMs, TimeUnit.MILLISECONDS)) throw EngineBusyException("AI engine busy (a previous run is still finishing)")
+        try { return block() } finally { l.unlock() }
+    }
+
+    private fun tryApplyAccel() {
+        val l = GLOBAL
+        if (!l.tryLock()) return
+        try { applyAccelLocked() } finally { l.unlock() }
+    }
+
+    /** Caller holds the global lock. */
+    private fun applyAccelLocked() {
+        if (!accelDirty) return
+        accelDirty = false
+        failedAtRuntime.clear()
+        lastFallbackReason = null
+        closeSession()
+    }
+
+    /** Drops this instance's references to a session that a stuck thread may still be using (it closes it itself). */
+    private fun abandonSession() {
+        session = null
+        activeAccel = null
+        if (owner === this) owner = null
     }
 
     /** Strict: throws if [a] cannot be created. Model weights are only held while the session is created. */
@@ -186,7 +229,8 @@ class OnnxLineArtModel(
     }
 
     /** Caller holds the global lock. */
-    private fun ensureSession(skipNnapi: Boolean = false): Pair<OrtEnvironment, OrtSession> {
+    private fun ensureSession(ep: Long, skipNnapi: Boolean = false): Pair<OrtEnvironment, OrtSession> {
+        if (closed) throw ModelClosedException()
         val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
         val cur = session
         if (cur != null) {
@@ -201,12 +245,24 @@ class OnnxLineArtModel(
             try {
                 MlLog.i("session create ${spec.id} accel=$a")
                 val s = buildSession(e, a)
+                if (ep != epoch) { // the breaker tripped while we were building: this thread is an orphan
+                    try { s.close() } catch (_: Throwable) {}
+                    throw CancellationException("engine reset")
+                }
+                if (closed) {
+                    try { s.close() } catch (_: Throwable) {}
+                    throw ModelClosedException()
+                }
                 session = s
                 activeAccel = a
                 owner = this
-                lastFallbackReason = if (a == accel) null else firstError
+                lastFallbackReason = if (a == accel && failedAtRuntime.isEmpty()) null else (firstError ?: lastFallbackReason)
                 MlLog.i("session ready ${spec.id} accel=$a (wanted $accel) in ${(System.nanoTime() - t0) / 1_000_000} ms")
                 return e to s
+            } catch (t: CancellationException) {
+                throw t
+            } catch (t: ModelClosedException) {
+                throw t
             } catch (t: Throwable) {
                 val msg = "$a failed: ${t.javaClass.simpleName}: ${t.message}"
                 MlLog.w(msg)
@@ -217,25 +273,51 @@ class OnnxLineArtModel(
         throw IllegalStateException("could not create ONNX session: $firstError")
     }
 
-    /** Runs [block] on the shared inference thread; abandons it (and asks ORT to terminate) after [timeoutMs]. */
-    private fun <T> guarded(timeoutMs: Long, what: String, block: () -> T): T {
-        val ex = exec
+    /**
+     * Runs [block] on [worker]'s thread, polling so a [cancelRun] returns within ~[POLL_MS]. After [timeoutMs] the run
+     * is terminated; if it still holds the engine after [GRACE_MS] the breaker trips (fresh lock + worker).
+     */
+    private fun <T> guarded(worker: Worker, timeoutMs: Long, what: String, block: () -> T): T {
+        val ex = worker.ex
         val fut = ex.submit(Callable { block() })
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000
         try {
-            return fut.get(timeoutMs, TimeUnit.MILLISECONDS)
-        } catch (e: TimeoutException) {
-            MlLog.w("WATCHDOG $what ${spec.id} timed out after ${timeoutMs / 1000}s")
-            terminateRun()
-            fut.cancel(true)
-            replaceExecutor(ex)
-            throw InferenceTimeoutException("${spec.name} model timed out after ${timeoutMs / 1000}s")
+            while (true) {
+                try {
+                    return fut.get(POLL_MS, TimeUnit.MILLISECONDS)
+                } catch (e: TimeoutException) {
+                    if (cancelRequested || closed) {
+                        terminateRun()
+                        fut.cancel(true)
+                        releaseOrTrip(worker, ex)
+                        throw CancellationException("$what cancelled")
+                    }
+                    if (System.nanoTime() >= deadline) {
+                        MlLog.w("WATCHDOG $what ${spec.id} timed out after ${timeoutMs / 1000}s")
+                        terminateRun()
+                        fut.cancel(true)
+                        releaseOrTrip(worker, ex)
+                        throw InferenceTimeoutException("${spec.name} model timed out after ${timeoutMs / 1000}s")
+                    }
+                }
+            }
         } catch (e: ExecutionException) {
             throw e.cause ?: e
         } catch (e: InterruptedException) {
             terminateRun()
             fut.cancel(true)
+            releaseOrTrip(worker, ex)
             throw e
         }
+    }
+
+    /** Waits briefly for the engine to be released after a terminate; else trips the circuit breaker. */
+    private fun releaseOrTrip(worker: Worker, ex: ExecutorService) {
+        if (!awaitRelease(GRACE_MS)) {
+            MlLog.w("engine still held after terminate: tripping circuit breaker")
+            tripBreaker(this)
+        }
+        worker.replace(ex)
     }
 
     private fun terminateRun() {
@@ -249,12 +331,14 @@ class OnnxLineArtModel(
      * Safe to call repeatedly; never throws.
      */
     fun warmUp() {
-        if (warming || session != null || spec.fp16) return
+        if (warming || session != null || spec.fp16 || closed) return
         warming = true
         Thread({
             try {
-                locked {
-                    val (env, session) = ensureSession()
+                locked(WARM_WAIT_MS) {
+                    if (closed) return@locked
+                    applyAccelLocked()
+                    val (env, session) = ensureSession(epoch)
                     val name = session.inputNames.iterator().next()
                     val side = max(64, spec.sizeMultiple)
                     val buf = ByteBuffer.allocateDirect(3 * side * side * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
@@ -270,11 +354,27 @@ class OnnxLineArtModel(
         }, "onnx-warmup").apply { isDaemon = true; priority = Thread.MIN_PRIORITY }.start()
     }
 
-    override fun infer(argb: IntArray, w: Int, h: Int): FloatArray =
-        guarded(TIMEOUT_MS, "infer") { locked { inferLocked(argb, w, h) } }
+    override fun infer(argb: IntArray, w: Int, h: Int): FloatArray {
+        if (closed) throw ModelClosedException()
+        if (cancelRequested) throw CancellationException("cancelled")
+        return guarded(INFER, TIMEOUT_MS, "infer") { locked { inferLocked(argb, w, h) } }
+    }
 
     private fun inferLocked(argb: IntArray, w: Int, h: Int): FloatArray {
         require(w > 0 && h > 0 && argb.size >= w * h) { "bad image" }
+        val ep = epoch
+        applyAccelLocked()
+        try {
+            return inferCore(ep, argb, w, h)
+        } finally {
+            // Only the live (non-orphaned) thread may touch shared state; a closed instance releases its session.
+            if (ep == epoch && closed) { closeSession(); inBuf = null }
+        }
+    }
+
+    private fun inferCore(ep: Long, argb: IntArray, w: Int, h: Int): FloatArray {
+        if (closed) throw ModelClosedException()
+        if (cancelRequested) throw CancellationException("cancelled")
         val tStart = System.nanoTime()
         val (tw, th) = spec.targetSize(w, h, longSide)
         MlLog.i("infer start ${spec.id} ${w}x$h -> ${tw}x$th (${tw.toLong() * th} px, cap ${spec.maxPixels}) fp16=${spec.fp16}")
@@ -285,12 +385,21 @@ class OnnxLineArtModel(
         val raw = FloatArray(tw * th)
         var attempts = 0
         while (true) {
-            val (env, session) = ensureSession(skipNnapi)
+            val (env, session) = ensureSession(ep, skipNnapi)
             try {
                 MlLog.i("run begin ${spec.id} accel=$activeAccel")
                 runInto(env, session, fb, tw, th, raw)
+                if (ep != epoch) { // abandoned by the breaker while running: release our session, report nothing
+                    try { session.close() } catch (_: Throwable) {}
+                    throw CancellationException("engine reset")
+                }
                 break
             } catch (t: Throwable) {
+                if (ep != epoch) {
+                    try { session.close() } catch (_: Throwable) {}
+                    throw if (t is CancellationException) t else CancellationException("engine reset")
+                }
+                if (cancelRequested) throw CancellationException("cancelled")
                 val a = activeAccel
                 // A provider that built fine but fails to run: block it and rebuild down the chain.
                 if (a == null || a == Accel.CPU || t is InterruptedException || ++attempts > 3) throw t
@@ -321,6 +430,7 @@ class OnnxLineArtModel(
         fb.position(0)
         OrtSession.RunOptions().use { ro ->
             runOptions = ro
+            if (cancelRequested) terminateRun()
             try {
                 OnnxTensor.createTensor(env, fb, longArrayOf(1, 3, th.toLong(), tw.toLong())).use { tensor ->
                     session.run(mapOf(inputName to tensor), ro).use { result ->
@@ -331,7 +441,7 @@ class OnnxLineArtModel(
                     }
                 }
             } finally {
-                runOptions = null
+                if (runOptions === ro) runOptions = null
             }
         }
     }
@@ -342,7 +452,7 @@ class OnnxLineArtModel(
      * Blocking; call off the main thread. Evicts any live session first (single-session rule).
      */
     fun benchmark(side: Int = 384, includeNnapi: Boolean = false): Map<Accel, Long> =
-        guarded(BENCH_TIMEOUT_MS, "benchmark") { locked { benchmarkLocked(side, includeNnapi) } }
+        guarded(BENCH, BENCH_TIMEOUT_MS, "benchmark") { locked { benchmarkLocked(side, includeNnapi) } }
 
     private fun benchmarkLocked(side: Int, includeNnapi: Boolean): Map<Accel, Long> {
         val e = env ?: OrtEnvironment.getEnvironment().also { env = it }
@@ -361,6 +471,7 @@ class OnnxLineArtModel(
             else -> listOf(Accel.CPU, Accel.XNNPACK)
         }
         for (a in candidates) {
+            if (cancelRequested || closed) break
             try {
                 MlLog.i("benchmark ${spec.id} $a begin")
                 buildSession(e, a).use { sess ->
@@ -381,7 +492,10 @@ class OnnxLineArtModel(
         return results
     }
 
+    /** Terminal: after this the instance never builds a session again. Safe to call repeatedly. */
     override fun close() {
+        closed = true
+        terminateRun()
         try {
             locked(CLOSE_WAIT_MS) {
                 closeSession()
@@ -389,8 +503,10 @@ class OnnxLineArtModel(
                 // OrtEnvironment is a process-wide singleton; leave it open.
                 env = null
             }
-        } catch (t: IllegalStateException) {
-            MlLog.w("close skipped: ${t.message}")
+        } catch (t: EngineBusyException) {
+            // A stuck run still holds the engine: abandon it so nothing waits on it; it closes its own session.
+            MlLog.w("close: engine stuck, tripping breaker")
+            tripBreaker(this)
         }
     }
 
@@ -465,20 +581,51 @@ class OnnxLineArtModel(
         const val NNAPI_MAX_PIXELS = 512 * 512
 
         /** Process-wide: one ORT session at a time, one inference at a time. */
-        private val GLOBAL = ReentrantLock()
+        @Volatile private var GLOBAL = ReentrantLock()
+        @Volatile private var epoch = 0L
         @Volatile private var owner: OnnxLineArtModel? = null
-        @Volatile private var exec: ExecutorService = newExec()
 
-        private fun newExec(): ExecutorService = Executors.newSingleThreadExecutor { r ->
-            Thread(r, "onnx-infer").apply { isDaemon = true }
+        private const val POLL_MS = 200L
+        private const val GRACE_MS = 2_000L
+        private const val WARM_WAIT_MS = 500L
+
+        /** A single-thread executor that can be swapped out when its thread is stuck. Benchmarks get their own. */
+        private class Worker(private val name: String) {
+            @Volatile var ex: ExecutorService = make()
+            private fun make(): ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, name).apply { isDaemon = true } }
+            fun replace(old: ExecutorService) {
+                synchronized(this) {
+                    if (ex === old) {
+                        old.shutdownNow()
+                        ex = make()
+                    }
+                }
+            }
         }
 
-        private fun replaceExecutor(old: ExecutorService) {
+        private val INFER = Worker("onnx-infer")
+        private val BENCH = Worker("onnx-bench")
+
+        /** True when the engine lock was free within [ms] (used to await a cancelled run's release). */
+        fun awaitRelease(ms: Long): Boolean {
+            val l = GLOBAL
+            if (!l.tryLock(ms, TimeUnit.MILLISECONDS)) return false
+            l.unlock()
+            return true
+        }
+
+        /**
+         * Circuit breaker: abandon whatever holds the engine (a stuck native run) and continue with a fresh lock.
+         * The orphan closes its own session when (if) it returns; nothing else ever waits on it.
+         */
+        fun tripBreaker(by: OnnxLineArtModel? = null) {
             synchronized(this) {
-                if (exec === old) {
-                    old.shutdownNow()
-                    exec = newExec()
-                }
+                epoch++
+                GLOBAL = ReentrantLock()
+                val o = owner
+                owner = null
+                o?.abandonSession()
+                by?.abandonSession()
             }
         }
 

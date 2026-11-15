@@ -39,15 +39,23 @@ object SketchPipeline {
     /** Last model/extractor failure that caused a fallback (null if the last run had none). */
     @Volatile var lastError: Throwable? = null
 
+    /**
+     * @param alphaMask optional known background (w*h, true = transparent/background). When null it is derived from
+     * [argbIn]'s alpha channel (transparent pixels). Either way the image is flattened onto white, the mask is used
+     * directly as the subject boundary (no background guessing, no letterbox detection), and nothing but the
+     * flattened pixels reaches the line extractors / model.
+     */
     suspend fun run(
-        argb: IntArray,
+        argbIn: IntArray,
         w: Int,
         h: Int,
         settings: PipelineSettings,
         model: LineArtModel?,
         progress: (stage: String, fraction: Float) -> Unit = { _, _ -> },
+        alphaMask: BooleanArray? = null,
     ): GeneratedDrawing = withContext(Dispatchers.Default) {
         lastError = null
+        val (argb, alphaFull) = flattenAlpha(argbIn, w, h, alphaMask)
         val tm = Timer()
         val tTotal = System.nanoTime()
         val ctx = currentCoroutineContext()
@@ -58,7 +66,8 @@ object SketchPipeline {
         check()
 
         // subject rectangle (flat backdrop / letterbox bars excluded); full frame for ordinary photos
-        val sub = tm.time("crop") { SubjectCrop.detect(px, pw, ph) }
+        val alphaBg = alphaFull?.let { downscaleMask(it, w, h, pw, ph) }
+        val sub = tm.time("crop") { SubjectCrop.detect(px, pw, ph, alphaBg = alphaBg) }
         // choose line source
         var source = settings.lineSource
         if (source == LineSource.AUTO) {
@@ -120,7 +129,7 @@ object SketchPipeline {
                     }
                     check()
                 }
-                ink = fuseCartoonInk(ai, cm, pw, ph, sub, px)
+                ink = fuseCartoonInk(ai, cm, pw, ph, sub, px, alphaBg)
                 fusedInk = ai != null
             }
         }
@@ -235,71 +244,162 @@ object SketchPipeline {
         return area > 0 && strong >= MIN_STRONG_INK * area
     }
 
+    /** Fraction of transparent pixels (alpha < 128) at/above which an image without an explicit mask counts as cut-out. */
+    private const val MIN_TRANSPARENT = 0.005f
+
     /**
-     * CARTOON ink = max(aiInk, cartoonInk) (aiInk optional, already normalised) plus the subject's outer contour
-     * (boundary of [sub]'s background mask) as bold ink. Returns a new array; inputs are untouched.
+     * Composites [argb] onto white (so transparent pixels are white, never black) and returns it with the background
+     * mask: [given] when supplied, else alpha < 128 when at least [MIN_TRANSPARENT] of the pixels are that
+     * transparent, else null. Fully opaque input is returned as is.
      */
-    internal fun fuseCartoonInk(ai: FloatArray?, cartoon: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result, argb: IntArray? = null): FloatArray {
+    internal fun flattenAlpha(argb: IntArray, w: Int, h: Int, given: BooleanArray?): Pair<IntArray, BooleanArray?> {
+        val n = w * h
+        if (argb.size < n) return argb to null
+        var hasAlpha = false; var transparent = 0
+        for (i in 0 until n) { val a = argb[i] ushr 24; if (a < 255) { hasAlpha = true; if (a < 128) transparent++ } }
+        val mask = given?.takeIf { it.size >= n }
+            ?: if (transparent >= MIN_TRANSPARENT * n) BooleanArray(n) { (argb[it] ushr 24) < 128 } else null
+        if (!hasAlpha && mask == null) return argb to null
+        val out = IntArray(n)
+        for (i in 0 until n) {
+            val p = argb[i]; val a = p ushr 24
+            out[i] = if (mask != null && mask[i]) -1
+            else if (a >= 255) p
+            else {
+                val r = (((p shr 16) and 255) * a + 255 * (255 - a)) / 255
+                val g = (((p shr 8) and 255) * a + 255 * (255 - a)) / 255
+                val b = ((p and 255) * a + 255 * (255 - a)) / 255
+                (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+        return out to mask
+    }
+
+    /** Nearest-sample a full-size mask to the working size (same grid as [downscale]'s block centres). */
+    internal fun downscaleMask(m: BooleanArray, w: Int, h: Int, pw: Int, ph: Int): BooleanArray {
+        if (w == pw && h == ph) return m
+        return BooleanArray(pw * ph) {
+            val x = ((it % pw + 0.5f) * w / pw).toInt().coerceIn(0, w - 1)
+            val y = ((it / pw + 0.5f) * h / ph).toInt().coerceIn(0, h - 1)
+            m[y * w + x]
+        }
+    }
+
+    /**
+     * CARTOON ink = max(aiInk, cartoonInk) (aiInk optional, already normalised). When the subject has a backdrop its
+     * silhouette is only REINFORCED: computed at full working resolution (from [alphaBg], else per-pixel colour distance
+     * to the local backdrop colour in [argb]), smoothed (blur + threshold) and added as bold ink only where the ink
+     * already has a line within [SIL_NEAR] px. Never invents contours, so no blocky halos. Returns a new array.
+     */
+    internal fun fuseCartoonInk(
+        ai: FloatArray?, cartoon: FloatArray, pw: Int, ph: Int, sub: SubjectCrop.Result,
+        argb: IntArray? = null, alphaBg: BooleanArray? = null,
+    ): FloatArray {
         val out = FloatArray(pw * ph) { if (ai != null) max(ai[it], cartoon[it]) else cartoon[it] }
-        val bg = sub.bgMask?.let { if (argb != null) tightenBg(it, argb, pw, ph) else it } ?: return out
+        val coarse = sub.bgMask ?: return out
+        val fg0 = silhouetteFg(coarse, argb, alphaBg, pw, ph) ?: return out
+        val rs = max(2, (max(pw, ph) / 300f).roundToInt())
+        val fg = smoothMask(fg0, pw, ph, rs)
+        // ink within SIL_NEAR px of a pixel (computed on the un-reinforced ink)
+        val has = BooleanArray(pw * ph) { out[it] > SIL_INK }
+        val near = dilateBox(has, pw, ph, SIL_NEAR)
         val r = max(1, (max(pw, ph) / 600f).roundToInt())
         val m = 3
         val x0 = max(sub.x0 + m, 1); val x1 = min(sub.x1 - m, pw - 1)
         val y0 = max(sub.y0 + m, 1); val y1 = min(sub.y1 - m, ph - 1)
         for (y in y0 until y1) for (x in x0 until x1) {
             val i = y * pw + x
-            if (bg[i] || !(bg[i - 1] || bg[i + 1] || bg[i - pw] || bg[i + pw])) continue
+            if (!fg[i] || !(!fg[i - 1] || !fg[i + 1] || !fg[i - pw] || !fg[i + pw])) continue
+            if (!near[i]) continue
             for (dy in -r..r) for (dx in -r..r) {
                 val xx = x + dx; val yy = y + dy
                 if (xx < 0 || yy < 0 || xx >= pw || yy >= ph) continue
                 val j = yy * pw + xx
-                if (!bg[j]) out[j] = 1f
+                if (fg[j] && out[j] < SIL_VALUE) out[j] = SIL_VALUE
             }
         }
         return out
     }
 
-    /**
-     * The backdrop mask is coarse (blocky, a few px loose). Pixels just inside its boundary whose colour matches the
-     * nearby backdrop (mean of backdrop pixels in a box) are reclassified as backdrop, so the contour hugs the figure.
-     */
-    internal fun tightenBg(bg: BooleanArray, argb: IntArray, pw: Int, ph: Int): BooleanArray {
-        val n = pw * ph; val W = pw + 1
+    private const val SIL_NEAR = 3
+    private const val SIL_INK = 0.3f
+    private const val SIL_VALUE = 0.9f
+    private const val SIL_COLOR_TOL = 22
+
+    /** true = subject. From [alphaBg] directly, else colour distance to the local backdrop mean; null if neither is available. */
+    private fun silhouetteFg(coarse: BooleanArray, argb: IntArray?, alphaBg: BooleanArray?, pw: Int, ph: Int): BooleanArray? {
+        if (alphaBg != null) return BooleanArray(pw * ph) { !alphaBg[it] }
+        if (argb == null) return null
+        val W = pw + 1
         val cnt = IntArray(W * (ph + 1)); val sr = LongArray(W * (ph + 1)); val sg = LongArray(W * (ph + 1)); val sb = LongArray(W * (ph + 1))
         for (y in 0 until ph) for (x in 0 until pw) {
             val i = y * pw + x; val k = (y + 1) * W + x + 1; val a = y * W + x + 1; val b = (y + 1) * W + x; val c = y * W + x
-            val c0 = argb[i]; val f = if (bg[i]) 1 else 0
+            val c0 = argb[i]; val f = if (coarse[i]) 1 else 0
             cnt[k] = cnt[a] + cnt[b] - cnt[c] + f
             sr[k] = sr[a] + sr[b] - sr[c] + f * ((c0 shr 16) and 255)
             sg[k] = sg[a] + sg[b] - sg[c] + f * ((c0 shr 8) and 255)
             sb[k] = sb[a] + sb[b] - sb[c] + f * (c0 and 255)
         }
-        // distance (chebyshev, capped) of non-bg pixels to the mask: band = within B px of a bg pixel
-        val B = max(4, (max(pw, ph) / 80f).roundToInt()); val R = 2 * B
-        val out = bg.copyOf()
+        val R = max(16, max(pw, ph) / 30)
+        val out = BooleanArray(pw * ph)
         for (y in 0 until ph) for (x in 0 until pw) {
             val i = y * pw + x
-            if (bg[i]) continue
-            val xa = max(0, x - B); val xb = min(pw, x + B + 1); val ya = max(0, y - B); val yb = min(ph, y + B + 1)
-            fun box(t: IntArray) = t[yb * W + xb] - t[ya * W + xb] - t[yb * W + xa] + t[ya * W + xa]
-            if (box(cnt) == 0) continue
-            val xa2 = max(0, x - R); val xb2 = min(pw, x + R + 1); val ya2 = max(0, y - R); val yb2 = min(ph, y + R + 1)
-            fun boxL(t: LongArray) = t[yb2 * W + xb2] - t[ya2 * W + xb2] - t[yb2 * W + xa2] + t[ya2 * W + xa2]
-            val c2 = (cnt[yb2 * W + xb2] - cnt[ya2 * W + xb2] - cnt[yb2 * W + xa2] + cnt[ya2 * W + xa2]).toLong()
-            if (c2 == 0L) continue
+            if (coarse[i]) continue
+            val xa = max(0, x - R); val xb = min(pw, x + R + 1); val ya = max(0, y - R); val yb = min(ph, y + R + 1)
+            val c = cnt[yb * W + xb] - cnt[ya * W + xb] - cnt[yb * W + xa] + cnt[ya * W + xa]
+            if (c == 0) { out[i] = true; continue }
+            fun box(t: LongArray) = (t[yb * W + xb] - t[ya * W + xb] - t[yb * W + xa] + t[ya * W + xa]) / c
             val p = argb[i]
-            val d = max(kotlin.math.abs(((p shr 16) and 255) - (boxL(sr) / c2).toInt()),
-                max(kotlin.math.abs(((p shr 8) and 255) - (boxL(sg) / c2).toInt()), kotlin.math.abs((p and 255) - (boxL(sb) / c2).toInt())))
-            if (d <= 14) out[i] = true
+            val d = max(kotlin.math.abs(((p shr 16) and 255) - box(sr).toInt()),
+                max(kotlin.math.abs(((p shr 8) and 255) - box(sg).toInt()), kotlin.math.abs((p and 255) - box(sb).toInt())))
+            out[i] = d > SIL_COLOR_TOL
         }
-        // drop isolated flips: a non-bg pixel needs >= 3 non-bg 4-neighbours-in-3x3 majority to stay, bg fills holes
-        val sm = out.copyOf()
-        for (y in 1 until ph - 1) for (x in 1 until pw - 1) {
-            var c = 0
-            for (dy in -1..1) for (dx in -1..1) if (out[(y + dy) * pw + x + dx]) c++
-            sm[y * pw + x] = c >= 5
+        return out
+    }
+
+    /** Two box blurs of radius [r] then threshold at 0.5: removes pixel stair-steps and specks. */
+    internal fun smoothMask(a: BooleanArray, w: Int, h: Int, r: Int): BooleanArray {
+        var f = FloatArray(w * h) { if (a[it]) 1f else 0f }
+        repeat(2) { f = boxBlur(f, w, h, r) }
+        return BooleanArray(w * h) { f[it] >= 0.5f }
+    }
+
+    private fun boxBlur(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+        val tmp = FloatArray(w * h); val out = FloatArray(w * h)
+        val k = 2 * r + 1f
+        for (y in 0 until h) {
+            var s = 0f
+            for (x in -r..r) s += src[y * w + x.coerceIn(0, w - 1)]
+            for (x in 0 until w) {
+                tmp[y * w + x] = s / k
+                s += src[y * w + (x + r + 1).coerceIn(0, w - 1)] - src[y * w + (x - r).coerceIn(0, w - 1)]
+            }
         }
-        return sm
+        for (x in 0 until w) {
+            var s = 0f
+            for (y in -r..r) s += tmp[y.coerceIn(0, h - 1) * w + x]
+            for (y in 0 until h) {
+                out[y * w + x] = s / k
+                s += tmp[(y + r + 1).coerceIn(0, h - 1) * w + x] - tmp[(y - r).coerceIn(0, h - 1) * w + x]
+            }
+        }
+        return out
+    }
+
+    /** Square dilation by [r] (true if any true within r, separable). */
+    private fun dilateBox(a: BooleanArray, w: Int, h: Int, r: Int): BooleanArray {
+        val tmp = BooleanArray(w * h); val out = BooleanArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            var v = false
+            for (dx in -r..r) { val xx = x + dx; if (xx in 0 until w && a[y * w + xx]) { v = true; break } }
+            tmp[y * w + x] = v
+        }
+        for (y in 0 until h) for (x in 0 until w) {
+            var v = false
+            for (dy in -r..r) { val yy = y + dy; if (yy in 0 until h && tmp[yy * w + x]) { v = true; break } }
+            out[y * w + x] = v
+        }
+        return out
     }
 
     private const val NORM_LO = 0.04f

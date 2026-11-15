@@ -25,6 +25,11 @@ import com.smitnk.sketcher.data.applySnapshot
 import com.smitnk.sketcher.data.toSnapshot
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.export.ExportKind
+import com.smitnk.sketcher.export.ExportResult
+import com.smitnk.sketcher.export.ExportState
+import com.smitnk.sketcher.export.blockedReason
+import com.smitnk.sketcher.export.summary
 import com.smitnk.sketcher.export.Exporter
 import com.smitnk.sketcher.export.GifExporter
 import com.smitnk.sketcher.export.VideoExporter
@@ -48,9 +53,22 @@ import com.smitnk.sketcher.image.pipeline.SketchPipeline
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
+import com.smitnk.sketcher.ui.canvas.StrokeSession
 import com.smitnk.sketcher.ui.generate.LineModelUi
 import com.smitnk.sketcher.ui.home.RecentProjectUi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import com.smitnk.sketcher.image.pipeline.GenerationAbort
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -58,10 +76,11 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import com.smitnk.sketcher.data.ProjectLoad
+import com.smitnk.sketcher.data.ProjectSession
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InterruptedIOException
@@ -79,6 +98,9 @@ class SavedExport(val path: String, val uri: Uri?, val mime: String)
 private interface EditAction {
     fun undo()
     fun redo()
+
+    /** Approximate retained bitmap bytes (for the history memory cap). */
+    val cost: Long get() = 0L
 }
 
 private class AddStrokeAction(val layer: Layer, val stroke: Stroke) : EditAction {
@@ -113,13 +135,19 @@ private class InkEraseAction(val layer: Layer, val before: Bitmap, val after: Bi
     private fun copy(b: Bitmap) = b.copy(Bitmap.Config.ARGB_8888, true)
     override fun undo() { layer.inkTexture = copy(before) }
     override fun redo() { layer.inkTexture = copy(after) }
+    override val cost: Long get() = (before.allocationByteCount + after.allocationByteCount).toLong()
 }
 
+private const val MAX_UNDO = 50
+private const val MAX_HISTORY_BYTES = 64L * 1024 * 1024
 private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
 private const val AUTOSAVE_DELAY_MS = 2000L
+private const val SAVE_RETRY_MS = 10_000L
 private const val KEY_MODEL_ID = "model_id"
 private const val KEY_ACCEL_CHOICE = "accel_choice"
 private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
+private const val PREV_JOIN_MS = 6_000L
+private const val ENGINE_RELEASE_WAIT_MS = 3_000L
 
 class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -158,10 +186,22 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         pipelineSettings = transform(pipelineSettings)
     }
 
-    var generationStage by mutableStateOf("")
+    // Single source of truth for a generation run (see GenerationState.kt); late callbacks of older runs are dropped.
+    private val genMachine = GenerationMachine()
+    var generationState by mutableStateOf<GenerationState>(GenerationState.Idle)
         private set
-    var generationProgress by mutableFloatStateOf(0f)
-        private set
+
+    private fun publishGen() { generationState = genMachine.state.value }
+
+    val generationStage: String get() = (generationState as? GenerationState.Running)?.stage ?: ""
+    val generationProgress: Float get() = (generationState as? GenerationState.Running)?.progress ?: 0f
+
+    /** True while a generation runs. */
+    val generating: Boolean get() = generationState is GenerationState.Running
+
+    /** Generation and the speed test exclude each other; the UI disables the other action while one runs. */
+    val canGenerate: Boolean get() = !benchmarking && !generating
+    val canBenchmark: Boolean get() = !benchmarking && !generating
 
     /** Seconds since the current generation stage began (ticks while generating). */
     private var stageElapsedSec by mutableIntStateOf(0)
@@ -180,40 +220,57 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun aiModelName(): String =
         (lineArtModel?.specName ?: (ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE).name)
 
-    private fun onStage(stage: String, fraction: Float) {
-        if (stage != generationStage) {
+    /** Progress callback of run [id]; a superseded/reset run is stopped instead of overwriting the new run's state. */
+    private fun onStage(id: Long, stage: String, fraction: Float) {
+        val prev = generationStage
+        if (!genMachine.stage(id, stage, fraction)) throw CancellationException("generation superseded")
+        if (stage != prev) {
             val now = android.os.SystemClock.elapsedRealtime()
             stageStartMs = now
             stageElapsedSec = 0
             MlLog.i("stage \"$stage\" at ${now - genStartMs} ms (progress ${(fraction * 100).toInt()}%)")
         }
-        generationStage = stage
-        generationProgress = fraction
+        publishGen()
     }
 
+    // Per-run built-in fallback model + why it was needed (never touches the user's selected model).
+    private var runFallback: OnnxLineArtModel? = null
+    private var runFellBackTo: String? = null
+    private var runFallbackReason: String? = null
+
     /**
-     * Wraps the live model: if it throws (session failure, timeout, OOM-ish error), switch to the bundled
-     * informative model, toast the reason, and finish the run with it instead of hanging.
+     * Wraps the live model. A genuine model failure (session failure, timeout, OOM-ish error) finishes THIS run with
+     * the bundled informative model and a toast; the user's selected model is left alone. "Engine busy" is not a
+     * model failure: it is waited out and, if it persists, the run is aborted without any fallback.
      */
-    private fun withFallback(primary: OnnxLineArtModel): LineArtModel = LineArtModel { argb, w, h ->
-        try {
-            primary.infer(argb, w, h)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (t: Throwable) {
-            if (primary.specId == ModelSpecs.DEFAULT_ID) throw t
-            val why = (t.message ?: t.javaClass.simpleName).take(120)
-            MlLog.w("model ${primary.specId} failed, falling back to informative", t)
-            viewModelScope.launch(Dispatchers.Main) {
-                toast("${primary.specName} model failed ($why). Using the built-in model instead.")
-            }
-            val fb = OnnxLineArtModel(app, ModelSpecs.INFORMATIVE, null, longSide = primary.longSide)
-            val old = lineArtModel
-            lineArtModel = fb
-            selectedLineModelId = ModelSpecs.DEFAULT_ID
-            closeInBackground(old)
-            fb.infer(argb, w, h)
-        }
+    private fun withFallback(primary: OnnxLineArtModel, run: Long): LineArtModel = LineArtModel { argb, w, h ->
+        inferWithPolicy(
+            primary = { primary.infer(argb, w, h) },
+            fallback = { t ->
+                if (primary.specId == ModelSpecs.DEFAULT_ID) throw t
+                val why = (t.message ?: t.javaClass.simpleName).take(120)
+                MlLog.w("model ${primary.specId} failed, falling back to informative for this run", t)
+                viewModelScope.launch(Dispatchers.Main) {
+                    toast("${primary.specName} model failed ($why). Using the built-in model for this drawing.")
+                }
+                val fb = runFallback ?: OnnxLineArtModel(app, ModelSpecs.INFORMATIVE, null, longSide = primary.longSide)
+                    .also { runFallback = it }
+                runFellBackTo = ModelSpecs.DEFAULT_ID
+                runFallbackReason = why
+                inferWithPolicy(
+                    primary = { fb.infer(argb, w, h) },
+                    fallback = { e -> throw e },
+                    isCancelled = { !genMachine.isCurrent(run) },
+                )
+            },
+            isCancelled = { !genMachine.isCurrent(run) },
+        )
+    }
+
+    /** Asks every engine instance of the current run to stop (ORT run terminate); safe from any thread. */
+    private fun cancelEngineRuns() {
+        lineArtModel?.cancelRun()
+        runFallback?.cancelRun()
     }
 
     // ------------------------------------------------------------------ line-art models / processing
@@ -230,10 +287,23 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     )
         private set
 
-    // Bundled models are available at once; downloaded ones are checked on IO (file access) after start.
-    private var installedModelIds by mutableStateOf(models.list().filter { it.isBundled }.map { it.id }.toSet())
-    private var downloadProgress by mutableStateOf<Map<String, Float>>(emptyMap())
+    // Per-model install state, updated atomically. Bundled models are Installed at once; downloaded ones are
+    // scanned on IO after start. modelStateUi mirrors the flow for Compose.
+    private val modelStates = MutableStateFlow<Map<String, ModelState>>(
+        models.list().associate { it.id to (if (it.isBundled) ModelState.Installed else ModelState.NotInstalled) },
+    )
+    private var modelStateUi by mutableStateOf(modelStates.value)
+    private val installedModelIds: Set<String>
+        get() = modelStates.value.filterValues { it == ModelState.Installed }.keys
     private val downloadJobs = HashMap<String, Job>()
+
+    // Applied once no generation/benchmark is running (never hot-swap a model mid-run).
+    private var pendingSelectId: String? = null
+    private val retiredModels = ArrayList<OnnxLineArtModel>()
+
+    init {
+        viewModelScope.launch { modelStates.collect { modelStateUi = it } }
+    }
 
     /** Rows for the style picker's model cards. */
     val lineModels: List<LineModelUi>
@@ -254,8 +324,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     s.id == "anime" -> "Large download"
                     else -> "Download"
                 },
-                installed = s.id in installedModelIds,
-                downloading = downloadProgress[s.id],
+                installed = modelStateUi[s.id] == ModelState.Installed,
+                downloading = (modelStateUi[s.id] as? ModelState.Downloading)?.progress,
                 recommended = s.id == ModelSpecs.DEFAULT_ID,
             )
         }
@@ -271,17 +341,18 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun refreshInstalledModels() {
         viewModelScope.launch(Dispatchers.IO) {
+            val all = models.list().map { it.id }
             val ids = models.list().filter { models.isAvailable(it.id) }.map { it.id }.toSet()
             withContext(Dispatchers.Main) {
-                installedModelIds = ids
+                modelStates.update { ModelStates.scanned(it, ids, all) }
                 // The persisted pick may have been deleted externally: never leave a missing model selected.
-                if (selectedLineModelId !in ids) selectedLineModelId = ModelSpecs.DEFAULT_ID
+                if (selectedLineModelId !in ids) selectLineModelNow(ModelSpecs.DEFAULT_ID)
             }
         }
     }
 
     private fun closeInBackground(m: OnnxLineArtModel?) {
-        // close() waits for a running inference; never block the main thread on it.
+        // close() is terminal and bounded (waits <= 10 s, then trips the breaker); never block the main thread on it.
         if (m != null) Thread({ try { m.close() } catch (e: Throwable) { android.util.Log.w("SketcherModel", "close failed", e) } }, "model-close").start()
     }
 
@@ -291,48 +362,83 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         return OnnxLineArtModel(app, useSpec, models.file(useSpec.id), longSide = OnnxLineArtModel.DEFAULT_LONG_SIDE)
     }
 
-    private fun model(): OnnxLineArtModel =
-        lineArtModel ?: buildModel().also { lineArtModel = it }
+    private fun model(): OnnxLineArtModel {
+        val cur = lineArtModel
+        if (cur != null && !cur.isClosed) return cur
+        return buildModel().also { lineArtModel = it }
+    }
 
-    /** Switches the line model (only if installed); the old instance is closed off the main thread. */
-    fun selectLineModel(id: String) {
-        if (id == selectedLineModelId || id !in installedModelIds) return
+    /** True while a run owns the engine; models must not be swapped/closed then. */
+    private val engineBusy: Boolean get() = generating || benchmarking
+
+    /** Closes models retired during a run and applies a selection deferred by a finished download. */
+    private fun flushDeferred() {
+        if (engineBusy) return
+        if (retiredModels.isNotEmpty()) {
+            val l = retiredModels.toList()
+            retiredModels.clear()
+            l.forEach { closeInBackground(it) }
+        }
+        pendingSelectId?.let { id -> pendingSelectId = null; selectLineModelNow(id) }
+    }
+
+    /** Switches the line model (only if installed). A model in use by a running generation is closed after it. */
+    fun selectLineModel(id: String) = selectLineModelNow(id)
+
+    private fun selectLineModelNow(id: String) {
+        if (id == selectedLineModelId || modelStates.value[id] != ModelState.Installed) return
         mlPrefs.edit().putString(KEY_MODEL_ID, id).apply()
         selectedLineModelId = id
         val old = lineArtModel
         lineArtModel = null
-        closeInBackground(old)
+        if (old != null) { if (engineBusy) retiredModels.add(old) else closeInBackground(old) }
     }
 
     fun downloadLineModel(id: String) {
         val spec = models.spec(id) ?: return
-        if (spec.isBundled || id in installedModelIds || downloadJobs.containsKey(id)) return
-        downloadProgress = downloadProgress + (id to 0f)
+        val cur = modelStates.value[id]
+        if (spec.isBundled || cur == ModelState.Installed || cur is ModelState.Downloading || downloadJobs.containsKey(id)) return
+        modelStates.update { ModelStates.beginDownload(it, id) }
         downloadJobs[id] = viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    models.download(
-                        id,
-                        onProgress = { done, total ->
-                            val f = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
-                            downloadProgress = downloadProgress + (id to f)
-                        },
-                        shouldCancel = { !isActive },
-                    )
+                    val closer = AtomicReference<(() -> Unit)?>(null)
+                    val finished = AtomicBoolean(false)
+                    // A blocked socket read ignores shouldCancel: close the connection on cancellation instead.
+                    val watcher = launch {
+                        try { awaitCancellation() } finally { if (!finished.get()) closer.get()?.invoke() }
+                    }
+                    try {
+                        models.download(
+                            id,
+                            onProgress = { done, total ->
+                                val f = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
+                                modelStates.update { ModelStates.progress(it, id, f) }
+                            },
+                            shouldCancel = { !isActive },
+                            onOpen = { closer.set(it) },
+                        )
+                    } finally {
+                        finished.set(true)
+                        watcher.cancel()
+                    }
                 }
-                installedModelIds = installedModelIds + id
-                selectLineModel(id)
+                modelStates.update { ModelStates.installed(it, id) }
+                // Never swap models under a running generation: apply afterwards.
+                if (engineBusy) pendingSelectId = id else selectLineModelNow(id)
                 toast("${spec.name} model ready")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: InterruptedIOException) {
                 // cancelled
             } catch (e: IOException) {
+                modelStates.update { ModelStates.failed(it, id, e.message ?: "download failed") }
                 toast("Download failed: ${e.message}")
             } catch (t: Throwable) {
+                modelStates.update { ModelStates.failed(it, id, t.message ?: "download failed") }
                 toast("Download failed: ${t.message}")
             } finally {
-                downloadProgress = downloadProgress - id
+                modelStates.update { ModelStates.cancelled(it, id) } // no-op unless still "Downloading"
                 downloadJobs.remove(id)
             }
         }
@@ -443,11 +549,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (generating) { toast("Wait for the current drawing to finish"); return }
         benchmarking = true
         val withNnapi = mlPrefs.getBoolean(KEY_NNAPI_ACK, false) && isNnapiId(selectedAccel)
-        viewModelScope.launch {
+        benchJob = viewModelScope.launch {
             try {
                 val res = withContext(Dispatchers.Default) {
                     val m = OnnxLineArtModel(app, ModelSpecs.INFORMATIVE, null)
-                    try { m.benchmark(includeNnapi = withNnapi) } finally { m.close() }
+                    val token = m.beginRun()
+                    val watcher = launch { try { awaitCancellation() } finally { m.cancelRun(token) } }
+                    try { m.benchmark(includeNnapi = withNnapi) } finally { watcher.cancel(); m.close() }
                 }
                 benchmarkResults = Accel.values().filter { it in res }.associate { accelId(it) to res[it] }
                 if (selectedAccel == "auto") applyAccelInBackground()
@@ -457,30 +565,28 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 toast("Speed test failed: ${t.message}")
             } finally {
                 benchmarking = false
+                flushDeferred()
             }
         }
     }
 
+    private var benchJob: Job? = null
+
     override fun onCleared() {
-        // Best-effort final save: snapshot now (main thread), write on a scope that outlives viewModelScope.
-        if (dirty && shouldSave()) {
-            val id = currentProjectId
-            val name = projectName
-            val snap = project.toSnapshot(anim.durationSec)
-            val bg = project.background
-            dirty = false
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                try {
-                    saveMutex.withLock { repo.save(id, name, snap, bg) }
-                } catch (t: Throwable) {
-                    android.util.Log.w("SketcherSave", "final save failed", t)
-                }
-            }
-        }
+        // Final save: snapshot now (main thread); the session's own scope outlives viewModelScope and drains its queue.
+        debounceJob?.cancel()
+        submitSave("cleared")
+        session.close()
         generateJob?.cancel()
+        benchJob?.cancel()
+        cancelEngineRuns()
         val m = lineArtModel
         lineArtModel = null
         closeInBackground(m)
+        closeInBackground(runFallback)
+        runFallback = null
+        retiredModels.forEach { closeInBackground(it) }
+        retiredModels.clear()
         super.onCleared()
     }
 
@@ -505,9 +611,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             shading = sh ?: pipelineSettings.shading,
         )
     }
-    var generating by mutableStateOf(false)
-        private set
-
     var tool by mutableStateOf(Tool.BRUSH)
     var brushColor by mutableIntStateOf(0xFF000000.toInt())
     var brushSize by mutableFloatStateOf(4f)
@@ -551,46 +654,112 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Bumped each time generation completes successfully. */
     var generationCount by mutableIntStateOf(0)
         private set
-    var pendingShowLayers by mutableStateOf(false)
-    var pendingAutoExport by mutableStateOf(false)
-    private var pendingAutoVideo = false
 
-    /** Set when a NEW photo was imported: the editor opens the style sheet, then clears it. */
-    var styleSheetRequest by mutableStateOf(false)
+    /**
+     * One-shot UI events (open style sheet, CI auto-actions). Each carries the project session it belongs to;
+     * the channel is drained on every project reset so a stale event can never fire on a later project.
+     */
+    private val editorEventChannel = Channel<EditorEvent>(Channel.BUFFERED)
+    val editorEvents: Flow<EditorEvent> = editorEventChannel.receiveAsFlow()
+
+    /** Id of the current project session (bumped on every reset / project switch). */
+    val sessionId: Int get() = projectGen
+
+    /** CI actions armed for the NEXT project (taken synchronously by runDemo) or the current one. */
+    private var armedActions: Set<EditorAutoAction> = emptySet()
+
+    /** CI actions waiting for generation to finish in the current session; cleared by [resetProject]. */
+    private var sessionActions: Set<EditorAutoAction> = emptySet()
+
+    private fun emitEditorEvent(e: EditorEvent) { editorEventChannel.trySend(e) }
+
+    private fun drainEditorEvents() {
+        while (editorEventChannel.tryReceive().isSuccess) { /* drop */ }
+    }
+
+    private fun fireSessionActions() {
+        val acts = sessionActions
+        sessionActions = emptySet()
+        val sid = projectGen
+        if (EditorAutoAction.SHOW_LAYERS in acts) emitEditorEvent(EditorEvent.ShowLayers(sid))
+        if (EditorAutoAction.AUTO_EXPORT in acts) emitEditorEvent(EditorEvent.AutoExport(sid))
+        if (EditorAutoAction.AUTO_VIDEO in acts) emitEditorEvent(EditorEvent.AutoVideo(sid))
+    }
+
+    /**
+     * Automation intents (CI) must not wipe a project the user is editing: accepted only when nothing
+     * unsaved is open, or when the intent carries a debug [label].
+     */
+    fun acceptsAutomation(label: String?): Boolean = label != null || !(hasProject && dirty)
 
     /** Small preview of the imported photo for the style sheet; computed once per source. */
     var sourceThumbnail by mutableStateOf<ImageBitmap?>(null)
         private set
 
-    /** Last successful export (shown in the progress dialog once [exportDone]). */
-    var lastSaved by mutableStateOf<SavedExport?>(null)
-        private set
-    var exportDone by mutableStateOf(false)
+    /** Export lifecycle (see [ExportState]). Only Running (or [generating]) blocks a new export. */
+    var exportState by mutableStateOf<ExportState>(ExportState.Idle)
         private set
 
-    /** Closes the export progress/result dialog. */
-    fun dismissExport() {
-        exportLabel = null
-        exportDone = false
-        lastSaved = null
-    }
+    /** Non-null = exporting is currently not possible, with the reason to show in the UI. */
+    val exportBlockedReason: String?
+        get() = exportState.blockedReason(generating)
+
+    /** Result text/uri for the result dialog: one honest line per file; uri only of the last successful file. */
+    val lastSaved: SavedExport?
+        get() = when (val st = exportState) {
+            is ExportState.Done -> {
+                val ok = st.results.lastOrNull { it.ok }
+                val mime = when (ok?.kind) {
+                    ExportKind.VIDEO -> "video/mp4"
+                    ExportKind.GIF -> "image/gif"
+                    else -> mimeFor(ok?.path ?: "x.png")
+                }
+                SavedExport(st.summary(), ok?.uri?.let { Uri.parse(it) }, mime)
+            }
+            is ExportState.Failed -> SavedExport(st.reason, null, "image/*")
+            else -> null
+        }
+
+    val exportDone: Boolean
+        get() = exportState.let { it is ExportState.Done || it is ExportState.Failed }
+
+    /** Dialog title: honest about partial failure. */
+    val exportTitle: String?
+        get() = when (val st = exportState) {
+            is ExportState.Done -> if (st.allOk) null else if (st.anyOk) "Export partly failed" else "Export failed"
+            is ExportState.Failed -> "Export failed"
+            else -> null
+        }
 
     /** Non-null while an export runs or its result is shown (shown in a progress dialog). */
-    var exportLabel by mutableStateOf<String?>(null)
-        private set
-    var exportProgress by mutableFloatStateOf(0f)
-        private set
+    val exportLabel: String?
+        get() = when (val st = exportState) {
+            ExportState.Idle -> null
+            is ExportState.Running -> st.label
+            is ExportState.Done -> "Export finished"
+            is ExportState.Failed -> st.reason
+        }
+
+    val exportProgress: Float
+        get() = (exportState as? ExportState.Running)?.progress ?: if (exportDone) 1f else 0f
+
+    /** Closes the export result dialog (never interrupts a running export). */
+    fun dismissExport() {
+        if (exportState !is ExportState.Running) exportState = ExportState.Idle
+    }
+
     private var exportJob: Job? = null
 
     private var sourceBitmap: Bitmap? = null
     private val undoStack = ArrayList<EditAction>()
     private val redoStack = ArrayList<EditAction>()
 
-    // live stroke state
-    private var liveLayer: Layer? = null
-    private var livePoints = FloatArray(256)
-    private var liveCount = 0
-    private var erased = ArrayList<Pair<Int, Stroke>>()
+    // live stroke state (frozen per gesture in the session)
+    private var liveSession: StrokeSession? = null
+
+    /** Bumped whenever a project is opened/reset so the canvas resets zoom and pan. */
+    var projectEpoch by mutableIntStateOf(0)
+        private set
 
     init {
         val layer = project.newLayer("Layer 1")
@@ -600,10 +769,11 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ projects / autosave
 
     private val repo = ProjectRepository(app)
-    private val saveMutex = Mutex()
 
-    var currentProjectId: String? = null
-        private set
+    /** Single writer for the open project (id allocation, ordering, retry, tombstones); see ProjectSession. */
+    private val session = ProjectSession(repo, CoroutineScope(SupervisorJob() + Dispatchers.IO), DEFAULT_PROJECT_NAME)
+
+    val currentProjectId: String? get() = session.projectId
 
     var projectName by mutableStateOf(DEFAULT_PROJECT_NAME)
         private set
@@ -611,6 +781,26 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var recentProjects by mutableStateOf<List<RecentProjectUi>>(emptyList())
         private set
 
+    /** Empty / Loading / Ready / Failed: the editor must show a loading indicator and block input while Loading. */
+    var projectLoad by mutableStateOf(ProjectLoad.Empty)
+        private set
+
+    /** Non-null while autosave keeps failing (retried in the background every few seconds). */
+    var saveError by mutableStateOf<String?>(null)
+        private set
+
+    init {
+        viewModelScope.launch { session.load.collect { projectLoad = it } }
+        viewModelScope.launch {
+            session.saveError.collectLatest { e ->
+                saveError = e?.let { it.message ?: it.javaClass.simpleName }
+                if (e != null) {
+                    delay(SAVE_RETRY_MS)
+                    session.flush()
+                }
+            }
+        }
+    }
 
     private var dirty = false
     private var debounceJob: Job? = null
@@ -622,6 +812,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Cheap hash of layer structure/properties (not strokes, not selection). Reads Compose state. */
     private fun layerFingerprint(): Int {
         var h = project.layers.size
+        h = 31 * h + anim.durationSec.hashCode() // animation length is project content too
         for (l in project.layers) {
             h = 31 * h + l.id.hashCode()
             h = 31 * h + l.name.hashCode()
@@ -644,58 +835,57 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // A project with only an imported photo (no strokes yet) is still worth keeping.
     private fun shouldSave(): Boolean =
-        currentProjectId != null || project.layers.any { it.strokes.isNotEmpty() }
+        session.projectId != null || project.background != null || project.layers.any { it.strokes.isNotEmpty() }
 
-    /** Call after any content mutation: saves 2 s after the last call. */
+    /** Call after any content mutation: saves 2 s after the last call. Ignored while a project is loading. */
     fun markDirty() {
+        if (projectLoad == ProjectLoad.Loading) return
         dirty = true
         debounceJob?.cancel()
         debounceJob = viewModelScope.launch {
             delay(AUTOSAVE_DELAY_MS)
-            // Launched on viewModelScope (not as a child) so a later markDirty cannot cancel a running write.
-            viewModelScope.launch { saveNow() }
+            submitSave("autosave") // no suspension inside, so a later markDirty cannot cancel half a save
         }
     }
 
-    private suspend fun saveNow() {
+    /** Takes the snapshot now (main thread) and queues it on the session; the write happens in order, off-thread. */
+    private fun submitSave(reason: String) {
         if (!dirty) return
+        if (session.load.value == ProjectLoad.Loading) return
         if (!shouldSave()) {
             dirty = false
             return
         }
         dirty = false
-        val gen = projectGen
-        val startId = currentProjectId
-        val name = projectName
-        val snap = project.toSnapshot(anim.durationSec) // main thread: reads Compose state
-        val bg = project.background
-        try {
-            val pid = withContext(NonCancellable) {
-                saveMutex.withLock {
-                    val id = if (gen == projectGen) currentProjectId else startId
-                    repo.save(id, name, snap, bg)
-                }
-            }
-            if (gen == projectGen && currentProjectId == null) currentProjectId = pid
-        } catch (t: Throwable) {
-            dirty = true
-            android.util.Log.w("SketcherSave", "autosave failed", t)
-        }
+        session.setName(projectName)
+        session.requestSave(project.toSnapshot(anim.durationSec), project.background, reason)
+    }
+
+    /** Persists right now (used for a freshly imported photo, which has no strokes to trigger autosave). */
+    private fun persistNow(reason: String) {
+        dirty = true
+        debounceJob?.cancel()
+        submitSave(reason)
     }
 
     /** Saves pending changes immediately, then reloads the recent list (used when leaving the editor). */
     fun saveAndRefresh() {
         debounceJob?.cancel()
-        viewModelScope.launch {
-            saveNow()
-            refreshRecent()
-        }
+        submitSave("leave")
+        refreshRecent()
     }
 
+    private var recentGen = 0
+
+    /** Reloads the recent list after every queued write; a newer refresh makes an older one's result get dropped. */
     fun refreshRecent() {
+        val gen = ++recentGen
         viewModelScope.launch {
-            recentProjects = withContext(Dispatchers.IO) { repo.list().map { it.toUi() } }
+            session.flush(retryFailed = false)
+            val list = withContext(Dispatchers.IO) { repo.list().map { it.toUi() } }
+            if (gen == recentGen) recentProjects = list
         }
     }
 
@@ -728,17 +918,21 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun openProject(id: String) {
+        debounceJob?.cancel()
+        submitSave("open") // queue the open project's edits first; the id is captured, so order on disk is safe
+        val token = session.beginLoad() // editing is blocked until Ready; a newer open/reset makes this one stale
         viewModelScope.launch {
-            debounceJob?.cancel()
-            saveNow() // flush the project currently open
+            if (!session.flush()) toast("Could not save the previous project yet; will keep retrying")
             val loaded = repo.load(id)
+            val name = if (loaded != null) repo.list().firstOrNull { it.id == id }?.name ?: DEFAULT_PROJECT_NAME else null
+            if (!session.isCurrentLoad(token)) return@launch // stale: something newer won
             if (loaded == null) {
+                session.failLoad(token)
                 toast("Could not open that project")
                 refreshRecent()
                 return@launch
             }
-            val name = repo.list().firstOrNull { it.id == id }?.name ?: DEFAULT_PROJECT_NAME
-            resetProject()
+            resetProject(keepLoad = true)
             val snap = loaded.snapshot
             project.applySnapshot(snap)
             if (project.layers.isEmpty()) project.layers.add(project.newLayer("Layer 1"))
@@ -750,7 +944,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             if (snap.animationSeconds > 0f) anim.durationSec = snap.animationSeconds
             hasProject = true
             styleSheetRequest = false
-            currentProjectId = id
+            session.completeLoad(token, id, name!!)
             projectName = name
             dirty = false
             lastFingerprint = layerFingerprint()
@@ -759,13 +953,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteProject(id: String) {
+        if (id == session.projectId) {
+            debounceJob?.cancel()
+            dirty = false
+        }
+        val done = session.delete(id) // tombstoned immediately; queued saves of it are discarded
         viewModelScope.launch {
-            if (id == currentProjectId) {
-                debounceJob?.cancel()
-                dirty = false
-                currentProjectId = null
-            }
-            withContext(NonCancellable) { saveMutex.withLock { repo.delete(id) } }
+            done.await()
             refreshRecent()
         }
     }
@@ -774,12 +968,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val n = name.trim().take(80)
         if (n.isEmpty()) return
         projectName = n
-        val id = currentProjectId
+        session.setName(n)
+        val id = session.projectId
         if (id == null) {
             markDirty()
         } else {
+            val done = session.rename(id, n)
             viewModelScope.launch {
-                withContext(NonCancellable) { saveMutex.withLock { repo.rename(id, n) } }
+                done.await()
                 refreshRecent()
             }
         }
@@ -797,6 +993,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             poseMode = true
             pipelineSettings = pipelineSettings.copy(
                 lineSource = LineSource.AUTO,
+                colourFill = false,
                 shading = ShadingLevel.NONE,
                 detail = 0.45f,
                 ignoreBackground = true,
@@ -827,14 +1024,18 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     fun renameProjectById(id: String, name: String) {
         val n = name.trim().take(80)
         if (n.isEmpty()) return
-        if (id == currentProjectId) projectName = n
+        if (id == session.projectId) projectName = n
+        val done = session.rename(id, n)
         viewModelScope.launch {
-            withContext(NonCancellable) { saveMutex.withLock { repo.rename(id, n) } }
+            done.await()
             refreshRecent()
         }
     }
 
-    fun loadImage(uri: Uri) {
+    /** [pose] is part of the request: pose mode is applied now and reset by every other load/open. */
+    fun loadImage(uri: Uri, pose: Boolean = false) {
+        setPoseMode(pose)
+        val armed = takeArmedActions()
         viewModelScope.launch {
             val picked = withContext(Dispatchers.IO) { displayNameOf(uri) }
             val bmp = withContext(Dispatchers.IO) {
@@ -848,19 +1049,23 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             if (bmp == null) {
                 toast("Could not open that image")
+                if (pose) setPoseMode(false)
                 return@launch
             }
             flushPendingSave()
             resetProject()
+            sessionActions = armed
             projectName = picked ?: autoName(if (poseMode) "Pose" else "Sketch")
             setSource(bmp)
             model().warmUp()
-            styleSheetRequest = true
+            emitEditorEvent(EditorEvent.OpenStyle(projectGen))
         }
     }
 
     /** Loads an asset (default assets/demo.png) and generates + animates it like an imported photo. */
     fun runDemo(asset: String = "demo.png") {
+        setPoseMode(false)
+        val armed = takeArmedActions()
         viewModelScope.launch {
             val bmp = withContext(Dispatchers.IO) {
                 try {
@@ -877,6 +1082,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             flushPendingSave()
             resetProject()
+            sessionActions = armed
             projectName = if (recentProjects.none { it.name == "Demo" }) "Demo" else autoName("Demo")
             setSource(bmp)
             model().warmUp()
@@ -886,13 +1092,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Starts an empty project (no photo, one blank layer). */
     fun newProject() {
+        setPoseMode(false)
         viewModelScope.launch {
             flushPendingSave()
             resetProject()
             sourceBitmap = null
             sourceThumbnail = null
             hasProject = false
-            styleSheetRequest = false
             project.background = null
             project.width = 1024
             project.height = 1024
@@ -903,7 +1109,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Saves unsaved edits of the open project before it is replaced (cancels the debounce first). */
     private suspend fun flushPendingSave() {
         debounceJob?.cancel()
-        saveNow()
+        submitSave("switch")
+        if (!session.flush()) toast("Could not save the previous project yet; will keep retrying")
         refreshRecent()
     }
 
@@ -924,9 +1131,16 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         label: String? = null,
     ) {
         if (label != null) DebugDump.runLabel = label
-        if (autoVideo) pendingAutoVideo = true
-        if (showLayers) pendingShowLayers = true
-        if (autoExport) pendingAutoExport = true
+        armedActions = buildSet {
+            if (autoVideo) add(EditorAutoAction.AUTO_VIDEO)
+            if (showLayers) add(EditorAutoAction.SHOW_LAYERS)
+            if (autoExport) add(EditorAutoAction.AUTO_EXPORT)
+        }
+        if (!autodemo && armedActions.isNotEmpty()) {
+            // No new project is coming: the actions belong to the project that is open now.
+            sessionActions = sessionActions + takeArmedActions()
+            if (hasProject && !generating) fireSessionActions()
+        }
         when (mode?.lowercase()) {
             "outline" -> settings = settings.copy(mode = DrawMode.OUTLINE)
             "shading" -> settings = settings.copy(mode = DrawMode.OUTLINE_SHADING)
@@ -952,11 +1166,11 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val spec = model?.lowercase()?.let { models.spec(it) }
                 if (spec != null) {
                     val ok = withContext(Dispatchers.IO) { models.isAvailable(spec.id) }
-                    if (ok) installedModelIds = installedModelIds + spec.id
+                    if (ok) modelStates.update { ModelStates.installed(it, spec.id) }
                     else {
                         downloadLineModel(spec.id)
                         var waited = 0
-                        while (spec.id !in installedModelIds && waited < 85_000) { delay(500); waited += 500 }
+                        while (spec.id !in installedModelIds && modelStates.value[spec.id] !is ModelState.Failed && waited < 85_000) { delay(500); waited += 500 }
                     }
                     selectLineModel(spec.id)
                 }
@@ -970,17 +1184,24 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun resetProject() {
+    private fun takeArmedActions(): Set<EditorAutoAction> = armedActions.also { armedActions = emptySet() }
+
+    private fun resetProject(keepLoad: Boolean = false) {
         debounceJob?.cancel()
         dirty = false
         projectGen++
+        projectEpoch++
+        liveSession = null
+        sessionActions = emptySet()
+        drainEditorEvents()
         // Drop any running generation: its result belongs to the project being replaced.
+        // The job is kept so the next generate() can join it (and wait for the engine) before starting.
         generateJob?.cancel()
-        generateJob = null
-        generating = false
-        generationStage = ""
-        generationProgress = 0f
-        currentProjectId = null
+        cancelEngineRuns()
+        genMachine.reset()
+        publishGen()
+        generationCount = 0
+        if (!keepLoad) session.reset() // new project: id allocated on its first save; cancels any pending load
         projectName = DEFAULT_PROJECT_NAME
         project.layers.clear()
         project.layers.add(project.newLayer("Layer 1"))
@@ -1015,6 +1236,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.background = bmp
         project.backgroundVisible = true
         project.backgroundOpacity = 1f
+        persistNow("import")
     }
 
     fun generate() {
@@ -1023,45 +1245,75 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             toast("Import a photo first")
             return
         }
-        if (generating) return
-        generating = true
+        if (benchmarking) {
+            toast("Wait for the speed test to finish")
+            return
+        }
         anim.showFinished()
         val genStart = android.os.SystemClock.elapsedRealtime()
         val gen = projectGen
+        val prev = generateJob
+        // Supersede any running generation at once: its callbacks carry the old id and are dropped from here on.
+        val run = genMachine.begin(genStart)
+        publishGen()
+        cancelEngineRuns()
+        prev?.cancel()
         generateJob = viewModelScope.launch {
+            var token = 0L
+            var success = false
             try {
+                // One generation at a time: wait for the previous one (and its model) to let go of the engine.
+                if (prev != null && withTimeoutOrNull(PREV_JOIN_MS) { prev.join() } == null) {
+                    MlLog.w("previous generation did not stop in time: resetting the AI engine")
+                    OnnxLineArtModel.tripBreaker()
+                }
+                if (!genMachine.isCurrent(run)) return@launch
+                closeInBackground(runFallback)
+                runFallback = null
+                runFellBackTo = null
+                runFallbackReason = null
+                flushDeferred()
+                val released = withContext(Dispatchers.Default) { OnnxLineArtModel.awaitRelease(ENGINE_RELEASE_WAIT_MS) }
+                if (!released) {
+                    MlLog.w("engine still held after previous run: resetting it")
+                    OnnxLineArtModel.tripBreaker()
+                }
                 val ps = pipelineSettings
                 val m = model()
+                token = m.beginRun()
                 m.detail = ps.detail
                 m.longSide = SketchPipeline.modelSide(ps.detail)
                 genStartMs = genStart
                 stageStartMs = genStart
                 stageElapsedSec = 0
-                generationStage = "Starting"
-                generationProgress = 0f
-                MlLog.i("generate begin model=${selectedLineModelId} accel=$selectedAccel src=${bmp.width}x${bmp.height}")
+                MlLog.i("generate begin run=$run model=${selectedLineModelId} accel=$selectedAccel src=${bmp.width}x${bmp.height}")
                 val ticker = launch {
                     while (true) {
                         kotlinx.coroutines.delay(1000)
                         stageElapsedSec = ((android.os.SystemClock.elapsedRealtime() - stageStartMs) / 1000).toInt()
                     }
                 }
+                // Cancelling this coroutine must stop the blocking ONNX run too, not just abandon the Job.
+                val stopper = launch {
+                    try { awaitCancellation() } finally { if (!success) { m.cancelRun(token); runFallback?.cancelRun() } }
+                }
                 val (drawing, scaledBg) = try { withContext(Dispatchers.Default) {
                     val w = bmp.width
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m)), ::onStage)
+                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) })
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {
                         null
                     }
                     d to bg
-                } } finally { ticker.cancel() }
-                if (gen != projectGen) return@launch // another project was opened meanwhile
+                } } finally { ticker.cancel(); stopper.cancel() }
+                if (gen != projectGen || !genMachine.isCurrent(run)) return@launch // superseded / another project
                 lastAppliedSettings = ps
                 refreshMlStatus()
+                runFallbackReason?.let { fallbackReason = it }
                 applyDrawing(drawing, scaledBg)
                 android.util.Log.i(
                     "SketcherGen",
@@ -1079,26 +1331,38 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     }
                 }
                 MlLog.i("generate done in ${android.os.SystemClock.elapsedRealtime() - genStart} ms source=${SketchPipeline.lastLineSource} timings=${SketchPipeline.lastTimings}")
+                success = true
+                genMachine.finish(run)
+                publishGen()
                 generationCount++
                 markDirty()
                 if (pendingAutoVideo) {
                     pendingAutoVideo = false
                     autoVideo()
                 }
+            } catch (e: GenerationAbort) {
+                // Engine busy / model closed: the run fails, the user's model selection is untouched.
+                MlLog.w("generate aborted: ${e.reason}")
+                pendingAutoVideo = false
+                if (genMachine.fail(run, e.reason, runFellBackTo)) { publishGen(); toast(e.reason) }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
                 android.util.Log.e("SketcherGen", "GEN_FAIL", t)
                 MlLog.w("generate failed", t)
-                toast(
-                    if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
-                    else "Generation failed: ${t.message}",
-                )
+                pendingAutoVideo = false // a failed run must not leave the auto-video request armed for the next one
+                val msg = if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
+                else "Generation failed: ${t.message}"
+                if (genMachine.fail(run, msg, runFellBackTo)) publishGen()
+                toast(msg)
             } finally {
-                if (gen == projectGen) {
-                    generating = false
-                    generationStage = ""
-                    generationProgress = 0f
+                // Cancelled while still the current run (project reset / teardown): go back to Idle.
+                if (gen == projectGen && genMachine.isCurrent(run)) genMachine.reset()
+                publishGen()
+                if (!generating) {
+                    closeInBackground(runFallback)
+                    runFallback = null
+                    flushDeferred()
                 }
             }
         }
@@ -1226,92 +1490,92 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ drawing
 
-    /** Returns true when the touch starts a stroke/erase on the selected layer. */
-    fun beginStroke(x: Float, y: Float): Boolean {
-        val layer = project.selectedLayer ?: return false
-        if (layer.locked || !layer.visible) return false
+    private fun layerById(id: Long): Layer? = project.layers.firstOrNull { it.id == id }
+
+    /**
+     * Starts a stroke/erase on the selected layer, freezing tool/brush/colour/size/alpha. Returns null (and toasts
+     * once) when the layer cannot take it (locked, hidden, pencil-texture + brush). Call once per gesture.
+     */
+    fun beginStroke(x: Float, y: Float): StrokeSession? {
+        liveSession?.let { cancelStroke(it) }
+        val layer = project.selectedLayer ?: return null
+        if (layer.locked || !layer.visible) {
+            toast(if (layer.locked) "This layer is locked" else "This layer is hidden")
+            return null
+        }
         if (anim.active) anim.showFinished()
+        var inkBefore: Bitmap? = null
         if (layer.inkTexture != null) {
             if (tool == Tool.BRUSH) {
                 toast("This is a pencil-texture layer - draw on another layer, or use the eraser")
-                return false
+                return null
             }
             inkBefore = layer.inkTexture?.copy(Bitmap.Config.ARGB_8888, true)
-            lastEraseX = Float.NaN
         }
-        liveLayer = layer
-        liveCount = 0
-        erased = ArrayList()
-        if (tool == Tool.BRUSH) addLivePoint(x, y) else eraseAt(x, y)
+        val session = StrokeSession(layer.id, tool, brushType, brushColor, brushSize, brushAlpha, inkBefore)
+        liveSession = session
+        if (session.tool == Tool.BRUSH) session.addPoint(x, y) else eraseAt(session, layer, x, y)
         liveTick++
-        return true
+        return session
     }
 
-    fun extendStroke(x: Float, y: Float) {
-        if (liveLayer == null) return
-        if (tool == Tool.BRUSH) addLivePoint(x, y) else eraseAt(x, y)
+    fun extendStroke(session: StrokeSession, x: Float, y: Float) {
+        if (session !== liveSession) return
+        if (session.tool == Tool.BRUSH) {
+            session.addPoint(x, y)
+        } else {
+            val layer = layerById(session.layerId) ?: return
+            eraseAt(session, layer, x, y)
+        }
         liveTick++
     }
 
-    /** [cancel] discards a brush stroke; erasing that already happened is kept. */
-    fun endStroke(cancel: Boolean) {
-        val layer = liveLayer ?: return
-        if (tool == Tool.BRUSH) {
-            if (!cancel && liveCount > 0) {
-                if (liveCount == 1) {
-                    // Tap: add a second point directly (bypasses the dedupe) so a dot is drawn.
-                    livePoints[2] = livePoints[0] + 0.01f
-                    livePoints[3] = livePoints[1]
-                    liveCount = 2
+    /** Commits the stroke to the layer it started on (looked up by id; dropped if that layer is gone). */
+    fun endStroke(session: StrokeSession) {
+        if (session !== liveSession) return
+        liveSession = null
+        val layer = layerById(session.layerId)
+        if (layer != null) {
+            if (session.tool == Tool.BRUSH) {
+                val stroke = session.toStroke()
+                if (stroke != null) {
+                    layer.strokes.add(stroke)
+                    pushUndo(AddStrokeAction(layer, stroke))
                 }
-                val stroke = Stroke(livePoints.copyOf(liveCount * 2), brushColor, brushSize, brushType, brushAlpha)
-                layer.strokes.add(stroke)
-                pushUndo(AddStrokeAction(layer, stroke))
+            } else if (layer.inkTexture != null) {
+                val before = session.inkBefore
+                val after = layer.inkTexture
+                if (before != null && after != null && session.inkErased) {
+                    pushUndo(InkEraseAction(layer, before, after.copy(Bitmap.Config.ARGB_8888, true)))
+                }
+            } else if (session.erased.isNotEmpty()) {
+                pushUndo(EraseAction(layer, session.erased))
             }
-        } else if (layer.inkTexture != null) {
-            val before = inkBefore
-            val after = layer.inkTexture
-            if (before != null && after != null && inkErased) pushUndo(InkEraseAction(layer, before, after.copy(Bitmap.Config.ARGB_8888, true)))
-            inkBefore = null
-            inkErased = false
-        } else if (erased.isNotEmpty()) {
-            pushUndo(EraseAction(layer, erased))
         }
-        liveLayer = null
-        liveCount = 0
-        erased = ArrayList()
+        liveTick++
+    }
+
+    /** Discards the stroke with no undo entry; an eraser's effects so far are reverted. Safe to call repeatedly. */
+    fun cancelStroke(session: StrokeSession) {
+        if (session !== liveSession) return
+        liveSession = null
+        val layer = layerById(session.layerId)
+        if (layer != null && session.tool == Tool.ERASER) {
+            if (layer.inkTexture != null) {
+                val before = session.inkBefore
+                if (before != null && session.inkErased) layer.inkTexture = before
+            } else if (session.erased.isNotEmpty()) {
+                EraseAction(layer, session.erased).undo()
+            }
+        }
         liveTick++
     }
 
     /** The brush stroke being drawn right now, if any. */
-    fun liveStroke(): Stroke? {
-        if (liveLayer == null || tool != Tool.BRUSH || liveCount == 0) return null
-        val pts = if (liveCount == 1) {
-            floatArrayOf(livePoints[0], livePoints[1], livePoints[0] + 0.01f, livePoints[1])
-        } else {
-            livePoints.copyOf(liveCount * 2)
-        }
-        return Stroke(pts, brushColor, brushSize, brushType, brushAlpha)
-    }
+    fun liveStroke(): Stroke? = liveSession?.liveStroke()
 
-    val liveLayerId: Long get() = liveLayer?.id ?: -1L
+    val liveLayerId: Long get() = liveSession?.layerId ?: -1L
 
-    private fun addLivePoint(x: Float, y: Float) {
-        if (liveCount > 0) {
-            val dx = x - livePoints[(liveCount - 1) * 2]
-            val dy = y - livePoints[(liveCount - 1) * 2 + 1]
-            if (dx * dx + dy * dy < 0.25f) return
-        }
-        if ((liveCount + 1) * 2 > livePoints.size) livePoints = livePoints.copyOf(livePoints.size * 2)
-        livePoints[liveCount * 2] = x
-        livePoints[liveCount * 2 + 1] = y
-        liveCount++
-    }
-
-    private var inkBefore: Bitmap? = null
-    private var inkErased = false
-    private var lastEraseX = Float.NaN
-    private var lastEraseY = 0f
     private val clearPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
         style = android.graphics.Paint.Style.STROKE
@@ -1319,30 +1583,29 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Eraser on a pencil-reveal layer: CLEAR along the path into the (mutable) ink texture. */
-    private fun eraseInk(layer: Layer, x: Float, y: Float) {
+    private fun eraseInk(session: StrokeSession, layer: Layer, x: Float, y: Float) {
         var tex = layer.inkTexture ?: return
         if (!tex.isMutable) {
             tex = tex.copy(Bitmap.Config.ARGB_8888, true)
             layer.inkTexture = tex
         }
-        val radius = max(brushSize * 1.5f, 6f)
+        val radius = max(session.size * 1.5f, 6f)
         clearPaint.strokeWidth = radius * 2f
         val c = android.graphics.Canvas(tex)
-        if (lastEraseX.isNaN()) c.drawPoint(x, y, clearPaint) else c.drawLine(lastEraseX, lastEraseY, x, y, clearPaint)
-        lastEraseX = x; lastEraseY = y
-        inkErased = true
+        if (session.lastEraseX.isNaN()) c.drawPoint(x, y, clearPaint) else c.drawLine(session.lastEraseX, session.lastEraseY, x, y, clearPaint)
+        session.lastEraseX = x; session.lastEraseY = y
+        session.inkErased = true
         layer.inkRev++
     }
 
-    private fun eraseAt(x: Float, y: Float) {
-        val layer = liveLayer ?: return
-        if (layer.inkTexture != null) { eraseInk(layer, x, y); return }
-        val radius = max(brushSize * 1.5f, 6f)
+    private fun eraseAt(session: StrokeSession, layer: Layer, x: Float, y: Float) {
+        if (layer.inkTexture != null) { eraseInk(session, layer, x, y); return }
+        val radius = max(session.size * 1.5f, 6f)
         var i = 0
         while (i < layer.strokes.size) {
             val s = layer.strokes[i]
             if (strokeNear(s, x, y, radius + s.width / 2f)) {
-                erased.add(i to s)
+                session.erased.add(i to s)
                 layer.strokes.removeAt(i)
             } else {
                 i++
@@ -1378,6 +1641,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun pushUndo(action: EditAction) {
         undoStack.add(action)
         redoStack.clear()
+        trimHistory()
         syncHistoryFlags()
         markDirty()
     }
@@ -1398,6 +1662,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         undoStack.add(a)
         syncHistoryFlags()
         markDirty()
+    }
+
+    /** Keeps at most [MAX_UNDO] entries and ~[MAX_HISTORY_BYTES] of bitmap snapshots, dropping the oldest. */
+    private fun trimHistory() {
+        var bytes = undoStack.sumOf { it.cost }
+        while (undoStack.size > 1 && (undoStack.size > MAX_UNDO || bytes > MAX_HISTORY_BYTES)) {
+            bytes -= undoStack.removeAt(0).cost
+        }
     }
 
     private fun clearHistory() {
@@ -1454,135 +1726,152 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun finishExport(saved: SavedExport) {
-        lastSaved = saved
-        exportProgress = 1f
-        exportDone = true
+    /** One image to render and save. [scale]: 1/2/4 or [Exporter.SCALE_ORIGINAL]. */
+    private class ImageJob(
+        val layers: List<Layer>,
+        val w: Int,
+        val h: Int,
+        val scale: Int,
+        val fmt: ExportFormat,
+        val transparent: Boolean,
+        val ignoreState: Boolean,
+        val name: String,
+        val origW: Int,
+        val origH: Int,
+    )
+
+    private fun setRunning(progress: Float? = null, label: String? = null) {
+        val st = exportState as? ExportState.Running ?: return
+        exportState = st.copy(progress = progress ?: st.progress, label = label ?: st.label)
     }
 
-    private fun exportSnapshot(layers: List<Layer>, w: Int, h: Int, scale: Int, fmt: ExportFormat, transparent: Boolean, ignoreState: Boolean, name: String) {
-        if (exportJob?.isActive == true) return
-        exportDone = false
-        lastSaved = null
-        exportProgress = 0f
-        exportLabel = "Saving image..."
+    /**
+     * Starts an export on a background coroutine. Refuses (with a toast) while generating or while another
+     * export runs; otherwise it explicitly replaces any previous Done/Failed state. [work] returns one result
+     * per file; a thrown CancellationException means the user cancelled (exporters delete their pending file).
+     */
+    private fun startExport(kind: ExportKind, label: String, work: suspend CoroutineScope.(done: MutableList<ExportResult>) -> Unit): Boolean {
+        exportBlockedReason?.let { toast(it); return false }
+        exportState = ExportState.Running(kind, 0f, label)
         exportJob = viewModelScope.launch {
-            var ok = false
+            val done = ArrayList<ExportResult>()
             try {
-                val saved = withContext(Dispatchers.Default) {
-                    val bmp = Exporter.render(w, h, layers, scale, transparent, ignoreState)
-                    val where = try {
-                        Exporter.save(app, bmp, fmt, name)
-                    } finally {
-                        bmp.recycle()
-                    }
-                    where?.let { SavedExport(it, resolveSavedUri(it, fmt.mime), fmt.mime) }
-                }
-                if (saved != null) {
-                    finishExport(saved)
-                    ok = true
-                } else {
-                    toast("Export failed")
-                }
+                withContext(Dispatchers.Default) { work(this, done) }
+                exportState = if (done.isEmpty()) ExportState.Failed("Nothing was exported") else ExportState.Done(done.toList())
             } catch (e: CancellationException) {
+                exportState = ExportState.Idle
+                val kept = done.count { it.ok }
+                toast(if (kept > 0) "Export cancelled ($kept file(s) were already saved)" else "Export cancelled")
                 throw e
             } catch (t: Throwable) {
-                toast("Export failed")
-            } finally {
-                if (!ok) exportLabel = null
+                exportState = ExportState.Failed(t.message ?: "Export failed")
+            }
+        }
+        return true
+    }
+
+    private fun runImageJob(job: ImageJob, kind: ExportKind, check: () -> Unit): ExportResult = try {
+        val bmp = Exporter.render(job.w, job.h, job.layers, job.scale, job.transparent, job.ignoreState, job.origW, job.origH)
+        val where = try {
+            check()
+            Exporter.save(app, bmp, job.fmt, job.name, check)
+        } finally {
+            bmp.recycle()
+        }
+        if (where != null) {
+            ExportResult(kind, resolveSavedUri(where, job.fmt.mime)?.toString(), where, true)
+        } else {
+            ExportResult(kind, null, null, false, "Could not write the ${job.fmt.extension.uppercase()} file")
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        ExportResult(kind, null, null, false, if (t is OutOfMemoryError) "Not enough memory, try a smaller size" else (t.message ?: "unknown error"))
+    }
+
+    private fun startImageExport(kind: ExportKind, label: String, jobs: List<ImageJob>) {
+        startExport(kind, label) { done ->
+            for ((i, job) in jobs.withIndex()) {
+                ensureActive()
+                done.add(runImageJob(job, kind) { ensureActive() })
+                setRunning(progress = (i + 1f) / jobs.size)
             }
         }
     }
 
-    /** One file per visible layer (transparent PNG each, ignoring opacity), saved in sequence. */
+    private fun originalSize(): Pair<Int, Int> = sourceBitmap?.let { it.width to it.height } ?: (0 to 0)
+
+    /** Size of the imported photo (0 when none): what the "Original" export size maps to. */
+    val originalPhotoWidth: Int get() = sourceBitmap?.width ?: 0
+    val originalPhotoHeight: Int get() = sourceBitmap?.height ?: 0
+
+    /** One file per visible layer. PNG = transparent per layer; JPEG = on paper (JPEG has no transparency). */
     fun exportLayersSeparately(scale: Int, format: ExportFormat, transparent: Boolean) {
-        if (exportJob?.isActive == true) return
+        exportBlockedReason?.let { toast(it); return }
         val layers = project.layers.filter { it.visible && it.strokes.isNotEmpty() }
         if (layers.isEmpty()) {
             toast("Nothing to export yet")
             return
         }
-        val snaps = layers.map { snapshotLayers(it).first() }
+        val (ow, oh) = originalSize()
         val w = project.width
         val h = project.height
-        exportDone = false
-        lastSaved = null
-        exportProgress = 0f
-        exportLabel = "Saving layers..."
-        exportJob = viewModelScope.launch {
-            var ok = false
-            try {
-                val results = withContext(Dispatchers.Default) {
-                    val out = ArrayList<SavedExport>()
-                    for ((i, l) in snaps.withIndex()) {
-                        ensureActive()
-                        val bmp = Exporter.render(w, h, listOf(l), scale, true, true)
-                        val where = try {
-                            Exporter.save(app, bmp, ExportFormat.PNG, l.name)
-                        } finally {
-                            bmp.recycle()
-                        }
-                        if (where != null) out.add(SavedExport(where, null, ExportFormat.PNG.mime))
-                        exportProgress = (i + 1f) / snaps.size
-                    }
-                    out
-                }
-                if (results.isNotEmpty()) {
-                    val dir = results.last().path.substringBeforeLast('/')
-                    finishExport(SavedExport("${results.size} layers in $dir", null, ExportFormat.PNG.mime))
-                    ok = true
-                } else {
-                    toast("Export failed")
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (t: Throwable) {
-                toast("Export failed")
-            } finally {
-                if (!ok) exportLabel = null
-            }
+        val jobs = layers.map { l ->
+            ImageJob(snapshotLayers(l), w, h, scale, format, format == ExportFormat.PNG, true, l.name, ow, oh)
         }
+        startImageExport(ExportKind.LAYERS, "Saving layers...", jobs)
     }
 
     fun export(scale: Int, format: ExportFormat, transparent: Boolean, selectedLayerOnly: Boolean) {
+        exportBlockedReason?.let { toast(it); return }
         val layer = if (selectedLayerOnly) project.selectedLayer else null
         if (selectedLayerOnly && layer == null) return
         val isLayer = layer != null
         val fmt = if (isLayer) ExportFormat.PNG else format
-        exportSnapshot(
+        val (ow, oh) = originalSize()
+        val job = ImageJob(
             snapshotLayers(layer), project.width, project.height, scale, fmt,
             transparent = isLayer || (fmt == ExportFormat.PNG && transparent),
-            ignoreState = isLayer, name = layer?.name ?: "drawing",
+            ignoreState = isLayer, name = layer?.name ?: "drawing", origW = ow, origH = oh,
         )
+        startImageExport(ExportKind.IMAGE, "Saving image...", listOf(job))
     }
 
-    /** Exports all visible layers as PNG, then the Outline layer alone as transparent PNG. */
+    /**
+     * Exports all visible layers as PNG, then the Outline layer alone as transparent PNG, as ONE export.
+     * Waits until no export runs and generation is finished (never wipes a result that is showing).
+     */
     fun autoExport() {
-        val outline = project.layers.firstOrNull { it.kind == LayerKind.AUTO_OUTLINE }
-        export(1, ExportFormat.PNG, false, false)
-        if (outline != null) {
-            val layers = snapshotLayers(outline)
+        viewModelScope.launch {
+            snapshotFlow { exportBlockedReason }.first { it == null }
+            val outline = project.layers.firstOrNull { it.kind == LayerKind.AUTO_OUTLINE }
+            val (ow, oh) = originalSize()
             val w = project.width
             val h = project.height
-            viewModelScope.launch {
-                exportJob?.join()
-                exportSnapshot(layers, w, h, 1, ExportFormat.PNG, true, true, "Outline")
-            }
+            val jobs = ArrayList<ImageJob>()
+            jobs.add(ImageJob(snapshotLayers(null), w, h, 1, ExportFormat.PNG, false, false, "drawing", ow, oh))
+            if (outline != null) jobs.add(ImageJob(snapshotLayers(outline), w, h, 1, ExportFormat.PNG, true, true, "Outline", ow, oh))
+            startImageExport(ExportKind.IMAGE, "Saving image...", jobs)
         }
     }
 
     /** Exports the draw-along animation as MP4 or GIF on a background thread, with progress + cancel. */
     fun exportAnimation(kind: AnimExportKind) = startAnimationExport(listOf(kind))
 
-    /** For CI: after generation, exports both MP4 and GIF. */
-    fun autoVideo() = startAnimationExport(listOf(AnimExportKind.VIDEO, AnimExportKind.GIF))
+    /** For CI: after generation, exports both MP4 and GIF (waits for any running export first). */
+    fun autoVideo() {
+        viewModelScope.launch {
+            snapshotFlow { exportBlockedReason }.first { it == null }
+            startAnimationExport(listOf(AnimExportKind.VIDEO, AnimExportKind.GIF))
+        }
+    }
 
     fun cancelExport() {
-        exportJob?.cancel()
+        if (exportState is ExportState.Running) exportJob?.cancel()
     }
 
     private fun startAnimationExport(kinds: List<AnimExportKind>) {
-        if (exportJob?.isActive == true) return
+        exportBlockedReason?.let { toast(it); return }
         if (project.layers.all { it.strokes.isEmpty() }) {
             toast("Nothing to export yet")
             return
@@ -1591,46 +1880,34 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val w = project.width
         val h = project.height
         val duration = anim.durationSec
-        exportProgress = 0f
-        exportLabel = "Preparing..."
-        exportDone = false
-        lastSaved = null
-        exportJob = viewModelScope.launch {
-            var animOk = false
-            try {
-                val saved = withContext(Dispatchers.Default) {
-                    val results = ArrayList<String>()
-                    for ((i, kind) in kinds.withIndex()) {
-                        exportLabel = if (kind == AnimExportKind.VIDEO) "Exporting MP4 video..." else "Exporting GIF..."
-                        val onProgress = { p: Float ->
-                            val overall = (i + p) / kinds.size
-                            if (overall - exportProgress >= 0.005f || overall >= 1f) exportProgress = overall
-                        }
-                        val check = { ensureActive() }
-                        val where = if (kind == AnimExportKind.VIDEO) {
-                            VideoExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
-                        } else {
-                            GifExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
-                        }
-                        if (where != null) results.add(where)
+        val first = if (kinds.first() == AnimExportKind.VIDEO) ExportKind.VIDEO else ExportKind.GIF
+        startExport(first, "Preparing...") { done ->
+            for ((i, k) in kinds.withIndex()) {
+                ensureActive()
+                val kind = if (k == AnimExportKind.VIDEO) ExportKind.VIDEO else ExportKind.GIF
+                setRunning(label = kind.runningLabel)
+                var last = -1f
+                val onProgress = { p: Float ->
+                    val overall = (i + p) / kinds.size
+                    if (overall - last >= 0.005f || overall >= 1f) { last = overall; setRunning(progress = overall) }
+                }
+                val check = { ensureActive() }
+                try {
+                    val where = if (k == AnimExportKind.VIDEO) {
+                        VideoExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
+                    } else {
+                        GifExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
                     }
-                    results
+                    val mime = if (k == AnimExportKind.VIDEO) "video/mp4" else "image/gif"
+                    done.add(
+                        if (where != null) ExportResult(kind, resolveSavedUri(where, mime)?.toString(), where, true)
+                        else ExportResult(kind, null, null, false, "Could not write the ${kind.label} file"),
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) {
+                    done.add(ExportResult(kind, null, null, false, t.message ?: "unknown error"))
                 }
-                if (saved.isNotEmpty()) {
-                    val last = saved.last()
-                    val mime = mimeFor(last)
-                    finishExport(SavedExport(saved.joinToString("\n"), resolveSavedUri(last, mime), mime))
-                    animOk = true
-                } else {
-                    toast("Export failed")
-                }
-            } catch (e: CancellationException) {
-                toast("Export cancelled")
-                throw e
-            } catch (t: Throwable) {
-                toast("Export failed: ${t.message}")
-            } finally {
-                if (!animOk) exportLabel = null
             }
         }
     }

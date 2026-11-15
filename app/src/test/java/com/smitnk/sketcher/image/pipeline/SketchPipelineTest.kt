@@ -105,19 +105,44 @@ class SketchPipelineTest {
         }
     }
 
-    @Test fun cartoonFusionIsMaxOfAiAndCartoonPlusSilhouette() {
+    @Test fun cartoonFusionIsMaxOfAiAndCartoonAndSilhouetteOnlyReinforces() {
         val pw = 100; val ph = 100
         val bg = BooleanArray(pw * ph) { val x = it % pw; val y = it / pw; x < 20 || x >= 80 || y < 20 || y >= 80 }
         val sub = SubjectCrop.Result(pw, ph, 0, 0, pw, ph, bg, 0.64f)
         val ai = FloatArray(pw * ph).also { it[50 * pw + 40] = 0.6f; it[50 * pw + 50] = 0.2f }
-        val cm = FloatArray(pw * ph).also { it[50 * pw + 50] = 0.9f }
-        val out = SketchPipeline.fuseCartoonInk(ai, cm, pw, ph, sub)
+        val cm = FloatArray(pw * ph).also { it[50 * pw + 50] = 0.9f; it[50 * pw + 22] = 0.9f }
+        val alpha = BooleanArray(pw * ph) { bg[it] }
+        val out = SketchPipeline.fuseCartoonInk(ai, cm, pw, ph, sub, null, alpha)
         assertEquals(0.6f, out[50 * pw + 40], 1e-6f)      // AI detail kept
         assertEquals(0.9f, out[50 * pw + 50], 1e-6f)      // cartoon outline wins
-        assertEquals(1f, out[50 * pw + 20], 1e-6f)        // silhouette on the subject edge
-        assertEquals(0f, out[50 * pw + 5], 0f)            // backdrop untouched
-        val noAi = SketchPipeline.fuseCartoonInk(null, cm, pw, ph, sub)
+        assertTrue(out[50 * pw + 20] >= 0.9f)             // edge with a nearby line (22 is within 3px of 20) is reinforced
+        assertEquals(0f, out[80 * pw / 2 + 5], 0f)        // backdrop untouched
+        assertEquals(0f, out[30 * pw + 20], 0f)           // silhouette far from any line is NOT invented
+        assertEquals(0f, out[79 * pw + 50], 0f)
+        val noAi = SketchPipeline.fuseCartoonInk(null, cm, pw, ph, sub, null, alpha)
         assertEquals(0.9f, noAi[50 * pw + 50], 1e-6f); assertEquals(0f, noAi[50 * pw + 40], 0f)
+        // no colour data and no alpha -> no silhouette at all
+        val plain = SketchPipeline.fuseCartoonInk(null, cm, pw, ph, sub)
+        assertEquals(0f, plain[50 * pw + 20], 0f)
+    }
+
+    @Test fun flattenAlphaCompositesOntoWhiteAndDerivesMask() {
+        val n = 40 * 40
+        val px = IntArray(n) { if (it % 40 < 20) 0x00000000 else (0xFF shl 24) or 0x112233 }
+        val (flat, mask) = SketchPipeline.flattenAlpha(px, 40, 40, null)
+        assertEquals(-1, flat[0]); assertEquals(px[39], flat[39])
+        assertTrue(mask!![0]); assertTrue(!mask[39])
+        val opaque = IntArray(n) { 0xFF112233.toInt() }
+        val (same, none) = SketchPipeline.flattenAlpha(opaque, 40, 40, null)
+        assertTrue(same === opaque); assertEquals(null, none)
+    }
+
+    @Test fun smoothMaskRemovesStairSteps() {
+        val w = 60; val h = 60
+        val a = BooleanArray(w * h) { val x = it % w; val y = it / w; x > 20 + (y / 3) % 2 * 2 }   // jagged vertical edge
+        val s = SketchPipeline.smoothMask(a, w, h, 3)
+        val edges = (10 until 50).map { y -> (0 until w).first { s[y * w + it] } }
+        assertTrue(edges.max() - edges.min() <= 1)
     }
 
     @Test fun cartoonRunsModelToo() = runBlocking {

@@ -29,7 +29,9 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,6 +76,20 @@ fun PlaybackBar(
     var wasPlaying by remember { mutableStateOf(false) }
     var scrubbing by remember { mutableStateOf(false) }
     val p = progress.coerceIn(0f, 1f)
+
+    // If the bar leaves composition mid-scrub (chrome hidden), onValueChangeFinished never fires:
+    // finish the scrub here so the animation is not left paused / "scrubbing" forever.
+    val latestSeekEnd by rememberUpdatedState(onSeekEnd)
+    val latestToggle by rememberUpdatedState(onTogglePlay)
+    val latestProgress by rememberUpdatedState(p)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (scrubbing) {
+                latestSeekEnd()
+                if (wasPlaying && latestProgress < 1f) latestToggle()
+            }
+        }
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = SketcherTokens.space8),

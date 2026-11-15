@@ -76,59 +76,115 @@ fun SketchCanvas(
     val layerCache = remember { Renderer.LayerCache() }
     DisposableEffect(layerCache) { onDispose { layerCache.release() } }
 
-    LaunchedEffect(project.width, project.height) { vt.reset() }
+    LaunchedEffect(vm.projectEpoch, project.width, project.height) { vt.reset() }
 
     Canvas(
         modifier = modifier
             .clipToBounds()
             .pointerInput(Unit) {
+                val slopPx = 8.dp.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val cw = size.width.toFloat()
                     val ch = size.height.toFloat()
 
                     fun toImage(p: Offset): Offset {
-                        val s = vt.scale(cw, ch, project.width, project.height)
-                        val o = vt.origin(cw, ch, project.width, project.height, s)
+                        val s = vt.scale(cw, ch, vm.project.width, vm.project.height)
+                        val o = vt.origin(cw, ch, vm.project.width, vm.project.height, s)
                         return (p - o) / s
                     }
 
-                    val start = toImage(down.position)
-                    var drawing = vm.beginStroke(start.x, start.y)
+                    var gesture: Gesture = GestureReducer.reduce(
+                        Gesture.Idle,
+                        GestureEvent.Down(down.position.x, down.position.y, down.uptimeMillis),
+                        slopPx,
+                    ).first
+                    var session: StrokeSession? = null
 
-                    do {
-                        val event = awaitPointerEvent()
-                        val pressed = event.changes.count { it.pressed }
-                        if (drawing && pressed >= 2) {
-                            vm.endStroke(cancel = true)
-                            drawing = false
-                        }
-                        if (drawing) {
-                            val change = event.changes.firstOrNull { it.id == down.id }
-                            if (change != null && change.pressed) {
-                                val p = toImage(change.position)
-                                vm.extendStroke(p.x, p.y)
-                                change.consume()
+                    fun perform(action: GestureAction, x: Float, y: Float) {
+                        when (action) {
+                            GestureAction.BEGIN_STROKE, GestureAction.TAP_STROKE -> {
+                                val start = toImage(down.position)
+                                session = vm.beginStroke(start.x, start.y)
+                                if (session == null) {
+                                    // beginStroke already toasted: once per gesture, then nothing is drawn or panned
+                                    gesture = Gesture.Stroke(blocked = true)
+                                } else if (action == GestureAction.BEGIN_STROKE) {
+                                    val p = toImage(Offset(x, y))
+                                    vm.extendStroke(session!!, p.x, p.y)
+                                } else {
+                                    vm.endStroke(session!!)
+                                    session = null
+                                }
                             }
-                        } else if (pressed > 0) {
-                            // pinch-zoom and pan around the finger centroid
-                            val zoomChange = event.calculateZoom()
-                            val panChange = event.calculatePan()
-                            val centroid = event.calculateCentroid(useCurrent = true)
-                            val pw = project.width
-                            val ph = project.height
-                            val oldS = vt.scale(cw, ch, pw, ph)
-                            val oldO = vt.origin(cw, ch, pw, ph, oldS)
-                            val q = ((centroid - panChange) - oldO) / oldS
-                            vt.zoom = (vt.zoom * zoomChange).coerceIn(0.5f, 16f)
-                            val newS = vt.scale(cw, ch, pw, ph)
-                            val newO = centroid - q * newS
-                            vt.pan = newO - vt.base(cw, ch, pw, ph, newS)
-                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            GestureAction.EXTEND_STROKE -> session?.let {
+                                val p = toImage(Offset(x, y))
+                                vm.extendStroke(it, p.x, p.y)
+                            }
+                            GestureAction.END_STROKE -> session?.let { vm.endStroke(it); session = null }
+                            GestureAction.CANCEL_STROKE, GestureAction.CANCEL_STROKE_TO_TRANSFORM ->
+                                session?.let { vm.cancelStroke(it); session = null }
+                            else -> {}
                         }
-                    } while (event.changes.any { it.pressed })
+                    }
 
-                    if (drawing) vm.endStroke(cancel = false)
+                    try {
+                        do {
+                            val pending = gesture as? Gesture.Pending
+                            val event = if (pending != null) {
+                                val wait = GestureReducer.COMMIT_DELAY_MS - (down.uptimeMillis - pending.downTimeMs)
+                                withTimeoutOrNull(wait.coerceAtLeast(1L)) { awaitPointerEvent() }
+                            } else {
+                                awaitPointerEvent()
+                            }
+                            if (event == null) {
+                                // Held still for the commit delay: this is a stroke.
+                                val (g, a) = GestureReducer.reduce(
+                                    gesture,
+                                    GestureEvent.Tick(pending!!.downTimeMs + GestureReducer.COMMIT_DELAY_MS),
+                                    slopPx,
+                                )
+                                gesture = g
+                                perform(a, pending.x, pending.y)
+                                continue
+                            }
+                            val pressed = event.changes.count { it.pressed }
+                            val primary = event.changes.firstOrNull { it.id == down.id && it.pressed }
+                                ?: event.changes.firstOrNull { it.pressed }
+                            val pos = primary?.position ?: down.position
+                            val time = event.changes.firstOrNull()?.uptimeMillis ?: down.uptimeMillis
+                            val (g, action) = GestureReducer.reduce(
+                                gesture,
+                                GestureEvent.Move(pressed, pos.x, pos.y, time),
+                                slopPx,
+                            )
+                            gesture = g
+                            perform(action, pos.x, pos.y)
+                            if (g is Gesture.Stroke && !g.blocked) primary?.consume()
+                            if (g === Gesture.Transform && pressed > 0) {
+                                // pinch-zoom and pan around the finger centroid
+                                val zoomChange = event.calculateZoom()
+                                val panChange = event.calculatePan()
+                                val centroid = event.calculateCentroid(useCurrent = true)
+                                val pw = vm.project.width
+                                val ph = vm.project.height
+                                val oldS = vt.scale(cw, ch, pw, ph)
+                                val oldO = vt.origin(cw, ch, pw, ph, oldS)
+                                val q = ((centroid - panChange) - oldO) / oldS
+                                vt.zoom = (vt.zoom * zoomChange).coerceIn(0.5f, 16f)
+                                val newS = vt.scale(cw, ch, pw, ph)
+                                val newO = centroid - q * newS
+                                vt.pan = newO - vt.base(cw, ch, pw, ph, newS)
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event == null || event.changes.any { it.pressed })
+
+                        val (_, upAction) = GestureReducer.reduce(gesture, GestureEvent.Up, slopPx)
+                        perform(upAction, down.position.x, down.position.y)
+                    } finally {
+                        // Cancellation (dispose, back, parent intercept) must never leave a live stroke behind.
+                        session?.let { vm.cancelStroke(it) }
+                    }
                 }
             },
     ) {

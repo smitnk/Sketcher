@@ -25,7 +25,7 @@ class LoadedProject(val snapshot: ProjectSnapshot, val source: Bitmap?)
 
 private const val MAX_SOURCE_SIDE = 2048
 
-class ProjectRepository(context: Context) {
+class ProjectRepository(context: Context) : ProjectStore {
     private val root = File(context.applicationContext.filesDir, "projects")
 
     private fun dir(id: String) = File(root, id)
@@ -36,7 +36,7 @@ class ProjectRepository(context: Context) {
      * Saves [snapshot] (take it with Project.toSnapshot() on the main thread first).
      * [source] is the background photo (JPEG 90). Returns the project id (new if [id] null).
      */
-    suspend fun save(id: String?, name: String, snapshot: ProjectSnapshot, source: Bitmap?): String =
+    override suspend fun save(id: String?, name: String, snapshot: ProjectSnapshot, source: Bitmap?): String =
         withContext(Dispatchers.IO) {
             val pid = id?.takeIf { safeId(it) } ?: UUID.randomUUID().toString()
             val d = dir(pid)
@@ -118,11 +118,11 @@ class ProjectRepository(context: Context) {
         }.sortedByDescending { it.updatedAt }
     }
 
-    suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun delete(id: String): Boolean = withContext(Dispatchers.IO) {
         safeId(id) && dir(id).deleteRecursively()
     }
 
-    suspend fun rename(id: String, newName: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun rename(id: String, newName: String): Boolean = withContext(Dispatchers.IO) {
         if (!safeId(id) || !File(dir(id), "project.skch").exists()) return@withContext false
         writeAtomic(File(dir(id), "name.txt"), newName.toByteArray(Charsets.UTF_8))
         true

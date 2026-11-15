@@ -9,6 +9,8 @@ import androidx.exifinterface.media.ExifInterface
 import kotlin.math.max
 
 object ImageLoader {
+    // Note: alpha is deliberately preserved (ARGB_8888). SketchPipeline.run flattens transparent pixels onto white and
+    // uses the alpha as the exact subject mask, so a cut-out never turns into a black backdrop.
 
     /** Decodes a bundled asset, scaled so the longest side is <= [maxSide]. */
     fun loadAsset(context: Context, name: String, maxSide: Int): Bitmap? = try {

@@ -43,7 +43,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.smitnk.sketcher.export.AnimExportKind
+import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.image.pipeline.PipelineSettings
+import com.smitnk.sketcher.ui.EditorEvent
+import com.smitnk.sketcher.ui.EditorOverlay
+import com.smitnk.sketcher.ui.EditorOverlaySaver
+import com.smitnk.sketcher.ui.PendingExport
+import com.smitnk.sketcher.ui.PendingExportKind
+import com.smitnk.sketcher.ui.PendingExportSaver
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,10 +83,33 @@ fun EditorScreen(
     onOpenSettings: (() -> Unit)? = null,
 ) {
     val anim = vm.anim
-    var showLayers by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showExport by remember { mutableStateOf(false) }
-    var renameText by remember { mutableStateOf<String?>(null) }
+    // Exactly one overlay at a time; back closes it.
+    var overlay by rememberSaveable(stateSaver = EditorOverlaySaver) { mutableStateOf<EditorOverlay>(EditorOverlay.None) }
+    // Style sheet edits a draft copy; it is committed only by "Draw it" (dismiss discards it).
+    var styleDraft by remember { mutableStateOf<PipelineSettings?>(null) }
+    var styleFromMl by remember { mutableStateOf(false) } // MlSettings opened from the style sheet -> return to it
+    val openStyle: () -> Unit = {
+        styleDraft = vm.pipelineSettings
+        overlay = EditorOverlay.Style
+    }
+    val openLayers = { overlay = EditorOverlay.Layers }
+    val openMl: () -> Unit = {
+        styleFromMl = overlay == EditorOverlay.Style
+        vm.openMlSettings()
+        overlay = EditorOverlay.MlSettings
+    }
+    val closeOverlay: () -> Unit = {
+        if (overlay == EditorOverlay.MlSettings) {
+            vm.closeMlSettings()
+            vm.dismissNnapiWarning()
+            overlay = if (styleFromMl) EditorOverlay.Style else EditorOverlay.None
+            styleFromMl = false
+        } else {
+            if (overlay == EditorOverlay.Style) styleDraft = null
+            overlay = EditorOverlay.None
+        }
+    }
+    BackHandler(enabled = overlay != EditorOverlay.None) { closeOverlay() }
 
     // Layer property edits (visibility, opacity, order...) made in the panel trigger autosave.
     LaunchedEffect(vm) { vm.watchLayerChanges() }
@@ -89,30 +122,33 @@ fun EditorScreen(
     }
 
     val context = LocalContext.current
-    var pendingExport by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        // Granted or not, export; Exporter falls back to the app folder when denied.
-        pendingExport?.invoke()
-        pendingExport = null
-    }
-
-    // A freshly imported photo opens the style picker so the user chooses outline / shading / colour first.
-    LaunchedEffect(vm.styleSheetRequest) {
-        if (vm.styleSheetRequest) {
-            vm.styleSheetRequest = false
-            showSettings = true
+    var pendingExport by rememberSaveable(stateSaver = PendingExportSaver) { mutableStateOf(PendingExport()) }
+    val runPending: (PendingExport) -> Unit = { p ->
+        when (p.kind) {
+            PendingExportKind.NONE -> Unit
+            PendingExportKind.LAYERS_SEPARATELY ->
+                vm.exportLayersSeparately(p.scale, ExportFormat.valueOf(p.format), p.transparent)
+            PendingExportKind.IMAGE ->
+                vm.export(p.scale, ExportFormat.valueOf(p.format), p.transparent, p.layerOnly)
+            PendingExportKind.ANIMATION -> vm.exportAnimation(AnimExportKind.valueOf(p.anim))
         }
     }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        // Granted or not, export; Exporter falls back to the app folder when denied.
+        val p = pendingExport
+        pendingExport = PendingExport()
+        runCatching { runPending(p) }
+    }
 
-    LaunchedEffect(vm.generationCount) {
-        if (vm.generationCount > 0) {
-            if (vm.pendingShowLayers) {
-                vm.pendingShowLayers = false
-                showLayers = true
-            }
-            if (vm.pendingAutoExport) {
-                vm.pendingAutoExport = false
-                vm.autoExport()
+    // One-shot events (style sheet after import, CI auto-actions). Events of an older project session are dropped.
+    LaunchedEffect(vm) {
+        vm.editorEvents.collect { e ->
+            if (e.sessionId != vm.sessionId) return@collect
+            when (e) {
+                is EditorEvent.OpenStyle -> if (overlay == EditorOverlay.None) openStyle()
+                is EditorEvent.ShowLayers -> overlay = EditorOverlay.Layers
+                is EditorEvent.AutoExport -> vm.autoExport()
+                is EditorEvent.AutoVideo -> vm.autoVideo()
             }
         }
     }
@@ -191,19 +227,19 @@ fun EditorScreen(
         ) {
             TopBar(
                 title = vm.projectName,
-                onRename = { renameText = vm.projectName },
+                onRename = { overlay = EditorOverlay.Rename(vm.projectName) },
                 generating = vm.generating,
                 playing = anim.playing,
                 onBack = onBack,
-                onStyle = { showSettings = true },
-                onLayers = { showLayers = true },
+                onStyle = { openStyle() },
+                onLayers = { openLayers() },
                 onTogglePlay = { anim.togglePlay() },
-                onExport = { showExport = true },
+                onExport = { overlay = EditorOverlay.Export },
                 onImport = { launchPicker() },
                 onDemo = { vm.runDemo() },
                 onGenerate = { vm.generate() },
                 onSettings = onOpenSettings,
-                onProcessing = { vm.openMlSettings() },
+                onProcessing = { openMl() },
                 modifier = Modifier
                     .onSizeChanged { topBarPx = it.height }
                     .statusBarsPadding()
@@ -230,20 +266,21 @@ fun EditorScreen(
                     ),
             ) {
                 AssistChip(
-                    onClick = { showSettings = true },
+                    onClick = { openStyle() },
                     label = { Text("Lines: $engine", style = MaterialTheme.typography.labelMedium) },
                 )
             }
         }
 
-        renameText?.let { text ->
+        (overlay as? EditorOverlay.Rename)?.let { rename ->
+            val text = rename.text
             AlertDialog(
-                onDismissRequest = { renameText = null },
+                onDismissRequest = { overlay = EditorOverlay.None },
                 title = { Text("Rename project") },
                 text = {
                     OutlinedTextField(
                         value = text,
-                        onValueChange = { renameText = it.take(80) },
+                        onValueChange = { overlay = EditorOverlay.Rename(it.take(80)) },
                         singleLine = true,
                     )
                 },
@@ -252,11 +289,11 @@ fun EditorScreen(
                         enabled = text.isNotBlank(),
                         onClick = {
                             vm.renameProject(text)
-                            renameText = null
+                            overlay = EditorOverlay.None
                         },
                     ) { Text("Save") }
                 },
-                dismissButton = { TextButton(onClick = { renameText = null }) { Text("Cancel") } },
+                dismissButton = { TextButton(onClick = { overlay = EditorOverlay.None }) { Text("Cancel") } },
             )
         }
 
@@ -297,7 +334,7 @@ fun EditorScreen(
                     canRedo = vm.canRedo,
                     onUndo = { vm.undo() },
                     onRedo = { vm.redo() },
-                    onLayers = { showLayers = true },
+                    onLayers = { openLayers() },
                     onAddShadingLayer = { vm.addShadingLayer() },
                     selectedLayer = vm.project.selectedLayer,
                 )
@@ -316,6 +353,7 @@ fun EditorScreen(
                     onTogglePlay = { anim.togglePlay() },
                     progress = anim.progress,
                     onSeek = { anim.seek(it) },
+                    onSeekEnd = { if (anim.progress >= 1f && !anim.playing) anim.showFinished() },
                 )
             }
         }
@@ -346,38 +384,55 @@ fun EditorScreen(
                 fraction = vm.generationDisplayProgress,
             )
         }
+        // Opening a saved project: opaque cover (hides the old project / empty state, swallows touches) until Ready.
+        if (vm.projectLoad == com.smitnk.sketcher.data.ProjectLoad.Loading) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(colors.canvasBackdrop)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } }
+                    },
+                contentAlignment = Alignment.Center,
+            ) { androidx.compose.material3.CircularProgressIndicator() }
+        }
     }
 
-    if (showLayers) {
+    if (overlay == EditorOverlay.Layers) {
         LayersPanel(
             project = vm.project,
             onAddLayer = { vm.addLayer() },
             onSelectLayer = { vm.selectLayer(it) },
             onMoveLayer = { layer, delta -> vm.moveLayer(layer, delta) },
             onDeleteLayer = { vm.deleteLayer(it) },
-            onDismiss = { showLayers = false },
+            onDismiss = { closeOverlay() },
         )
     }
 
-    if (showSettings) {
+    if (overlay == EditorOverlay.Style) {
         StylePickerSheet(
-            settings = vm.pipelineSettings,
-            onSettingsChange = { vm.updatePipelineSettings(it) },
+            settings = styleDraft ?: vm.pipelineSettings,
+            onSettingsChange = { styleDraft = it },
             onGenerate = {
-                showSettings = false
-                vm.generate()
+                if (!vm.generating) {
+                    styleDraft?.let { vm.updatePipelineSettings(it) }
+                    styleDraft = null
+                    overlay = EditorOverlay.None
+                    vm.generate()
+                }
             },
-            onDismiss = { showSettings = false },
+            generating = vm.generating,
+            onDismiss = { closeOverlay() },
             sourceThumbnail = vm.sourceThumbnail,
             models = vm.lineModels,
             selectedModelId = vm.selectedLineModelId,
             onSelectModel = { vm.selectLineModel(it) },
             onDownloadModel = { vm.downloadLineModel(it) },
-            onOpenMlSettings = { vm.openMlSettings() },
+            onOpenMlSettings = { openMl() },
         )
     }
 
-    if (vm.showMlSettings) {
+    if (overlay == EditorOverlay.MlSettings) {
         MlSettingsSheet(
             accelOptions = vm.accelOptions,
             selectedAccel = vm.selectedAccel,
@@ -388,42 +443,51 @@ fun EditorScreen(
             lastInferenceMs = vm.lastInferenceMs,
             activeAccelLabel = vm.activeAccelLabel,
             fallbackReason = vm.fallbackReason,
-            onDismiss = { vm.closeMlSettings() },
+            onDismiss = { closeOverlay() },
             nnapiWarningPending = vm.nnapiWarningPending != null,
             onConfirmNnapi = { vm.confirmNnapiWarning() },
             onDismissNnapi = { vm.dismissNnapiWarning() },
         )
     }
 
-    if (showExport) {
+    if (overlay == EditorOverlay.Export) {
         // Pre-Q devices need WRITE_EXTERNAL_STORAGE before export.
-        val runWithPermission = { run: () -> Unit ->
+        val runWithPermission = { pending: PendingExport ->
             val needsPerm = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
                 context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
             if (needsPerm) {
-                pendingExport = run
+                pendingExport = pending
                 permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             } else {
-                run()
+                runPending(pending)
             }
         }
         ExportDialog(
             selectedLayerName = vm.project.selectedLayer?.name ?: "layer",
-            onDismiss = { showExport = false },
+            onDismiss = { overlay = EditorOverlay.None },
             durationSec = anim.durationSec,
             resolutionNote = "${vm.project.width} x ${vm.project.height} px",
             onExportLayersSeparately = { scale, format, transparent ->
-                showExport = false
-                runWithPermission { vm.exportLayersSeparately(scale, format, transparent) }
+                overlay = EditorOverlay.None
+                runWithPermission(
+                    PendingExport(PendingExportKind.LAYERS_SEPARATELY, scale, format.name, transparent),
+                )
             },
             onExport = { scale, format, transparent, layerOnly ->
-                showExport = false
-                runWithPermission { vm.export(scale, format, transparent, layerOnly) }
+                overlay = EditorOverlay.None
+                runWithPermission(
+                    PendingExport(PendingExportKind.IMAGE, scale, format.name, transparent, layerOnly),
+                )
             },
             onExportAnimation = { kind ->
-                showExport = false
-                runWithPermission { vm.exportAnimation(kind) }
+                overlay = EditorOverlay.None
+                runWithPermission(PendingExport(PendingExportKind.ANIMATION, anim = kind.name))
             },
+            blockedReason = vm.exportBlockedReason,
+            workingWidth = vm.project.width,
+            workingHeight = vm.project.height,
+            originalWidth = vm.originalPhotoWidth,
+            originalHeight = vm.originalPhotoHeight,
         )
     }
 
@@ -438,6 +502,7 @@ fun EditorScreen(
             savedUri = saved?.uri,
             savedMime = saved?.mime ?: "image/*",
             onDone = { vm.dismissExport() },
+            title = vm.exportTitle,
         )
     }
 }

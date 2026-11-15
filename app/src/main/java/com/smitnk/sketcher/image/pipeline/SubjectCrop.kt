@@ -40,8 +40,12 @@ object SubjectCrop {
      * Letterbox bars first (phone-gallery screenshots: dark/light bars with a status-bar clock and round
      * buttons), then the flat-background subject search inside the remaining rectangle.
      */
-    fun detect(argb: IntArray, w: Int, h: Int, margin: Float = 0.06f): Result {
+    fun detect(argb: IntArray, w: Int, h: Int, margin: Float = 0.06f, alphaBg: BooleanArray? = null): Result {
         if (w < 16 || h < 16 || argb.size < w * h) return full(w, h)
+        if (alphaBg != null) {
+            // Known transparency: the subject is exactly alpha > 0; no guessing, and never letterbox bars.
+            return fromAlpha(alphaBg, w, h, margin) ?: detectInner(argb, w, h, margin)
+        }
         val lb = letterbox(argb, w, h) ?: return detectInner(argb, w, h, margin)
         val (lx0, ly0, lx1, ly1) = lb
         val iw = lx1 - lx0; val ih = ly1 - ly0
@@ -54,9 +58,58 @@ object SubjectCrop {
     }
 
     /**
+     * Subject from a known background mask ([alphaBg]: true = transparent / background), or null when there is
+     * (almost) no background or (almost) no subject. Specks (< 2% of the biggest piece) do not stretch the box.
+     * The returned mask is the exact alpha mask minus a 2px band around the subject so outlines survive.
+     */
+    fun fromAlpha(alphaBg: BooleanArray, w: Int, h: Int, margin: Float = 0.06f): Result? {
+        val n = w * h
+        if (w < 16 || h < 16 || alphaBg.size < n) return null
+        var bgCount = 0
+        for (i in 0 until n) if (alphaBg[i]) bgCount++
+        val frac = bgCount.toFloat() / n
+        if (frac < 0.02f || frac > 0.995f) return null
+        val comp = IntArray(n); val queue = IntArray(n)
+        val sizes = ArrayList<Int>(); val boxes = ArrayList<IntArray>()
+        for (s in 0 until n) {
+            if (alphaBg[s] || comp[s] != 0) continue
+            val id = sizes.size + 1
+            var head = 0; var tail = 0
+            queue[tail++] = s; comp[s] = id
+            var bx0 = w; var by0 = h; var bx1 = -1; var by1 = -1
+            while (head < tail) {
+                val i = queue[head++]
+                val x = i % w; val y = i / w
+                bx0 = min(bx0, x); bx1 = max(bx1, x); by0 = min(by0, y); by1 = max(by1, y)
+                if (x > 0 && !alphaBg[i - 1] && comp[i - 1] == 0) { comp[i - 1] = id; queue[tail++] = i - 1 }
+                if (x < w - 1 && !alphaBg[i + 1] && comp[i + 1] == 0) { comp[i + 1] = id; queue[tail++] = i + 1 }
+                if (y > 0 && !alphaBg[i - w] && comp[i - w] == 0) { comp[i - w] = id; queue[tail++] = i - w }
+                if (y < h - 1 && !alphaBg[i + w] && comp[i + w] == 0) { comp[i + w] = id; queue[tail++] = i + w }
+            }
+            sizes.add(tail); boxes.add(intArrayOf(bx0, by0, bx1, by1))
+        }
+        if (sizes.isEmpty()) return null
+        val biggest = sizes.max()
+        var ux0 = w; var uy0 = h; var ux1 = -1; var uy1 = -1
+        for (c in sizes.indices) if (sizes[c] >= 0.02f * biggest) {
+            val b = boxes[c]
+            ux0 = min(ux0, b[0]); uy0 = min(uy0, b[1]); ux1 = max(ux1, b[2]); uy1 = max(uy1, b[3])
+        }
+        val m = margin * max(ux1 - ux0 + 1, uy1 - uy0 + 1)
+        val x0 = floor(max(0f, ux0 - m)).toInt(); val y0 = floor(max(0f, uy0 - m)).toInt()
+        val x1 = ceil(min(w.toFloat(), ux1 + 1 + m)).toInt(); val y1 = ceil(min(h.toFloat(), uy1 + 1 + m)).toInt()
+        if (x1 - x0 < 8 || y1 - y0 < 8) return null
+        val fg = BooleanArray(n) { !alphaBg[it] }
+        val shrink = dilate(fg, w, h, 2)
+        val mask = BooleanArray(n) { alphaBg[it] && !shrink[it] }
+        return Result(w, h, x0, y0, x1, y1, mask, frac)
+    }
+
+    /**
      * Inner rectangle [x0,y0,x1,y1] after stripping near-uniform dark/light bars from each side, or null.
-     * A dark line counts as bar when >= 60% of its pixels are near the bar colour (median of the outermost line),
-     * so status-bar glyphs and round buttons do not break the bar; light (white) bars need >= 99.5% and are only
+     * A dark line counts as bar when >= 97% of its pixels are near the bar colour (median of the outermost line)
+     * and the bar is continuous from the border. Status-bar glyphs / round buttons (lines between 60% and 97%) are
+     * tolerated only as a short run (<= 9% of the extent) that is followed again by a clean line; light (white) bars need >= 99.5% and are only
      * taken continuously from the border, so a white backdrop around a narrow figure is never letterbox.
      */
     internal fun letterbox(argb: IntArray, w: Int, h: Int): IntArray? {
@@ -74,13 +127,17 @@ object SubjectCrop {
             val c = barColor(len) { at(0, it) } ?: return 0
             // White studio backdrops must never read as bars: light bars need near-total uniformity, dark bars 60%.
             val light = ((c shr 16) and 255) > 200 && ((c shr 8) and 255) > 200 && (c and 255) > 200
-            val need = if (light) 0.995f else 0.60f
+            val need = if (light) 0.995f else 0.97f
+            fun frac(l: Int): Float { var ok = 0; for (i in 0 until len) if (near(c, at(l, i))) ok++; return ok.toFloat() / len }
+            val maxGlitch = (0.09f * lines).toInt()
             var n = 0
             while (n < lines) {
-                var ok = 0
-                for (i in 0 until len) if (near(c, at(n, i))) ok++
-                if (ok < need * len) break
-                n++
+                val f = frac(n)
+                if (f >= need) { n++; continue }
+                if (light || f < 0.60f) break
+                var k = n
+                while (k < lines && k - n <= maxGlitch && frac(k).let { it >= 0.60f && it < need }) k++
+                if (k < lines && k - n <= maxGlitch && frac(k) >= need) n = k else break
             }
             return n
         }

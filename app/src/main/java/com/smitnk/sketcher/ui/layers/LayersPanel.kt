@@ -62,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Alignment
@@ -133,8 +134,9 @@ fun LayersPanel(
     onDeleteLayer: (Layer) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var renaming by remember { mutableStateOf<Layer?>(null) }
-    var deleting by remember { mutableStateOf<Layer?>(null) }
+    // Dialogs hold layer ids, never Layer refs: the layer is re-looked-up (and may have vanished) on every frame.
+    var renamingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var deletingId by rememberSaveable { mutableStateOf<Long?>(null) }
     val expanded = remember { mutableStateListOf<Long>() }
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
@@ -202,9 +204,9 @@ fun LayersPanel(
                                             onSelectLayer(layer)
                                         }
                                     },
-                                    onRename = { renaming = layer },
+                                    onRename = { renamingId = layer.id },
                                     onMove = { delta -> onMoveLayer(layer, delta) },
-                                    onDelete = { deleting = layer },
+                                    onDelete = { deletingId = layer.id },
                                 )
                             }
                         }
@@ -228,34 +230,38 @@ fun LayersPanel(
         }
     }
 
+    val renaming = renamingId?.let { id -> project.layers.firstOrNull { it.id == id } }
+    if (renamingId != null && renaming == null) renamingId = null
     renaming?.let { layer ->
-        var text by remember(layer) { mutableStateOf(layer.name) }
+        var text by rememberSaveable(layer.id) { mutableStateOf(layer.name) }
         AlertDialog(
-            onDismissRequest = { renaming = null },
+            onDismissRequest = { renamingId = null },
             title = { Text("Rename layer") },
             text = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true) },
             confirmButton = {
                 TextButton(onClick = {
                     if (text.isNotBlank()) layer.name = text.trim()
-                    renaming = null
+                    renamingId = null
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renamingId = null }) { Text("Cancel") } },
         )
     }
 
+    val deleting = deletingId?.let { id -> project.layers.firstOrNull { it.id == id } }
+    if (deletingId != null && deleting == null) deletingId = null
     deleting?.let { layer ->
         AlertDialog(
-            onDismissRequest = { deleting = null },
+            onDismissRequest = { deletingId = null },
             title = { Text("Delete layer?") },
             text = { Text("\"${layer.name}\" and its strokes will be removed.") },
             confirmButton = {
                 TextButton(onClick = {
                     onDeleteLayer(layer)
-                    deleting = null
+                    deletingId = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deletingId = null }) { Text("Cancel") } },
         )
     }
 }

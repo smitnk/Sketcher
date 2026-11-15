@@ -77,6 +77,10 @@ fun MlSettingsSheet(
     val maxMs = results.values.filterNotNull().maxOrNull()?.coerceAtLeast(1L) ?: 1L
     val bestMs = results.values.filterNotNull().minOrNull()
 
+    // Closing the sheet (by any route) must not leave a stale NNAPI warning queued for the next open.
+    val dismissNnapi by androidx.compose.runtime.rememberUpdatedState(onDismissNnapi)
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { dismissNnapi() } }
+
     if (nnapiWarningPending) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = onDismissNnapi,

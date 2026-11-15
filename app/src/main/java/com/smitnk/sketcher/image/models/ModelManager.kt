@@ -47,6 +47,8 @@ class ModelManager(
         id: String,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
         shouldCancel: () -> Boolean = { false },
+        /** Receives a closer that aborts the socket at once (a blocked read otherwise lags until [READ_TIMEOUT_MS]). */
+        onOpen: (close: () -> Unit) -> Unit = {},
     ): File {
         val s = spec(id) ?: throw IOException("unknown model $id")
         val url = s.downloadUrl ?: throw IOException("model $id is bundled")
@@ -56,8 +58,9 @@ class ModelManager(
         tmp.delete()
         try {
             val conn = URL(url).openConnection()
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 30_000
+            conn.connectTimeout = CONNECT_TIMEOUT_MS
+            conn.readTimeout = READ_TIMEOUT_MS
+            onOpen { try { (conn as? HttpURLConnection)?.disconnect() } catch (_: Throwable) {} }
             if (conn is HttpURLConnection) {
                 conn.instanceFollowRedirects = true
                 val code = conn.responseCode
@@ -72,7 +75,9 @@ class ModelManager(
                     var lastReport = 0L
                     while (true) {
                         if (shouldCancel()) throw InterruptedIOException("cancelled")
-                        val n = input.read(buf)
+                        val n = try { input.read(buf) } catch (e: IOException) {
+                            if (shouldCancel()) throw InterruptedIOException("cancelled") else throw e
+                        }
                         if (n < 0) break
                         out.write(buf, 0, n)
                         done += n
@@ -103,6 +108,9 @@ class ModelManager(
     }
 
     companion object {
+        const val CONNECT_TIMEOUT_MS = 15_000
+        const val READ_TIMEOUT_MS = 15_000
+
         fun sha256Hex(f: File): String {
             val md = MessageDigest.getInstance("SHA-256")
             f.inputStream().use { ins ->
