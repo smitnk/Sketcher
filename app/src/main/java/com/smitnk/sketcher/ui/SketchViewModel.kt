@@ -943,7 +943,6 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             sourceThumbnail = loaded.source?.let { makeThumbnail(it) }
             if (snap.animationSeconds > 0f) anim.durationSec = snap.animationSeconds
             hasProject = true
-            styleSheetRequest = false
             session.completeLoad(token, id, name!!)
             projectName = name
             dirty = false
@@ -1336,21 +1335,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 publishGen()
                 generationCount++
                 markDirty()
-                if (pendingAutoVideo) {
-                    pendingAutoVideo = false
-                    autoVideo()
-                }
             } catch (e: GenerationAbort) {
                 // Engine busy / model closed: the run fails, the user's model selection is untouched.
                 MlLog.w("generate aborted: ${e.reason}")
-                pendingAutoVideo = false
                 if (genMachine.fail(run, e.reason, runFellBackTo)) { publishGen(); toast(e.reason) }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
                 android.util.Log.e("SketcherGen", "GEN_FAIL", t)
                 MlLog.w("generate failed", t)
-                pendingAutoVideo = false // a failed run must not leave the auto-video request armed for the next one
                 val msg = if (t is OutOfMemoryError) "Not enough memory - try a smaller image size in Settings"
                 else "Generation failed: ${t.message}"
                 if (genMachine.fail(run, msg, runFellBackTo)) publishGen()
