@@ -1,1 +1,9 @@
-BUILD SUCCESSFUL in 1m 24s
+> Task :app:compileDebugKotlin FAILED
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/SketchViewModel.kt:946:13 Unresolved reference 'styleSheetRequest'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/SketchViewModel.kt:1339:21 Unresolved reference 'pendingAutoVideo'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/SketchViewModel.kt:1340:21 Unresolved reference 'pendingAutoVideo'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/SketchViewModel.kt:1346:17 Unresolved reference 'pendingAutoVideo'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/SketchViewModel.kt:1353:17 Unresolved reference 'pendingAutoVideo'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/settings/MlSettingsSheet.kt:81:25 Type 'androidx.compose.runtime.State<kotlin.Function0<kotlin.Unit>>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/ui/settings/MlSettingsSheet.kt:82:67 Unresolved reference 'dismissNnapi'.
+BUILD FAILED in 36s
