@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-15T10:55:02" hostname="runnervmccnms" time="0.635">
+  <properties/>
+  <testcase name="cartoonFlatColourGivesNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.051"/>
+  <testcase name="heavierLevelMeansMoreStrokes" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.243"/>
+  <testcase name="shadesDarkSubjectOnly" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.071"/>
+  <testcase name="styleAndColour" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.079"/>
+  <testcase name="deterministicAndCapped" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.114"/>
+  <testcase name="noneGivesNothing" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.002"/>
+  <testcase name="cartoonCelShadowIsShaded" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.049"/>
+  <testcase name="flatImageGetsNoShading" classname="com.smitnk.sketcher.image.pipeline.ShadingGeneratorTest" time="0.024"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
