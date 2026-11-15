@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Gif
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
@@ -80,12 +81,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
 import com.smitnk.sketcher.export.Exporter
+import com.smitnk.sketcher.export.FramesExportKind
+import com.smitnk.sketcher.model.FrameOps
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private enum class ExportMode { IMAGE, VIDEO, GIF }
+private enum class ExportMode { IMAGE, VIDEO, GIF, FRAMES }
 private enum class LayerScope { SEPARATE, SELECTED, ALL }
 
 /**
@@ -109,8 +112,13 @@ fun ExportDialog(
     workingHeight: Int = 0,
     originalWidth: Int = 0,
     originalHeight: Int = 0,
+    frameCount: Int = 1,
+    flipbookFps: Int = FrameOps.DEFAULT_FPS,
+    onExportFrames: ((kind: FramesExportKind, fps: Int) -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf(ExportMode.IMAGE) }
+    var framesKind by remember { mutableStateOf(FramesExportKind.PNG_SEQUENCE) }
+    var framesFps by remember { mutableIntStateOf(if (flipbookFps in FrameOps.FPS_CHOICES) flipbookFps else FrameOps.DEFAULT_FPS) }
     var scale by remember { mutableIntStateOf(1) }
     var format by remember { mutableStateOf(ExportFormat.PNG) }
     var transparent by remember { mutableStateOf(false) }
@@ -118,11 +126,20 @@ fun ExportDialog(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val transparentEffective = (transparent && format == ExportFormat.PNG) || scope == LayerScope.SELECTED
-    val destination = if (mode == ExportMode.VIDEO) "Saved to Movies/Sketcher" else "Saved to Pictures/Sketcher"
+    val destination = when {
+        mode == ExportMode.VIDEO || (mode == ExportMode.FRAMES && framesKind == FramesExportKind.VIDEO) -> "Saved to Movies/Sketcher"
+        mode == ExportMode.FRAMES && framesKind == FramesExportKind.PNG_SEQUENCE -> "Saved to Pictures/Sketcher/<project name>/"
+        else -> "Saved to Pictures/Sketcher"
+    }
     val exportLabel = when (mode) {
         ExportMode.IMAGE -> "Export ${format.extension.uppercase()}"
         ExportMode.VIDEO -> "Export MP4"
         ExportMode.GIF -> "Export GIF"
+        ExportMode.FRAMES -> when (framesKind) {
+            FramesExportKind.PNG_SEQUENCE -> "Export $frameCount PNGs"
+            FramesExportKind.GIF -> "Export flipbook GIF"
+            FramesExportKind.VIDEO -> "Export flipbook MP4"
+        }
     }
 
     ModalBottomSheet(
@@ -176,9 +193,59 @@ fun ExportDialog(
                     onClick = { mode = ExportMode.GIF },
                     modifier = Modifier.weight(1f),
                 )
+                if (onExportFrames != null) {
+                    FormatCard(
+                        title = "Frames",
+                        subtitle = "$frameCount",
+                        icon = Icons.Outlined.Slideshow,
+                        selected = mode == ExportMode.FRAMES,
+                        onClick = { mode = ExportMode.FRAMES },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
-            if (mode == ExportMode.IMAGE) {
+            if (mode == ExportMode.FRAMES) {
+                SectionLabel("Frames")
+                val kinds = listOf(
+                    FramesExportKind.PNG_SEQUENCE to "PNGs",
+                    FramesExportKind.GIF to "GIF",
+                    FramesExportKind.VIDEO to "MP4",
+                )
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    kinds.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = framesKind == value,
+                            onClick = { framesKind = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, kinds.size),
+                            modifier = Modifier.defaultMinSize(minHeight = SketcherTokens.minTouchTarget),
+                        ) { Text(label, maxLines = 1) }
+                    }
+                }
+                if (framesKind != FramesExportKind.PNG_SEQUENCE) {
+                    SectionLabel("Speed")
+                    Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                        FrameOps.FPS_CHOICES.forEach { f ->
+                            FilterChip(
+                                selected = framesFps == f,
+                                onClick = { framesFps = f },
+                                label = { Text("$f fps") },
+                                modifier = Modifier.defaultMinSize(minHeight = SketcherTokens.minTouchTarget),
+                            )
+                        }
+                    }
+                }
+                Text(
+                    when (framesKind) {
+                        FramesExportKind.PNG_SEQUENCE -> "One transparent PNG per frame, numbered frame_0001, frame_0002, ... in a folder named after the project"
+                        FramesExportKind.GIF -> "Flipbook: each frame's finished drawing for 1/$framesFps s, looping, on paper"
+                        FramesExportKind.VIDEO -> "Flipbook: each frame's finished drawing for 1/$framesFps s, paper background"
+                    } + ". For the draw-along time-lapse of the open frame choose Video or GIF.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                InfoRow(label = "Frames", value = "$frameCount")
+            } else if (mode == ExportMode.IMAGE) {
                 SectionLabel("Format")
                 Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
                     FilterChip(
@@ -326,6 +393,7 @@ fun ExportDialog(
                         }
                         ExportMode.VIDEO -> onExportAnimation(AnimExportKind.VIDEO)
                         ExportMode.GIF -> onExportAnimation(AnimExportKind.GIF)
+                        ExportMode.FRAMES -> onExportFrames?.invoke(framesKind, framesFps)
                     }
                 },
                 modifier = Modifier

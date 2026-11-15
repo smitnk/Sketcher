@@ -6,6 +6,7 @@ enum class ExportKind(val label: String, val runningLabel: String) {
     LAYERS("Layers", "Saving layers..."),
     VIDEO("MP4", "Exporting MP4 video..."),
     GIF("GIF", "Exporting GIF..."),
+    FRAMES("Frames", "Exporting frames..."),
 }
 
 /** Outcome of one exported file. [uri] is a MediaStore uri string when shareable. */

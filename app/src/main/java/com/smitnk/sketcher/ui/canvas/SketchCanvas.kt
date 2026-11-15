@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +76,10 @@ fun SketchCanvas(
     val paperColor = com.smitnk.sketcher.ui.theme.LightExtraColors.paper.toArgb() // always light paper, both themes
     val layerCache = remember { Renderer.LayerCache() }
     DisposableEffect(layerCache) { onDispose { layerCache.release() } }
+    val onionCache = remember { OnionCache() }
+    DisposableEffect(onionCache) { onDispose { onionCache.release() } }
+    val onionPrevTint = MaterialTheme.colorScheme.primary.toArgb() // vermilion: previous frame
+    val onionNextTint = MaterialTheme.colorScheme.secondary.toArgb() // graphite blue: next frame
 
     LaunchedEffect(vm.projectEpoch, project.width, project.height) { vt.reset() }
 
@@ -225,6 +230,20 @@ fun SketchCanvas(
             c.clipRect(0f, 0f, pw.toFloat(), ph.toFloat())
             Renderer.drawBackground(c, project)
             c.restore()
+            // Onion skin (screen only): neighbours of the open frame, tinted, under its own drawing.
+            val cur = project.currentFrameIndex
+            if (vm.onionEnabled && !vm.anim.active && !vm.flipbookPlaying && project.frames.size > 1) {
+                val strength = vm.onionOpacity.coerceIn(0f, 1f)
+                onionCache.draw(
+                    c, s, pw, ph,
+                    prev = project.frames.getOrNull(cur - 1),
+                    next = project.frames.getOrNull(cur + 1),
+                    prevTint = onionPrevTint,
+                    nextTint = onionNextTint,
+                    prevAlpha = (strength * 255f).toInt(),
+                    nextAlpha = (strength * 0.8f * 255f).toInt(),
+                )
+            }
             layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId)
             c.restore()
         }

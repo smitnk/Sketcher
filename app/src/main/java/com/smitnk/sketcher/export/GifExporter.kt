@@ -85,6 +85,83 @@ object GifExporter {
         return if (ok) target.displayPath else null
     }
 
+    /**
+     * Flipbook: one GIF frame per entry of [frames] (each a snapshot of that frame's layers), shown finished at [fps],
+     * looping, on paper. Blocking; call off the main thread. Returns a readable location or null on failure.
+     */
+    fun exportFrames(
+        context: Context,
+        width: Int,
+        height: Int,
+        frames: List<List<Layer>>,
+        fps: Int,
+        baseName: String,
+        onProgress: (Float) -> Unit,
+        checkCancel: () -> Unit,
+    ): String? {
+        if (frames.isEmpty()) return null
+        val rate = fps.coerceIn(1, 60)
+        val (w, h) = fitSize(width, height, MAX_LONG_SIDE, 1)
+        val target = OutputTarget.create(context, false, exportFileName(baseName, "gif"), "image/gif") ?: return null
+        val s = min(w.toFloat() / width, h.toFloat() / height)
+        val dx = (w - width * s) / 2f
+        val dy = (h - height * s) / 2f
+
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val pixels = IntArray(w * h)
+        val indices = ByteArray(w * h)
+
+        fun render(layers: List<Layer>) {
+            canvas.drawColor(Color.WHITE)
+            canvas.save()
+            canvas.translate(dx, dy)
+            canvas.scale(s, s)
+            canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
+            Renderer.drawLayers(canvas, width, height, layers)
+            canvas.restore()
+            bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        }
+
+        fun csAt(i: Int): Int = (i * 100.0 / rate).roundToInt()
+
+        var out: OutputStream? = null
+        var ok = false
+        try {
+            // One global palette from up to 8 evenly spaced frames (they share the paper and the ink colours).
+            val sample = minOf(8, frames.size)
+            val joined = IntArray(w * h * sample)
+            for (k in 0 until sample) {
+                checkCancel()
+                render(frames[(k.toLong() * frames.size / sample).toInt()])
+                System.arraycopy(pixels, 0, joined, k * w * h, w * h)
+            }
+            val palette = GifQuantizer.palette(joined)
+            val lut = IntArray(32768) { -1 }
+
+            val stream = BufferedOutputStream(target.openStream() ?: return null, 1 shl 16)
+            out = stream
+            writeHeader(stream, w, h, palette)
+            val lzw = GifLzw(stream)
+            for ((i, layers) in frames.withIndex()) {
+                checkCancel()
+                render(layers)
+                GifQuantizer.map(pixels, indices, palette, lut)
+                writeFrameHeader(stream, w, h, csAt(i + 1) - csAt(i))
+                lzw.encode(indices)
+                onProgress((i + 1).toFloat() / frames.size)
+            }
+            stream.write(0x3B)
+            stream.flush()
+            ok = true
+        } finally {
+            try { out?.close() } catch (e: Exception) { ok = false }
+            bmp.recycle()
+            if (ok) target.commit() else target.abort()
+        }
+        return if (ok) target.displayPath else null
+    }
+
     /** Start time of frame [i] in centiseconds, rounded so delays average exactly 100/12. */
     private fun cs(i: Int): Int = (i * 100.0 / FPS).roundToInt()
 

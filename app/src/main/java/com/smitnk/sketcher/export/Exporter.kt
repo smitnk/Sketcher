@@ -138,11 +138,18 @@ object Exporter {
      * readable location, or null on failure. [checkCancel] may throw CancellationException: the pending file is
      * then deleted, so a cancelled export never leaves a partial file behind.
      */
-    fun save(context: Context, bitmap: Bitmap, format: ExportFormat, baseName: String, checkCancel: () -> Unit = {}): String? {
-        val fileName = exportFileName(baseName, format.extension)
+    fun save(
+        context: Context,
+        bitmap: Bitmap,
+        format: ExportFormat,
+        baseName: String,
+        checkCancel: () -> Unit = {},
+        fileName: String = exportFileName(baseName, format.extension),
+        subDir: String? = null,
+    ): String? {
         val compressFormat = if (format == ExportFormat.PNG) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val quality = if (format == ExportFormat.PNG) 100 else 95
-        val target = OutputTarget.create(context, false, fileName, format.mime) ?: return null
+        val target = OutputTarget.create(context, false, fileName, format.mime, subDir) ?: return null
         var ok = false
         try {
             checkCancel()

@@ -32,6 +32,7 @@ object Renderer {
             color = android.graphics.Color.BLACK
         }
         val inkPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+        val onionPaint = Paint(Paint.FILTER_BITMAP_FLAG)
         val inkInPaint = Paint(Paint.FILTER_BITMAP_FLAG).apply {
             xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
         }
@@ -41,13 +42,30 @@ object Renderer {
         override fun initialValue() = Scratch()
     }
 
-    fun drawBackground(canvas: Canvas, project: Project) {
-        val bmp = project.background ?: return
-        if (!project.backgroundVisible) return
+    fun drawBackground(canvas: Canvas, project: Project) =
+        drawBackground(canvas, project.background, project.backgroundVisible, project.backgroundOpacity, project.width, project.height)
+
+    /** Reference photo of any frame (never part of exports). */
+    fun drawBackground(canvas: Canvas, bmp: Bitmap?, visible: Boolean, opacity: Float, width: Int, height: Int) {
+        if (bmp == null || bmp.isRecycled || !visible) return
         val sc = scratchTl.get()!!
-        sc.bgPaint.alpha = (project.backgroundOpacity * 255f).roundToInt().coerceIn(0, 255)
-        sc.rect.set(0f, 0f, project.width.toFloat(), project.height.toFloat())
+        sc.bgPaint.alpha = (opacity * 255f).roundToInt().coerceIn(0, 255)
+        sc.rect.set(0f, 0f, width.toFloat(), height.toFloat())
         canvas.drawBitmap(bmp, null, sc.rect, sc.bgPaint)
+    }
+
+    /**
+     * Onion skin: the finished drawing of [layers] flattened to one colour [tint] at [alpha] (0..255) over what is
+     * already on [canvas]. Screen only; exports never call this.
+     */
+    fun drawOnion(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, tint: Int, alpha: Int) {
+        if (alpha <= 0) return
+        val sc = scratchTl.get()!!
+        sc.onionPaint.colorFilter = android.graphics.PorterDuffColorFilter(tint, android.graphics.PorterDuff.Mode.SRC_IN)
+        sc.onionPaint.alpha = alpha.coerceIn(0, 255)
+        val sv = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), sc.onionPaint)
+        drawLayers(canvas, width, height, layers)
+        canvas.restoreToCount(sv)
     }
 
     /**

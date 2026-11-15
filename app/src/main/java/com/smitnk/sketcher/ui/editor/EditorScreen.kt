@@ -67,6 +67,12 @@ import com.smitnk.sketcher.ui.SketchViewModel
 import com.smitnk.sketcher.ui.Tool
 import com.smitnk.sketcher.ui.canvas.SketchCanvas
 import com.smitnk.sketcher.ui.export.ExportDialog
+import com.smitnk.sketcher.ui.frames.FrameActionsSheet
+import com.smitnk.sketcher.ui.frames.FrameStrip
+import com.smitnk.sketcher.export.FramesExportKind
+import com.smitnk.sketcher.model.FlipbookClock
+import com.smitnk.sketcher.model.FrameOps
+import com.smitnk.sketcher.model.AddFrameKind
 import com.smitnk.sketcher.ui.export.ExportProgressDialog
 import com.smitnk.sketcher.ui.generate.StylePickerSheet
 import com.smitnk.sketcher.ui.layers.LayersPanel
@@ -121,6 +127,17 @@ fun EditorScreen(
         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 
+    // Frames: add from one photo / pose render, or several photos at once (each becomes a generated frame).
+    var stripExpanded by rememberSaveable { mutableStateOf(false) }
+    var framePickIsPose by remember { mutableStateOf(false) }
+    val framePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.addFrame(AddFrameKind.FROM_IMAGE, uri, pose = framePickIsPose)
+    }
+    val multiPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (uris.isNotEmpty()) vm.addFramesFromImages(uris)
+    }
+    val imageOnly = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+
     val context = LocalContext.current
     var pendingExport by rememberSaveable(stateSaver = PendingExportSaver) { mutableStateOf(PendingExport()) }
     val runPending: (PendingExport) -> Unit = { p ->
@@ -131,6 +148,8 @@ fun EditorScreen(
             PendingExportKind.IMAGE ->
                 vm.export(p.scale, ExportFormat.valueOf(p.format), p.transparent, p.layerOnly)
             PendingExportKind.ANIMATION -> vm.exportAnimation(AnimExportKind.valueOf(p.anim))
+            PendingExportKind.FRAMES ->
+                vm.exportFrames(runCatching { FramesExportKind.valueOf(p.anim) }.getOrDefault(FramesExportKind.PNG_SEQUENCE), p.scale)
         }
     }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -163,6 +182,25 @@ fun EditorScreen(
                 last = now
             }
         }
+    }
+
+    // Flipbook clock: steps the shown frame at the chosen fps while "Play frames" is on.
+    LaunchedEffect(vm.flipbookPlaying) {
+        if (vm.flipbookPlaying) {
+            val clock = FlipbookClock(vm.flipbookFps)
+            var last = withFrameNanos { it }
+            while (vm.flipbookPlaying) {
+                val now = withFrameNanos { it }
+                clock.fps = vm.flipbookFps
+                vm.flipbookAdvance(clock.advance((now - last) / 1_000_000_000f))
+                last = now
+            }
+        }
+    }
+    // Starting the draw-along animation ends the flipbook (they share the canvas).
+    val togglePlay = {
+        vm.stopFlipbook()
+        anim.togglePlay()
     }
 
     var chromeVisible by remember { mutableStateOf(true) }
@@ -233,7 +271,7 @@ fun EditorScreen(
                 onBack = onBack,
                 onStyle = { openStyle() },
                 onLayers = { openLayers() },
-                onTogglePlay = { anim.togglePlay() },
+                onTogglePlay = togglePlay,
                 onExport = { overlay = EditorOverlay.Export },
                 onImport = { launchPicker() },
                 onDemo = { vm.runDemo() },
@@ -302,7 +340,7 @@ fun EditorScreen(
                 .align(Alignment.BottomCenter)
                 .onSizeChanged { h ->
                     // Track the collapsed height only (panels open/close, dock hides while playing).
-                    if (chromeVisible && !anim.playing && h.height > 0) {
+                    if (chromeVisible && !anim.playing && !vm.flipbookPlaying && h.height > 0) {
                         bottomBasePx = if (bottomBasePx == 0) h.height else minOf(bottomBasePx, h.height)
                     }
                 }
@@ -312,7 +350,7 @@ fun EditorScreen(
         ) {
             // Tools auto-hide while the animation plays for a clean view.
             AnimatedVisibility(
-                visible = chromeVisible && !anim.playing,
+                visible = chromeVisible && !anim.playing && !vm.flipbookPlaying,
                 enter = fadeIn(tween(SketcherTokens.MotionMedium)),
                 exit = fadeOut(tween(200)),
             ) {
@@ -340,6 +378,39 @@ fun EditorScreen(
                 )
             }
             AnimatedVisibility(
+                visible = chromeVisible && !anim.playing,
+                enter = fadeIn(tween(SketcherTokens.MotionShort)),
+                exit = fadeOut(tween(200)),
+            ) {
+                FrameStrip(
+                    project = vm.project,
+                    expanded = stripExpanded,
+                    onExpandedChange = { stripExpanded = it },
+                    onionEnabled = vm.onionEnabled,
+                    onOnionChange = { vm.onionEnabled = it },
+                    onionOpacity = vm.onionOpacity,
+                    onOnionOpacityChange = { vm.onionOpacity = it },
+                    flipbookPlaying = vm.flipbookPlaying,
+                    onToggleFlipbook = { vm.toggleFlipbook() },
+                    fps = vm.flipbookFps,
+                    onCycleFps = { vm.flipbookFps = FrameOps.nextFps(vm.flipbookFps) },
+                    busy = vm.framesBusy,
+                    onSelect = { vm.selectFrame(it) },
+                    onFrameActions = { overlay = EditorOverlay.FrameActions(it) },
+                    onAddBlank = { vm.addFrame(AddFrameKind.BLANK) },
+                    onAddDuplicate = { vm.addFrame(AddFrameKind.DUPLICATE) },
+                    onAddFromPhoto = {
+                        framePickIsPose = false
+                        framePicker.launch(imageOnly)
+                    },
+                    onAddFromPose = {
+                        framePickIsPose = true
+                        framePicker.launch(imageOnly)
+                    },
+                    onAddSeveral = { multiPicker.launch(imageOnly) },
+                )
+            }
+            AnimatedVisibility(
                 visible = chromeVisible,
                 enter = fadeIn(tween(SketcherTokens.MotionShort)),
                 exit = fadeOut(tween(200)),
@@ -347,10 +418,10 @@ fun EditorScreen(
                 PlaybackBar(
                     durationSec = anim.durationSec,
                     onDurationChange = { anim.durationSec = it },
-                    onRestart = { anim.restart() },
+                    onRestart = { vm.stopFlipbook(); anim.restart() },
                     onShowFinished = { anim.showFinished() },
                     playing = anim.playing,
-                    onTogglePlay = { anim.togglePlay() },
+                    onTogglePlay = togglePlay,
                     progress = anim.progress,
                     onSeek = { anim.seek(it) },
                     onSeekEnd = { if (anim.progress >= 1f && !anim.playing) anim.showFinished() },
@@ -378,7 +449,7 @@ fun EditorScreen(
         }
 
         // Last child so the dimming overlay covers the canvas and chrome and blocks touches.
-        if (vm.generating) {
+        if (vm.generating || vm.batchProgress != null) {
             GeneratingIndicator(
                 stage = vm.generationStageLabel,
                 fraction = vm.generationDisplayProgress,
@@ -406,6 +477,34 @@ fun EditorScreen(
             onMoveLayer = { layer, delta -> vm.moveLayer(layer, delta) },
             onDeleteLayer = { vm.deleteLayer(it) },
             onDismiss = { closeOverlay() },
+        )
+    }
+
+    (overlay as? EditorOverlay.FrameActions)?.let { a ->
+        FrameActionsSheet(
+            index = a.index,
+            count = vm.project.frames.size,
+            onDuplicate = { vm.duplicateFrame(a.index); overlay = EditorOverlay.None },
+            onMove = { delta ->
+                FrameOps.moveTarget(a.index, delta, vm.project.frames.size)?.let { to ->
+                    vm.moveFrame(a.index, to)
+                    overlay = EditorOverlay.FrameActions(to)
+                }
+            },
+            onDelete = { overlay = EditorOverlay.DeleteFrame(a.index) },
+            onDismiss = { closeOverlay() },
+        )
+    }
+
+    (overlay as? EditorOverlay.DeleteFrame)?.let { d ->
+        AlertDialog(
+            onDismissRequest = { closeOverlay() },
+            title = { Text("Delete frame ${d.index + 1}?") },
+            text = { Text("Its drawing and photo are removed from this project. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = { vm.deleteFrame(d.index); overlay = EditorOverlay.None }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { closeOverlay() }) { Text("Cancel") } },
         )
     }
 
@@ -482,6 +581,12 @@ fun EditorScreen(
             onExportAnimation = { kind ->
                 overlay = EditorOverlay.None
                 runWithPermission(PendingExport(PendingExportKind.ANIMATION, anim = kind.name))
+            },
+            frameCount = vm.project.frames.size,
+            flipbookFps = vm.flipbookFps,
+            onExportFrames = { kind, fps ->
+                overlay = EditorOverlay.None
+                runWithPermission(PendingExport(PendingExportKind.FRAMES, fps, anim = kind.name))
             },
             blockedReason = vm.exportBlockedReason,
             workingWidth = vm.project.width,

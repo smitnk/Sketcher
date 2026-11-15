@@ -1,5 +1,6 @@
 package com.smitnk.sketcher.data
 
+import android.graphics.Bitmap
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -32,6 +33,26 @@ class LayerSnapshot(
     val revealWidthPx: Float = 0f,
 )
 
+/**
+ * One page of the animation. [source] is the frame's reference photo (never encoded: the repository stores it
+ * as frame_<id>.jpg next to the project file).
+ */
+class FrameSnapshot(
+    val id: Long,
+    val layers: List<LayerSnapshot>,
+    val selectedIndex: Int,
+    val backgroundVisible: Boolean,
+    val backgroundOpacity: Float,
+    /** Animation duration in seconds; <= 0 means "unknown / use default". */
+    val animationSeconds: Float = 0f,
+    val source: Bitmap? = null,
+)
+
+/**
+ * A whole project. [frames] is the truth; [layers], [selectedIndex], [backgroundVisible], [backgroundOpacity] and
+ * [animationSeconds] mirror the OPEN frame ([currentFrameIndex]) so single-frame code keeps working. A snapshot
+ * built with the legacy constructor is one frame (id 1). Use [ofFrames] for several frames.
+ */
 class ProjectSnapshot(
     val width: Int,
     val height: Int,
@@ -39,17 +60,47 @@ class ProjectSnapshot(
     val selectedIndex: Int,
     val backgroundVisible: Boolean,
     val backgroundOpacity: Float,
-    /** Animation duration in seconds; <= 0 means "unknown / use default". */
+    /** Animation duration in seconds of the open frame; <= 0 means "unknown / use default". */
     val animationSeconds: Float = 0f,
-)
+    val frames: List<FrameSnapshot> = listOf(
+        FrameSnapshot(1L, layers, selectedIndex, backgroundVisible, backgroundOpacity, animationSeconds),
+    ),
+    val currentFrameIndex: Int = 0,
+) {
+    /** Same project with the given reference photos attached (frame id -> bitmap). */
+    fun withSources(sources: Map<Long, Bitmap?>): ProjectSnapshot = ofFrames(
+        width, height,
+        frames.map { f ->
+            FrameSnapshot(f.id, f.layers, f.selectedIndex, f.backgroundVisible, f.backgroundOpacity, f.animationSeconds, sources[f.id] ?: f.source)
+        },
+        currentFrameIndex,
+    )
 
-/** Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an optional per-layer ink PNG. */
+    companion object {
+        fun ofFrames(width: Int, height: Int, frames: List<FrameSnapshot>, currentFrameIndex: Int): ProjectSnapshot {
+            require(frames.isNotEmpty()) { "a project needs at least one frame" }
+            val ci = currentFrameIndex.coerceIn(0, frames.lastIndex)
+            val c = frames[ci]
+            return ProjectSnapshot(
+                width, height, c.layers, c.selectedIndex, c.backgroundVisible, c.backgroundOpacity, c.animationSeconds,
+                frames, ci,
+            )
+        }
+    }
+}
+
+/**
+ * Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an
+ * optional per-layer ink PNG; v4 stores a list of frames (v1-v3 files load as a single frame).
+ */
 object ProjectCodec {
-    const val VERSION = 3
+    const val VERSION = 4
     private const val MAX_INK_BYTES = 200_000_000
     private const val MAX_DIM = 8192
     private const val MIN_LAYER_BYTES = 20
     private const val MIN_STROKE_BYTES = 20
+    private const val MIN_FRAME_BYTES = 25
+    private const val MAX_FRAMES = 5_000
     private val MAGIC = byteArrayOf('S'.code.toByte(), 'K'.code.toByte(), 'C'.code.toByte(), 'H'.code.toByte())
     private const val MAX_LAYERS = 10_000
     private const val MAX_STROKES = 5_000_000
@@ -62,12 +113,23 @@ object ProjectCodec {
         out.writeInt(VERSION)
         out.writeInt(s.width)
         out.writeInt(s.height)
-        out.writeInt(s.selectedIndex)
-        out.writeBoolean(s.backgroundVisible)
-        out.writeFloat(s.backgroundOpacity)
-        out.writeFloat(s.animationSeconds)
-        out.writeInt(s.layers.size)
-        for (l in s.layers) {
+        out.writeInt(s.currentFrameIndex)
+        out.writeInt(s.frames.size)
+        for (f in s.frames) {
+            out.writeLong(f.id)
+            out.writeInt(f.selectedIndex)
+            out.writeBoolean(f.backgroundVisible)
+            out.writeFloat(f.backgroundOpacity)
+            out.writeFloat(f.animationSeconds)
+            writeLayers(out, f.layers)
+        }
+        out.flush()
+        return bos.toByteArray()
+    }
+
+    private fun writeLayers(out: DataOutputStream, layers: List<LayerSnapshot>) {
+        out.writeInt(layers.size)
+        for (l in layers) {
             out.writeLong(l.id)
             out.writeUTF(l.name)
             out.writeBoolean(l.visible)
@@ -95,8 +157,6 @@ object ProjectCodec {
                 out.writeBoolean(false)
             }
         }
-        out.flush()
-        return bos.toByteArray()
     }
 
     /** v1 files had no kind: infer it from the names the generator used. */
@@ -117,11 +177,37 @@ object ProjectCodec {
         if (version !in 1..VERSION) throw IOException("Unsupported project version $version")
         val width = inp.readInt()
         val height = inp.readInt()
+        if (width !in 1..MAX_DIM || height !in 1..MAX_DIM) throw IOException("Corrupt project size")
+        if (version >= 4) {
+            val current = inp.readInt()
+            val frameCount = inp.readInt()
+            if (frameCount !in 1..MAX_FRAMES || frameCount > inp.available() / MIN_FRAME_BYTES) throw IOException("Corrupt frame count")
+            val frames = ArrayList<FrameSnapshot>(frameCount)
+            val seen = HashSet<Long>()
+            var maxId = 0L
+            repeat(frameCount) {
+                val id = inp.readLong()
+                if (id > maxId) maxId = id
+                val selected = inp.readInt()
+                val bgVisible = inp.readBoolean()
+                val bgOpacity = inp.readFloat()
+                val animSeconds = inp.readFloat()
+                val layers = readLayers(inp, version)
+                // A corrupt file must not give two frames one id (they would share one photo file).
+                val uniqueId = if (seen.add(id)) id else { maxId += 1; seen.add(maxId); maxId }
+                frames.add(FrameSnapshot(uniqueId, layers, selected, bgVisible, bgOpacity, animSeconds))
+            }
+            return ProjectSnapshot.ofFrames(width, height, frames, current)
+        }
         val selected = inp.readInt()
         val bgVisible = inp.readBoolean()
         val bgOpacity = inp.readFloat()
         val animSeconds = inp.readFloat()
-        if (width !in 1..MAX_DIM || height !in 1..MAX_DIM) throw IOException("Corrupt project size")
+        val layers = readLayers(inp, version)
+        return ProjectSnapshot(width, height, layers, selected, bgVisible, bgOpacity, animSeconds)
+    }
+
+    private fun readLayers(inp: DataInputStream, version: Int): List<LayerSnapshot> {
         val layerCount = inp.readInt()
         if (layerCount !in 0..MAX_LAYERS || layerCount > inp.available() / MIN_LAYER_BYTES) throw IOException("Corrupt layer count")
         val layers = ArrayList<LayerSnapshot>(layerCount)
@@ -163,6 +249,6 @@ object ProjectCodec {
             }
             layers.add(LayerSnapshot(id, name, visible, opacity, locked, inAnim, prio, strokes, kind, inkPng, reveal))
         }
-        return ProjectSnapshot(width, height, layers, selected, bgVisible, bgOpacity, animSeconds)
+        return layers
     }
 }

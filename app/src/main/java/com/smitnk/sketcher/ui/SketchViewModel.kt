@@ -31,6 +31,8 @@ import com.smitnk.sketcher.export.ExportState
 import com.smitnk.sketcher.export.blockedReason
 import com.smitnk.sketcher.export.summary
 import com.smitnk.sketcher.export.Exporter
+import com.smitnk.sketcher.export.FramesExportKind
+import com.smitnk.sketcher.export.FramesExporter
 import com.smitnk.sketcher.export.GifExporter
 import com.smitnk.sketcher.export.VideoExporter
 import com.smitnk.sketcher.image.BrushType
@@ -50,6 +52,10 @@ import com.smitnk.sketcher.image.pipeline.OnnxLineArtModel
 import com.smitnk.sketcher.image.pipeline.PipelineSettings
 import com.smitnk.sketcher.image.pipeline.ShadingLevel
 import com.smitnk.sketcher.image.pipeline.SketchPipeline
+import com.smitnk.sketcher.model.Frame
+import com.smitnk.sketcher.model.AddFrameKind
+import com.smitnk.sketcher.model.FlipbookClock
+import com.smitnk.sketcher.model.FrameOps
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
@@ -138,6 +144,12 @@ private class InkEraseAction(val layer: Layer, val before: Bitmap, val after: Bi
     override val cost: Long get() = (before.allocationByteCount + after.allocationByteCount).toLong()
 }
 
+/** Undo and redo stacks of one frame. */
+private class EditHistory {
+    val undo = ArrayList<EditAction>()
+    val redo = ArrayList<EditAction>()
+}
+
 private const val MAX_UNDO = 50
 private const val MAX_HISTORY_BYTES = 64L * 1024 * 1024
 private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
@@ -212,7 +224,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Stage text for the overlay: while the AI model runs, show its name and elapsed seconds instead of a frozen %. */
     val generationStageLabel: String
-        get() = if (aiStage) "AI (${aiModelName()}) running\u2026 ${stageElapsedSec}s" else generationStage
+        get() = batchPrefix() + if (aiStage) "AI (${aiModelName()}) running\u2026 ${stageElapsedSec}s" else generationStage
 
     /** Null (indeterminate) while the AI model runs: its progress is unknowable. */
     val generationDisplayProgress: Float? get() = if (aiStage) null else generationProgress
@@ -578,6 +590,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         submitSave("cleared")
         session.close()
         generateJob?.cancel()
+        batchJob?.cancel()
         benchJob?.cancel()
         cancelEngineRuns()
         val m = lineArtModel
@@ -750,9 +763,16 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private var exportJob: Job? = null
 
-    private var sourceBitmap: Bitmap? = null
-    private val undoStack = ArrayList<EditAction>()
-    private val redoStack = ArrayList<EditAction>()
+    // Per-frame state lives on the open frame (see model.Frame); these delegate so the generation code is unchanged.
+    private var sourceBitmap: Bitmap?
+        get() = project.currentFrame.sourceBitmap
+        set(v) { project.currentFrame.sourceBitmap = v }
+
+    /** Undo/redo history per frame (frame id -> stacks); undo/redo only ever touch the open frame's. */
+    private val histories = HashMap<Long, EditHistory>()
+    private fun history(): EditHistory = histories.getOrPut(project.currentFrame.id) { EditHistory() }
+    private val undoStack: ArrayList<EditAction> get() = history().undo
+    private val redoStack: ArrayList<EditAction> get() = history().redo
 
     // live stroke state (frozen per gesture in the session)
     private var liveSession: StrokeSession? = null
@@ -837,7 +857,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // A project with only an imported photo (no strokes yet) is still worth keeping.
     private fun shouldSave(): Boolean =
-        session.projectId != null || project.background != null || project.layers.any { it.strokes.isNotEmpty() }
+        session.projectId != null || project.frames.size > 1 || project.background != null || project.layers.any { it.strokes.isNotEmpty() }
 
     /** Call after any content mutation: saves 2 s after the last call. Ignored while a project is loading. */
     fun markDirty() {
@@ -1202,10 +1222,17 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         generationCount = 0
         if (!keepLoad) session.reset() // new project: id allocated on its first save; cancels any pending load
         projectName = DEFAULT_PROJECT_NAME
+        batchJob?.cancel()
+        batchJob = null
+        batchProgress = null
+        flipbookPlaying = false
+        histories.clear()
+        project.resetFrames()
         project.layers.clear()
         project.layers.add(project.newLayer("Layer 1"))
         project.selectedIndex = 0
         project.background = null
+        project.currentFrame.durationSec = anim.durationSec
         sourceSerial++
         autoSource = sourceSerial
         clearHistory()
@@ -1222,8 +1249,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Increments for every newly imported/loaded source photo; auto layers remember which one produced them. */
-    private var sourceSerial = 0
-    private var autoSource = 0
+    private var sourceSerial: Int
+        get() = project.currentFrame.sourceSerial
+        set(v) { project.currentFrame.sourceSerial = v }
+    private var autoSource: Int
+        get() = project.currentFrame.autoSource
+        set(v) { project.currentFrame.autoSource = v }
 
     private fun setSource(bmp: Bitmap) {
         sourceSerial++
@@ -1248,6 +1279,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             toast("Wait for the speed test to finish")
             return
         }
+        stopFlipbook()
         anim.showFinished()
         val genStart = android.os.SystemClock.elapsedRealtime()
         val gen = projectGen
@@ -1442,6 +1474,270 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         anim.restart()
     }
 
+    // ------------------------------------------------------------------ frames
+
+    /** Onion skin (screen only, never exported): previous frame red, next frame blue, under the open frame. */
+    var onionEnabled by mutableStateOf(false)
+    var onionOpacity by mutableFloatStateOf(0.25f)
+
+    /** Flipbook preview: cycles every frame's finished drawing at [flipbookFps]. */
+    var flipbookPlaying by mutableStateOf(false)
+        private set
+    var flipbookFps by mutableIntStateOf(FrameOps.DEFAULT_FPS)
+    private var flipbookReturnIndex = 0
+
+    /** (current, total) while a batch import generates frame after frame; null otherwise. */
+    var batchProgress by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+    private var batchJob: Job? = null
+
+    private fun batchPrefix(): String = batchProgress?.let { "Frame ${it.first}/${it.second} \u00b7 " } ?: ""
+
+    /** Frames cannot be switched, added or deleted while a drawing is generated for the open frame. */
+    val framesBusy: Boolean get() = generating || batchProgress != null
+
+    private fun frameBlocked(): Boolean {
+        if (!framesBusy) return false
+        toast("Wait for the drawing to finish generating")
+        return true
+    }
+
+    /** The open frame's draw-along length lives in the controller while it is open; store it before leaving. */
+    private fun commitFrameDuration() {
+        project.currentFrame.durationSec = anim.durationSec
+    }
+
+    /** Commits an in-progress stroke to the open frame (call before the open frame changes). */
+    private fun flushStroke() {
+        liveSession?.let { endStroke(it) }
+    }
+
+    /** Makes frame [index] the open one (no checks): stops the animation, loads its draw-along length and history. */
+    private fun switchTo(index: Int) {
+        commitFrameDuration()
+        project.currentFrameIndex = index
+        anim.durationSec = project.currentFrame.durationSec
+        anim.showFinished()
+        syncHistoryFlags()
+        sourceThumbnail = sourceBitmap?.let { makeThumbnail(it) }
+        trimOtherHistories()
+        markDirty()
+    }
+
+    /** Histories of other frames can pin ink bitmaps; past ~2x the cap keep only the open frame's. */
+    private fun trimOtherHistories() {
+        var bytes = 0L
+        for (h in histories.values) {
+            for (a in h.undo) bytes += a.cost
+            for (a in h.redo) bytes += a.cost
+        }
+        if (bytes <= 2 * MAX_HISTORY_BYTES) return
+        val keep = project.currentFrame.id
+        histories.keys.retainAll { it == keep }
+    }
+
+    /** Opens frame [index] (also stops the flipbook and flushes the stroke being drawn). */
+    fun selectFrame(index: Int) {
+        if (index !in project.frames.indices) return
+        if (index == project.currentFrameIndex && !flipbookPlaying) return
+        if (frameBlocked()) return
+        flushStroke()
+        stopFlipbook(restore = false)
+        switchTo(index)
+    }
+
+    fun addFrame(kind: AddFrameKind, uri: Uri? = null, pose: Boolean = false) {
+        when (kind) {
+            AddFrameKind.BLANK -> addBlankFrame()
+            AddFrameKind.DUPLICATE -> duplicateFrame(project.currentFrameIndex)
+            AddFrameKind.FROM_IMAGE -> if (uri != null) addFrameFromImage(uri, pose)
+        }
+    }
+
+    /** New empty frame right after the open one; it becomes the open frame. */
+    fun addBlankFrame() {
+        if (frameBlocked()) return
+        flushStroke()
+        stopFlipbook(restore = false)
+        commitFrameDuration()
+        val f = project.newFrame()
+        f.layers.add(project.newLayer("Layer 1"))
+        f.durationSec = project.currentFrame.durationSec
+        val at = project.currentFrameIndex + 1
+        project.frames.add(at, f)
+        hasProject = true
+        switchTo(at)
+    }
+
+    /** Copy of frame [index] (default: the open one) right after it; the copy becomes the open frame. */
+    fun duplicateFrame(index: Int = project.currentFrameIndex) {
+        if (index !in project.frames.indices || frameBlocked()) return
+        flushStroke()
+        stopFlipbook(restore = false)
+        commitFrameDuration()
+        val copy = project.copyFrame(project.frames[index])
+        project.frames.add(index + 1, copy)
+        hasProject = true
+        switchTo(index + 1)
+    }
+
+    fun deleteFrame(index: Int) {
+        if (index !in project.frames.indices) return
+        if (project.frames.size <= 1) {
+            toast("Keep at least one frame")
+            return
+        }
+        if (frameBlocked()) return
+        flushStroke()
+        stopFlipbook(restore = false)
+        commitFrameDuration()
+        val wasOpen = index == project.currentFrameIndex
+        val removed = project.frames.removeAt(index)
+        histories.remove(removed.id)
+        project.currentFrameIndex = FrameOps.indexAfterDelete(project.currentFrameIndex, index, project.frames.size)
+        if (wasOpen) {
+            anim.durationSec = project.currentFrame.durationSec
+            anim.showFinished()
+            sourceThumbnail = sourceBitmap?.let { makeThumbnail(it) }
+        }
+        syncHistoryFlags()
+        markDirty()
+    }
+
+    /** Moves frame [from] to position [to]; the open frame stays the same drawing. */
+    fun moveFrame(from: Int, to: Int) {
+        if (from == to) return
+        val open = project.currentFrameIndex
+        if (!FrameOps.move(project.frames, from, to)) return
+        project.currentFrameIndex = FrameOps.indexAfterMove(open, from, to)
+        markDirty()
+    }
+
+    /** Decodes [uri]; with [fit] crops it to the canvas aspect and size so every frame stays the same size. */
+    private suspend fun loadFrameImage(uri: Uri, fit: Boolean): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val bmp = ImageLoader.load(app, uri, settings.maxSide) ?: return@withContext null
+            if (!fit) return@withContext bmp
+            val r = FrameOps.coverRect(bmp.width, bmp.height, project.width, project.height)
+            val cropped = Bitmap.createBitmap(bmp, r[0], r[1], r[2], r[3])
+            val out = if (cropped.width == project.width && cropped.height == project.height) cropped
+            else Bitmap.createScaledBitmap(cropped, project.width, project.height, true)
+            if (cropped !== bmp && cropped !== out) cropped.recycle()
+            if (out !== bmp) bmp.recycle()
+            out
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) { // incl. OutOfMemoryError
+            null
+        }
+    }
+
+    /** Puts [bmp] into a new frame at [at] (or into the open, still empty, first frame when [reuse]) and opens it. */
+    private fun insertImageFrame(bmp: Bitmap, reuse: Boolean, at: Int) {
+        if (!reuse) {
+            flushStroke()
+            stopFlipbook(restore = false)
+            commitFrameDuration()
+            val f = project.newFrame()
+            f.layers.add(project.newLayer("Layer 1"))
+            f.durationSec = project.currentFrame.durationSec
+            project.frames.add(at, f)
+            switchTo(at)
+        }
+        setSource(bmp)
+    }
+
+    /** New frame from one photo (or pose render when [pose]) after the open frame; then the style sheet opens. */
+    fun addFrameFromImage(uri: Uri, pose: Boolean = false) {
+        if (frameBlocked()) return
+        setPoseMode(pose)
+        val gen = projectGen
+        viewModelScope.launch {
+            val reuse = !hasProject && project.frames.size == 1
+            val bmp = loadFrameImage(uri, fit = !reuse)
+            if (gen != projectGen) return@launch
+            if (bmp == null) {
+                toast("Could not open that image")
+                if (pose) setPoseMode(false)
+                return@launch
+            }
+            if (framesBusy) {
+                toast("Wait for the drawing to finish generating")
+                return@launch
+            }
+            insertImageFrame(bmp, reuse, project.currentFrameIndex + 1)
+            emitEditorEvent(EditorEvent.OpenStyle(projectGen))
+        }
+    }
+
+    /**
+     * Batch import: every image becomes a frame (after the open one, in order) and is generated one after the other
+     * with the current style; [batchProgress] drives the "Frame i/n" label.
+     */
+    fun addFramesFromImages(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (framesBusy || benchmarking) {
+            toast("Wait for the current drawing to finish")
+            return
+        }
+        setPoseMode(false)
+        val gen = projectGen
+        batchProgress = 1 to uris.size // set now so the UI blocks frame edits immediately
+        batchJob = viewModelScope.launch {
+            var insertAt = project.currentFrameIndex + 1
+            try {
+                for ((i, uri) in uris.withIndex()) {
+                    if (gen != projectGen) return@launch
+                    batchProgress = (i + 1) to uris.size
+                    val reuse = !hasProject && project.frames.size == 1
+                    val bmp = loadFrameImage(uri, fit = !reuse)
+                    if (gen != projectGen) return@launch
+                    if (bmp == null) {
+                        toast("Skipped image ${i + 1}: could not open it")
+                        continue
+                    }
+                    insertImageFrame(bmp, reuse, insertAt)
+                    insertAt = project.currentFrameIndex + 1
+                    generate()
+                    generateJob?.join()
+                }
+            } finally {
+                if (gen == projectGen) batchProgress = null
+            }
+        }
+    }
+
+    fun toggleFlipbook() {
+        if (flipbookPlaying) stopFlipbook() else startFlipbook()
+    }
+
+    fun startFlipbook() {
+        if (flipbookPlaying) return
+        if (project.frames.size < 2) {
+            toast("Add a second frame to play the flipbook")
+            return
+        }
+        if (frameBlocked()) return
+        flushStroke()
+        commitFrameDuration()
+        anim.showFinished()
+        flipbookReturnIndex = project.currentFrameIndex
+        flipbookPlaying = true
+    }
+
+    /** Stops the flipbook; with [restore] the frame that was open when it started is shown again. */
+    fun stopFlipbook(restore: Boolean = true) {
+        if (!flipbookPlaying) return
+        flipbookPlaying = false
+        if (restore) project.currentFrameIndex = flipbookReturnIndex.coerceIn(0, project.frames.lastIndex)
+    }
+
+    /** Called by the UI clock: shows the frame [steps] after the visible one (loops). */
+    fun flipbookAdvance(steps: Int) {
+        if (!flipbookPlaying || steps <= 0) return
+        project.currentFrameIndex = FlipbookClock.next(project.currentFrameIndex, steps, project.frames.size)
+    }
+
     // ------------------------------------------------------------------ layers
 
     fun selectLayer(layer: Layer) {
@@ -1491,6 +1787,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
      */
     fun beginStroke(x: Float, y: Float): StrokeSession? {
         liveSession?.let { cancelStroke(it) }
+        if (flipbookPlaying) {
+            stopFlipbook() // touching the canvas stops the flipbook; draw on the next touch
+            return null
+        }
         val layer = project.selectedLayer ?: return null
         if (layer.locked || !layer.visible) {
             toast(if (layer.locked) "This layer is locked" else "This layer is hidden")
@@ -1856,6 +2156,80 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             snapshotFlow { exportBlockedReason }.first { it == null }
             startAnimationExport(listOf(AnimExportKind.VIDEO, AnimExportKind.GIF))
+        }
+    }
+
+    /** Copies a frame's layers (strokes + ink) so background rendering cannot race with edits. */
+    private fun snapshotFrameLayers(f: Frame): List<Layer> = f.layers.toList().map { src ->
+        Layer(src.id, src.name).also {
+            it.visible = src.visible
+            it.opacity = src.opacity
+            it.inAnimation = src.inAnimation
+            it.animPriority = src.animPriority
+            it.locked = src.locked
+            it.kind = src.kind
+            it.strokes.addAll(src.strokes.toList())
+            it.revealWidthPx = src.revealWidthPx
+            it.inkTexture = src.inkTexture?.takeIf { b -> !b.isRecycled }?.copy(Bitmap.Config.ARGB_8888, false)
+        }
+    }
+
+    /**
+     * Exports the finished drawing of every frame: a transparent PNG sequence, or a flipbook GIF / MP4 at [fps]
+     * (6/8/12/24). Frame state is copied on the main thread; encoding runs in the background with progress + cancel.
+     */
+    fun exportFrames(kind: FramesExportKind, fps: Int) {
+        exportBlockedReason?.let { toast(it); return }
+        if (batchProgress != null) { toast("Wait for the frames to finish generating"); return }
+        flushStroke()
+        if (project.frames.all { f -> f.layers.all { it.strokes.isEmpty() } }) {
+            toast("Nothing to export yet")
+            return
+        }
+        val frames = project.frames.map { snapshotFrameLayers(it) }
+        val w = project.width
+        val h = project.height
+        val name = projectName
+        val rate = fps.coerceIn(1, 60)
+        val first = when (kind) {
+            FramesExportKind.GIF -> ExportKind.GIF
+            FramesExportKind.VIDEO -> ExportKind.VIDEO
+            FramesExportKind.PNG_SEQUENCE -> ExportKind.FRAMES
+        }
+        startExport(first, "Preparing...") { done ->
+            setRunning(label = first.runningLabel)
+            var last = -1f
+            val onProgress = { p: Float ->
+                if (p - last >= 0.005f || p >= 1f) { last = p; setRunning(progress = p) }
+            }
+            val check = { ensureActive() }
+            val safe = FrameOps.safeName(name)
+            try {
+                when (kind) {
+                    FramesExportKind.PNG_SEQUENCE -> {
+                        val where = FramesExporter.pngSequence(app, w, h, frames, name, onProgress, check)
+                        done.add(ExportResult(ExportKind.FRAMES, null, where, true))
+                    }
+                    FramesExportKind.GIF -> {
+                        val where = GifExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check)
+                        done.add(
+                            if (where != null) ExportResult(ExportKind.GIF, resolveSavedUri(where, "image/gif")?.toString(), where, true)
+                            else ExportResult(ExportKind.GIF, null, null, false, "Could not write the GIF file"),
+                        )
+                    }
+                    FramesExportKind.VIDEO -> {
+                        val where = VideoExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check)
+                        done.add(
+                            if (where != null) ExportResult(ExportKind.VIDEO, resolveSavedUri(where, "video/mp4")?.toString(), where, true)
+                            else ExportResult(ExportKind.VIDEO, null, null, false, "Could not write the MP4 file"),
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                done.add(ExportResult(first, null, null, false, if (t is OutOfMemoryError) "Not enough memory, try fewer frames" else (t.message ?: "unknown error")))
+            }
         }
     }
 

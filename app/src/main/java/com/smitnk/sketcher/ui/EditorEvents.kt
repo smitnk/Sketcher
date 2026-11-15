@@ -27,6 +27,12 @@ sealed interface EditorOverlay {
     data object Export : EditorOverlay
     data class Rename(val text: String) : EditorOverlay
     data object MlSettings : EditorOverlay
+
+    /** Long-press actions of frame [index] (duplicate, move, delete). */
+    data class FrameActions(val index: Int) : EditorOverlay
+
+    /** Delete confirmation for frame [index]. */
+    data class DeleteFrame(val index: Int) : EditorOverlay
 }
 
 val EditorOverlaySaver: Saver<EditorOverlay, Any> = listSaver(
@@ -38,6 +44,8 @@ val EditorOverlaySaver: Saver<EditorOverlay, Any> = listSaver(
             EditorOverlay.Export -> listOf("export")
             is EditorOverlay.Rename -> listOf("rename", o.text)
             EditorOverlay.MlSettings -> listOf("ml")
+            is EditorOverlay.FrameActions -> listOf("frameActions", o.index.toString())
+            is EditorOverlay.DeleteFrame -> listOf("frameDelete", o.index.toString())
         }
     },
     restore = { l ->
@@ -47,13 +55,15 @@ val EditorOverlaySaver: Saver<EditorOverlay, Any> = listSaver(
             "export" -> EditorOverlay.Export
             "rename" -> EditorOverlay.Rename(l.getOrElse(1) { "" })
             "ml" -> EditorOverlay.MlSettings
+            "frameActions" -> EditorOverlay.FrameActions((l.getOrNull(1) as? String)?.toIntOrNull() ?: 0)
+            "frameDelete" -> EditorOverlay.DeleteFrame((l.getOrNull(1) as? String)?.toIntOrNull() ?: 0)
             else -> EditorOverlay.None
         }
     },
 )
 
 /** Export that waits for the storage permission (pre-Q). Survives activity recreation. */
-enum class PendingExportKind { NONE, LAYERS_SEPARATELY, IMAGE, ANIMATION }
+enum class PendingExportKind { NONE, LAYERS_SEPARATELY, IMAGE, ANIMATION, FRAMES }
 
 data class PendingExport(
     val kind: PendingExportKind = PendingExportKind.NONE,

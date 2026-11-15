@@ -24,6 +24,7 @@ data class ProjectMeta(val id: String, val name: String, val updatedAt: Long, va
 class LoadedProject(val snapshot: ProjectSnapshot, val source: Bitmap?)
 
 private const val MAX_SOURCE_SIDE = 2048
+private const val LEGACY_SOURCE = "source.jpg"
 
 class ProjectRepository(context: Context) : ProjectStore {
     private val root = File(context.applicationContext.filesDir, "projects")
@@ -33,42 +34,52 @@ class ProjectRepository(context: Context) : ProjectStore {
     private fun safeId(id: String): Boolean = id.isNotEmpty() && id.all { it.isLetterOrDigit() || it == '-' || it == '_' }
 
     /**
-     * Saves [snapshot] (take it with Project.toSnapshot() on the main thread first).
-     * [source] is the background photo (JPEG 90). Returns the project id (new if [id] null).
+     * Saves [snapshot] (take it with Project.toSnapshot() on the main thread first). Each frame's reference photo
+     * (FrameSnapshot.source) is stored as frame_<frameId>.jpg (JPEG 90); [source] is only the fallback photo of the
+     * open frame for callers that do not attach photos to the snapshot. Returns the project id (new if [id] null).
      */
     override suspend fun save(id: String?, name: String, snapshot: ProjectSnapshot, source: Bitmap?): String =
         withContext(Dispatchers.IO) {
             val pid = id?.takeIf { safeId(it) } ?: UUID.randomUUID().toString()
             val d = dir(pid)
             d.mkdirs()
+            // Photos first, project file last: a crash in between leaves the old project readable.
+            val keep = HashSet<String>()
+            for ((i, f) in snapshot.frames.withIndex()) {
+                val fileName = frameFileName(f.id)
+                val bmp = f.source ?: if (i == snapshot.currentFrameIndex) source else null
+                val file = File(d, fileName)
+                if (bmp != null && !bmp.isRecycled) {
+                    keep.add(fileName)
+                    // Re-encode the photo only when it is a different bitmap than the one last written (or the file is gone).
+                    val key = "$pid/${f.id}"
+                    val unchanged = synchronized(this@ProjectRepository) { lastSources[key]?.get() === bmp } && file.exists()
+                    if (!unchanged) {
+                        val tmp = File(d, "$fileName.tmp")
+                        FileOutputStream(tmp).use {
+                            bmp.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                            it.fd.sync()
+                        }
+                        moveReplace(tmp, file)
+                        synchronized(this@ProjectRepository) { lastSources[key] = java.lang.ref.WeakReference(bmp) }
+                    }
+                } else {
+                    synchronized(this@ProjectRepository) { lastSources.remove("$pid/${f.id}") }
+                }
+            }
             writeAtomic(File(d, "project.skch"), ProjectCodec.encode(snapshot))
             writeAtomic(File(d, "name.txt"), name.toByteArray(Charsets.UTF_8))
-            val src = File(d, "source.jpg")
-            if (source != null && !source.isRecycled) {
-                // Re-encode the photo only when it is a different bitmap than the one last written (or the file is gone).
-                val unchanged = synchronized(this@ProjectRepository) {
-                    lastSourceId == pid && lastSource === source
-                } && src.exists()
-                if (!unchanged) {
-                    val tmp = File(d, "source.jpg.tmp")
-                    FileOutputStream(tmp).use {
-                        source.compress(Bitmap.CompressFormat.JPEG, 90, it)
-                        it.fd.sync()
-                    }
-                    moveReplace(tmp, src)
-                    synchronized(this@ProjectRepository) { lastSourceId = pid; lastSource = source }
-                }
-            } else {
-                src.delete()
-                synchronized(this@ProjectRepository) { if (lastSourceId == pid) lastSource = null }
-            }
+            // Drop photos of deleted frames and the pre-frames single photo (its content now lives in frame_<id>.jpg).
+            d.listFiles { f -> f.isFile && ((f.name.startsWith("frame_") && f.name.endsWith(".jpg") && f.name !in keep) || f.name == LEGACY_SOURCE) }
+                ?.forEach { it.delete() }
             writeThumb(d, snapshot, source)
             pid
         }
 
-    // Identity of the source bitmap last written to disk (and for which project), so autosaves skip the JPEG encode.
-    private var lastSource: Bitmap? = null
-    private var lastSourceId: String? = null
+    // Identity of the photo last written to disk per "<project>/<frame>", so autosaves skip the JPEG encode.
+    private val lastSources = HashMap<String, java.lang.ref.WeakReference<Bitmap>>()
+
+    private fun frameFileName(frameId: Long) = "frame_$frameId.jpg"
 
     suspend fun load(id: String): LoadedProject? = withContext(Dispatchers.IO) {
         if (!safeId(id)) return@withContext null
@@ -83,9 +94,15 @@ class ProjectRepository(context: Context) : ProjectStore {
             android.util.Log.w("SketcherLoad", "cannot read project $id", t)
             return@withContext null
         }
-        val src = File(d, "source.jpg")
-        val bmp = if (src.exists()) decodeSource(src) else null
-        LoadedProject(snap, bmp)
+        val sources = HashMap<Long, Bitmap?>()
+        for (fr in snap.frames) {
+            var file = File(d, frameFileName(fr.id))
+            // Projects saved before frames existed keep their one photo in source.jpg.
+            if (!file.exists() && snap.frames.size == 1) file = File(d, LEGACY_SOURCE)
+            sources[fr.id] = if (file.exists()) decodeSource(file) else null
+        }
+        val withPhotos = snap.withSources(sources)
+        LoadedProject(withPhotos, withPhotos.frames[withPhotos.currentFrameIndex].source)
     }
 
     /** Decodes the photo, subsampling so the long side stays <= [MAX_SOURCE_SIDE]; null on failure or OOM. */
@@ -145,6 +162,8 @@ class ProjectRepository(context: Context) : ProjectStore {
 
     private fun writeThumb(d: File, s: ProjectSnapshot, source: Bitmap?) {
         try {
+            val f0 = s.frames.first() // the first frame is the project's cover
+            val photo = f0.source ?: if (s.currentFrameIndex == 0) source else null
             val scale = 360f / max(s.width, s.height).coerceAtLeast(1)
             val tw = max(1, (s.width * scale).roundToInt())
             val th = max(1, (s.height * scale).roundToInt())
@@ -152,12 +171,12 @@ class ProjectRepository(context: Context) : ProjectStore {
             val c = Canvas(bmp)
             c.drawColor(Color.WHITE)
             c.scale(scale, scale)
-            if (source != null && !source.isRecycled && s.backgroundVisible) {
+            if (photo != null && !photo.isRecycled && f0.backgroundVisible) {
                 val p = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
-                p.alpha = (s.backgroundOpacity * 255f).roundToInt().coerceIn(0, 255)
-                c.drawBitmap(source, null, android.graphics.RectF(0f, 0f, s.width.toFloat(), s.height.toFloat()), p)
+                p.alpha = (f0.backgroundOpacity * 255f).roundToInt().coerceIn(0, 255)
+                c.drawBitmap(photo, null, android.graphics.RectF(0f, 0f, s.width.toFloat(), s.height.toFloat()), p)
             }
-            val layers = s.layers.map { ls ->
+            val layers = f0.layers.map { ls ->
                 Layer(ls.id, ls.name).also { l ->
                     l.visible = ls.visible
                     l.opacity = ls.opacity

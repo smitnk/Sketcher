@@ -79,8 +79,9 @@ internal class OutputTarget private constructor(
     }
 
     companion object {
-        fun create(context: Context, video: Boolean, fileName: String, mime: String): OutputTarget? {
-            val relDir = if (video) "Movies/Sketcher" else "Pictures/Sketcher"
+        /** [subDir] (already a safe folder name) puts the file in Pictures|Movies/Sketcher/<subDir>/. */
+        fun create(context: Context, video: Boolean, fileName: String, mime: String, subDir: String? = null): OutputTarget? {
+            val relDir = (if (video) "Movies/Sketcher" else "Pictures/Sketcher") + (if (subDir != null) "/$subDir" else "")
             return try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val values = ContentValues().apply {
@@ -101,12 +102,14 @@ internal class OutputTarget private constructor(
                     val legacyOk = context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
                         PackageManager.PERMISSION_GRANTED
                     val publicDir = if (legacyOk) {
-                        File(Environment.getExternalStoragePublicDirectory(type), "Sketcher")
+                        File(File(Environment.getExternalStoragePublicDirectory(type), "Sketcher"), subDir ?: "")
                             .takeIf { it.isDirectory || it.mkdirs() }
                     } else {
                         null
                     }
-                    val dir = publicDir ?: context.getExternalFilesDir(type) ?: return null
+                    val dir = publicDir ?: context.getExternalFilesDir(type)?.let { base ->
+                        if (subDir != null) File(base, subDir).takeIf { it.isDirectory || it.mkdirs() } else base
+                    } ?: return null
                     val f = File(dir, fileName)
                     OutputTarget(context, null, f, mime, publicDir != null, f.absolutePath)
                 }
@@ -231,6 +234,137 @@ object VideoExporter {
                     canvas.scale(s, s)
                     canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
                     Renderer.drawPartial(canvas, width, height, layers, progress)
+                    canvas.restore()
+                } finally {
+                    inputSurface.unlockCanvasAndPost(canvas)
+                }
+                drain(false)
+                onProgress((i + 1).toFloat() / total)
+            }
+
+            enc.signalEndOfInputStream()
+            drain(true)
+            ok = true
+        } finally {
+            try { codec?.stop() } catch (e: Exception) { }
+            try { codec?.release() } catch (e: Exception) { }
+            try { surface?.release() } catch (e: Exception) { }
+            try { if (muxerStarted) muxer?.stop() } catch (e: Exception) { ok = false }
+            try { muxer?.release() } catch (e: Exception) { }
+            try { pfd?.close() } catch (e: Exception) { }
+            if (ok) target.commit() else target.abort()
+        }
+        return if (ok) target.displayPath else null
+    }
+
+    /**
+     * Flipbook MP4: every entry of [frames] (snapshots of each frame's layers, finished drawing, on paper) is shown
+     * for 1/[fps] s; the last one is held one extra step so it has a duration. Blocking; call off the main thread.
+     */
+    fun exportFrames(
+        context: Context,
+        width: Int,
+        height: Int,
+        frames: List<List<Layer>>,
+        fps: Int,
+        baseName: String,
+        onProgress: (Float) -> Unit,
+        checkCancel: () -> Unit,
+    ): String? {
+        if (frames.isEmpty()) return null
+        val rate = fps.coerceIn(1, 60)
+        val (outW, outH) = fitSize(width, height, MAX_LONG_SIDE, 16)
+        val target = OutputTarget.create(context, true, exportFileName(baseName, "mp4"), "video/mp4") ?: return null
+
+        var codec: MediaCodec? = null
+        var muxer: MediaMuxer? = null
+        var pfd: ParcelFileDescriptor? = null
+        var surface: Surface? = null
+        var muxerStarted = false
+        var ok = false
+        try {
+            val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, outW, outH)
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+            format.setInteger(MediaFormat.KEY_BIT_RATE, (outW.toLong() * outH * 5).toInt().coerceIn(1_500_000, 12_000_000))
+            format.setInteger(MediaFormat.KEY_FRAME_RATE, rate)
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+
+            val enc = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            codec = enc
+            enc.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            val inputSurface = enc.createInputSurface()
+            surface = inputSurface
+            enc.start()
+
+            val mux: MediaMuxer
+            val p = target.path
+            if (p != null) {
+                mux = MediaMuxer(p, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            } else {
+                pfd = target.openFd() ?: return null
+                mux = MediaMuxer(pfd.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            }
+            muxer = mux
+
+            val info = MediaCodec.BufferInfo()
+            var track = -1
+            var written = 0L
+
+            // Surface input stamps frames with wall-clock time, so timestamps are rewritten at [rate].
+            fun drain(endOfStream: Boolean) {
+                var idle = 0
+                while (true) {
+                    val idx = enc.dequeueOutputBuffer(info, if (endOfStream) 10_000L else 0L)
+                    if (idx == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                        if (!endOfStream) return
+                        if (++idle > 1000) throw IOException("Video encoder timed out")
+                    } else if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        track = mux.addTrack(enc.outputFormat)
+                        mux.start()
+                        muxerStarted = true
+                    } else if (idx >= 0) {
+                        idle = 0
+                        val buf = enc.getOutputBuffer(idx)
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) info.size = 0
+                        if (info.size > 0 && buf != null && muxerStarted) {
+                            buf.position(info.offset)
+                            buf.limit(info.offset + info.size)
+                            info.presentationTimeUs = written * 1_000_000L / rate
+                            written++
+                            mux.writeSampleData(track, buf, info)
+                        }
+                        enc.releaseOutputBuffer(idx, false)
+                        if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) return
+                    }
+                }
+            }
+
+            val total = frames.size + 1
+            val s = min(outW.toFloat() / width, outH.toFloat() / height)
+            val dx = (outW - width * s) / 2f
+            val dy = (outH - height * s) / 2f
+            var useHardware = true
+
+            for (i in 0 until total) {
+                checkCancel()
+                val layers = frames[minOf(i, frames.lastIndex)]
+                val canvas = if (useHardware) {
+                    try {
+                        inputSurface.lockHardwareCanvas()
+                    } catch (e: Exception) {
+                        useHardware = false
+                        inputSurface.lockCanvas(null)
+                    }
+                } else {
+                    inputSurface.lockCanvas(null)
+                }
+                try {
+                    canvas.drawColor(Color.WHITE)
+                    canvas.save()
+                    canvas.translate(dx, dy)
+                    canvas.scale(s, s)
+                    canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
+                    Renderer.drawLayers(canvas, width, height, layers)
                     canvas.restore()
                 } finally {
                     inputSurface.unlockCanvasAndPost(canvas)
