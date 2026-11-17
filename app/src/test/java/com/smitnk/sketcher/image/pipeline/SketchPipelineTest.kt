@@ -156,4 +156,23 @@ class SketchPipelineTest {
         assertTrue(!called)
         assertEquals("CARTOON", SketchPipeline.lastLineSource)
     }
+
+    @Test fun edgeInkFindsColourEdgeBetweenEquallyBrightRegions() {
+        val w = 40; val h = 40
+        val px = IntArray(w * h) { if (it % w < 20) rgb(200, 60, 60) else rgb(60, 200, 60) }
+        val e = SketchPipeline.edgeInk(px, w, h)
+        assertTrue("edge at the seam", e[20 * w + 20] > 0.2f)
+        assertEquals("flat region has no edge", 0f, e[20 * w + 5], 1e-6f)
+    }
+
+    @Test fun cleanVectorUsesFullDetail() {
+        assertEquals(1f, SketchPipeline.cleanDetail(PipelineSettings(outlineStyle = OutlineStyle.CLEAN_VECTOR), 0.3f), 0f)
+        assertEquals(0.3f, SketchPipeline.cleanDetail(PipelineSettings(), 0.3f), 0f)
+    }
+
+    @Test fun classicWithoutModelTracesRenderWithEdgeInkRaster() {
+        val d = runBlocking { SketchPipeline.run(scene(), w, h, PipelineSettings(lineSource = LineSource.CLASSIC), null) }
+        assertEquals("CLASSIC", SketchPipeline.lastLineSource)
+        assertTrue("figure outline traced", d.outline.isNotEmpty())
+    }
 }

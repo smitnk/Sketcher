@@ -36,6 +36,8 @@ data class ModelSpec(
     val maxPixels: Int = 768 * 768,
     /** fp16 weights: CPU only, never XNNPACK/NNAPI, lighter graph optimisation. */
     val fp16: Boolean = false,
+    /** Dynamic-int8 weights: CPU EP only (ORT docs: XNNPACK/NNAPI give nothing for ConvInteger/MatMulInteger). */
+    val int8: Boolean = false,
 ) {
     init {
         require(sizeMultiple > 0) { "sizeMultiple" }

@@ -150,7 +150,11 @@ class OnnxLineArtModel(
         accel = a
     }
 
-    private fun threads() = min(4, max(1, Runtime.getRuntime().availableProcessors()))
+    /**
+     * CPU-EP intra-op threads. Dimensity 7200 = 2x A715 + 6x A510: more than 4 threads only adds sync cost on the
+     * little cores (ORT threading doc: intra-op pool size is the main knob; tune by measurement, see docs/perf-notes.md).
+     */
+    private fun threads() = min(MAX_THREADS, max(1, Runtime.getRuntime().availableProcessors()))
 
     private inline fun <T> locked(waitMs: Long = LOCK_WAIT_MS, block: () -> T): T {
         val l = GLOBAL
@@ -185,8 +189,15 @@ class OnnxLineArtModel(
         val opts = OrtSession.SessionOptions()
         try {
             val t = threads()
-            opts.setIntraOpNumThreads(t)
+            // XNNPACK EP doc: it has its own pool (size = physical cores) so keep the ORT pool small to avoid
+            // contention; ops XNNPACK does not take (InstanceNorm...) still run on the CPU EP, so 2 not 1.
+            opts.setIntraOpNumThreads(if (a == Accel.XNNPACK) min(2, t) else t)
             opts.setInterOpNumThreads(1)
+            opts.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+            // Idle pool threads spin by default: burns battery on phones; the model runs are long enough that
+            // wake-up latency is irrelevant. Dynamic block size (doc-recommended 4) lowers latency variance.
+            opts.addConfigEntry("session.intra_op.allow_spinning", "0")
+            opts.addConfigEntry("session.dynamic_block_base", "4")
             // fp16 graphs: skip the extended fusions/layout rewrites (copies = peak memory).
             opts.setOptimizationLevel(
                 if (spec.fp16) OrtSession.SessionOptions.OptLevel.BASIC_OPT else OrtSession.SessionOptions.OptLevel.ALL_OPT,
@@ -212,7 +223,7 @@ class OnnxLineArtModel(
 
     private fun chain(skipNnapi: Boolean): List<Accel> {
         val order = when {
-            spec.fp16 -> listOf(Accel.CPU) // fp16: plain CPU only, never XNNPACK/NNAPI
+            spec.fp16 || spec.int8 -> listOf(Accel.CPU) // fp16/int8: plain CPU only (XNNPACK/NNAPI gain nothing, fp16 crashed)
             accel == Accel.CPU -> listOf(Accel.CPU)
             accel == Accel.XNNPACK -> listOf(Accel.XNNPACK, Accel.CPU)
             skipNnapi -> listOf(Accel.XNNPACK, Accel.CPU)
@@ -322,7 +333,7 @@ class OnnxLineArtModel(
 
     private fun terminateRun() {
         val ro = runOptions ?: return
-        try { ro.javaClass.getMethod("setTerminate", Boolean::class.javaPrimitiveType).invoke(ro, true) } catch (_: Throwable) {}
+        try { ro.setTerminate(true) } catch (_: Throwable) {} // public API of RunOptions (ORT Java docs)
     }
 
     /**
@@ -378,7 +389,7 @@ class OnnxLineArtModel(
         val tStart = System.nanoTime()
         val (tw, th) = spec.targetSize(w, h, longSide)
         MlLog.i("infer start ${spec.id} ${w}x$h -> ${tw}x$th (${tw.toLong() * th} px, cap ${spec.maxPixels}) fp16=${spec.fp16}")
-        val skipNnapi = spec.fp16 || tw.toLong() * th > NNAPI_MAX_PIXELS
+        val skipNnapi = spec.fp16 || spec.int8 || tw.toLong() * th > NNAPI_MAX_PIXELS
         val fb = fillInput(argb, w, h, tw, th)
         val tPre = System.nanoTime()
         MlLog.i("infer preprocessed in ${(tPre - tStart) / 1_000_000} ms")
@@ -466,7 +477,7 @@ class OnnxLineArtModel(
         val out = FloatArray(plane)
         val results = LinkedHashMap<Accel, Long>()
         val candidates = when {
-            spec.fp16 -> listOf(Accel.CPU)
+            spec.fp16 || spec.int8 -> listOf(Accel.CPU)
             includeNnapi -> Accel.values().toList()
             else -> listOf(Accel.CPU, Accel.XNNPACK)
         }
@@ -565,6 +576,9 @@ class OnnxLineArtModel(
 
     companion object {
         const val DEFAULT_LONG_SIDE = 768
+
+        /** Upper bound for CPU threads (big cores + a couple of littles). */
+        private const val MAX_THREADS = 4
         const val PREFS = "sketcher_ml"
         private const val KEY_ACCEL = "accel"
         private const val KEY_BENCH_PREFIX = "bench_ms_"

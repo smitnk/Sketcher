@@ -26,12 +26,28 @@ jobs:
         run: python tools/model_lab/convert.py
       - name: Evaluate
         run: python tools/model_lab/evaluate.py app/src/debug/assets/testimages out out
+      - name: Variants (int8 dynamic, ORT format, quality + timing vs fp32)
+        run: python tools/model_lab/variants.py app/src/debug/assets/testimages out out
       - name: Publish
         run: |
           set -e
           mkdir -p pub/sheets
           cp -r out/sheets/. pub/sheets/
           cp out/timings.csv out/sizes.txt pub/
+          # variants: verdict json + sheets always; weights only if the quality gate passed AND < 95 MB (branch rule)
+          mkdir -p pub/variants/sheets
+          cp out/variants/variants.json pub/variants/
+          cp -r out/variants/sheets/. pub/variants/sheets/
+          python - <<'PY'
+          import json, os, shutil
+          v = json.load(open("out/variants/variants.json"))
+          for f, r in v.items():
+              if r.get("verdict") == "pass" and r.get("mb", 1e9) < 95 and r["kind"] != "fp32":
+                  shutil.copy(os.path.join("out/variants", f), "pub/variants/")
+          PY
+          for f in out/variants/*.onnx out/variants/*.ort; do
+            [ -f "$f" ] && gh release upload models-v1 "$f" --repo "$GITHUB_REPOSITORY" --clobber || true
+          done
           gh release create models-v1 --repo "$GITHUB_REPOSITORY" --title "Line-art ONNX models" --notes "Converted ControlNet Annotators line-art models (see tools/model_lab/LICENSES.md)" || true
           for f in out/*.onnx; do
             sz=$(stat -c %s "$f")

@@ -23,11 +23,15 @@ class AnimationController {
     /** Total animation length in seconds (2..60). */
     var durationSec by mutableFloatStateOf(12f)
 
+    /** Seconds left of the end hold (final frame shown at progress 1 before [playing] turns off). */
+    private var holdLeft = 0f
+
     fun togglePlay() {
         if (playing) {
             playing = false
         } else {
             if (!active || progress >= 1f) progress = 0f
+            holdLeft = 0f
             active = true
             playing = true
         }
@@ -35,6 +39,7 @@ class AnimationController {
 
     fun restart() {
         progress = 0f
+        holdLeft = 0f
         active = true
         playing = true
     }
@@ -42,6 +47,7 @@ class AnimationController {
     /** Scrub to [fraction] (0..1): pauses playback and shows the partial drawing at that progress. */
     fun seek(fraction: Float) {
         playing = false
+        holdLeft = 0f
         active = true
         progress = fraction.coerceIn(0f, 1f)
     }
@@ -54,11 +60,20 @@ class AnimationController {
 
     fun advance(deltaSeconds: Float) {
         if (!playing) return
-        progress += deltaSeconds / durationSec.coerceAtLeast(0.5f)
-        if (progress >= 1f) {
-            progress = 1f
-            playing = false
-            com.smitnk.sketcher.ui.DebugDump.logAnimEnd(progress)
+        // A long frame (GC / jank) must not skip a chunk of the drawing: cap what one frame can advance.
+        val dt = deltaSeconds.coerceIn(0f, MAX_FRAME_SEC)
+        if (progress < 1f) {
+            progress += dt / durationSec.coerceAtLeast(0.5f)
+            if (progress >= 1f) {
+                progress = 1f // the final frame is drawn at exactly 1, then held
+                holdLeft = END_HOLD_SEC
+            }
+        } else {
+            holdLeft -= dt
+            if (holdLeft <= 0f) {
+                playing = false
+                com.smitnk.sketcher.ui.DebugDump.logAnimEnd(progress)
+            }
         }
     }
 
@@ -69,5 +84,10 @@ class AnimationController {
     fun allowances(layers: List<Layer>): Map<Long, Float>? {
         if (!active) return null
         return LayerTimeline.allowances(layers, progress)
+    }
+
+    companion object {
+        const val END_HOLD_SEC = 0.6f
+        const val MAX_FRAME_SEC = 0.1f
     }
 }

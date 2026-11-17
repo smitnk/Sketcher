@@ -17,6 +17,11 @@ object DrawTimeline {
     const val LAYER_PAUSE_SEC = 0.9
     const val SHADING_MUL = 2.5
     const val FILL_MUL = 3.0
+    /** Pen-lift + layer pauses together never exceed this share of the timeline. */
+    const val MAX_PAUSE_FRACTION = 0.25
+    const val EASE_MIX = 0.6
+    private const val TINY_FLOOR = 0.2
+    private const val TINY_LEN_PX = 60.0
 
     /** One layer in play order. Arrays are per stroke; [speedMul] divides draw time and pause. */
     class LayerSpec(
@@ -77,10 +82,10 @@ object DrawTimeline {
         }
     }
 
-    /** Smoothstep ease-in-out, 0..1 -> 0..1. */
+    /** Mild ease-in-out (60% smoothstep, 40% linear), 0..1 -> 0..1: the pen slows at stroke ends without stalling. */
     fun ease(u: Double): Double {
         val t = u.coerceIn(0.0, 1.0)
-        return t * t * (3 - 2 * t)
+        return t + EASE_MIX * (t * t * (3 - 2 * t) - t)
     }
 
     fun build(layers: List<LayerSpec>): Timeline {
@@ -93,7 +98,10 @@ object DrawTimeline {
         val te = DoubleArray(n)
         val ln = FloatArray(n)
         val lb = FloatArray(n)
-        var t = 0.0
+        val dur = DoubleArray(n)
+        val pause = DoubleArray(n) // pen-lift / layer pause BEFORE stroke k (0 for the first)
+        var drawTotal = 0.0
+        var pauseTotal = 0.0
         var k = 0
         var havePrev = false
         for ((li, l) in layers.withIndex()) {
@@ -101,24 +109,36 @@ object DrawTimeline {
             for (s in l.lengths.indices) {
                 val mul = l.speedMul[s].toDouble().coerceAtLeast(0.01)
                 if (havePrev) {
-                    t += if (s == 0) LAYER_PAUSE_SEC else {
+                    pause[k] = if (s == 0) LAYER_PAUSE_SEC else {
                         val dist = hypot(
                             (l.startX[s] - l.endX[s - 1]).toDouble(),
                             (l.startY[s] - l.endY[s - 1]).toDouble(),
                         )
                         min(LIFT_MAX_SEC, LIFT_BASE_SEC + dist * LIFT_PER_PX_SEC) / mul
                     }
+                    pauseTotal += pause[k]
                 }
-                val dur = (BASE_SEC + l.lengths[s] / SPEED_PX_PER_SEC) / mul
-                sl[k] = li; ts[k] = t; te[k] = t + dur; ln[k] = l.lengths[s]; lb[k] = cum
-                t += dur
+                // Tiny strokes (coverage hairs) must not cost a full stroke's setup time.
+                val base = BASE_SEC * min(1.0, TINY_FLOOR + l.lengths[s] / TINY_LEN_PX)
+                dur[k] = (base + l.lengths[s] / SPEED_PX_PER_SEC) / mul
+                drawTotal += dur[k]
+                sl[k] = li; ln[k] = l.lengths[s]; lb[k] = cum
                 cum += l.lengths[s]
                 havePrev = true
                 k++
             }
             totals[li] = cum
         }
+        // Pauses may take at most MAX_PAUSE_FRACTION of the whole timeline, so they never eat the tail.
+        val maxPause = drawTotal * MAX_PAUSE_FRACTION / (1.0 - MAX_PAUSE_FRACTION)
+        val f = if (pauseTotal > maxPause && pauseTotal > 0.0) maxPause / pauseTotal else 1.0
+        var t = 0.0
+        for (i in 0 until n) {
+            t += pause[i] * f
+            ts[i] = t; t += dur[i]; te[i] = t
+        }
         if (t > 0.0) for (i in 0 until n) { ts[i] /= t; te[i] /= t }
+        if (n > 0) te[n - 1] = 1.0 // exact: progress 1 == the last stroke completes
         return Timeline(ids, totals, sl, ts, te, ln, lb, t)
     }
 }

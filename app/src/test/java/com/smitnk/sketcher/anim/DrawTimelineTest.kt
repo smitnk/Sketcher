@@ -74,7 +74,7 @@ class DrawTimelineTest {
 
     @Test fun longJumpPausesLongerButCapped() {
         fun gap(dist: Float): Double {
-            val l = DrawTimeline.LayerSpec(1, floatArrayOf(10f, 10f), floatArrayOf(0f, dist), floatArrayOf(0f, 0f),
+            val l = DrawTimeline.LayerSpec(1, floatArrayOf(5000f, 5000f), floatArrayOf(0f, dist), floatArrayOf(0f, 0f),
                 floatArrayOf(0f, 0f), floatArrayOf(0f, 0f), floatArrayOf(1f, 1f))
             val t = DrawTimeline.build(listOf(l))
             return (t.startOf(1) - t.endOf(0)) * t.rawSeconds

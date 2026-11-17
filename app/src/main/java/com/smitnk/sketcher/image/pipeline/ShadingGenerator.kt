@@ -438,16 +438,19 @@ object ShadingGenerator {
                 if (rem >= 0) { sum -= src[row + rem]; c-- }
             }
         }
+        // Column pass done row-major with one running sum per column (same adds in the same order as a
+        // per-column walk, so results are bit-identical, but memory access is sequential).
         val out = FloatArray(src.size)
-        for (x in 0 until w) {
-            var sum = 0f; var c = 0
-            for (y in 0..min(r, h - 1)) { sum += tmp[y * w + x]; c++ }
-            for (y in 0 until h) {
-                out[y * w + x] = sum / c
-                val add = y + r + 1; val rem = y - r
-                if (add < h) { sum += tmp[add * w + x]; c++ }
-                if (rem >= 0) { sum -= tmp[rem * w + x]; c-- }
-            }
+        val sums = FloatArray(w)
+        var c = 0
+        for (y in 0..min(r, h - 1)) { val row = y * w; for (x in 0 until w) sums[x] += tmp[row + x]; c++ }
+        for (y in 0 until h) {
+            val row = y * w
+            val inv = c
+            for (x in 0 until w) out[row + x] = sums[x] / inv
+            val add = y + r + 1; val rem = y - r
+            if (add < h) { val a = add * w; for (x in 0 until w) sums[x] += tmp[a + x]; c++ }
+            if (rem >= 0) { val b = rem * w; for (x in 0 until w) sums[x] -= tmp[b + x]; c-- }
         }
         return out
     }
@@ -467,15 +470,16 @@ object ShadingGenerator {
             }
         }
         val out = ByteArray(src.size)
-        for (x in 0 until w) {
-            var sum = 0; var c = 0
-            for (y in 0..min(r, h - 1)) { sum += tmp[y * w + x]; c++ }
-            for (y in 0 until h) {
-                out[y * w + x] = (if (erode) sum == c else sum > 0).let { if (it) 1 else 0 }.toByte()
-                val add = y + r + 1; val rem = y - r
-                if (add < h) { sum += tmp[add * w + x]; c++ }
-                if (rem >= 0) { sum -= tmp[rem * w + x]; c-- }
-            }
+        val sums = IntArray(w)
+        var c = 0
+        for (y in 0..min(r, h - 1)) { val row = y * w; for (x in 0 until w) sums[x] += tmp[row + x]; c++ }
+        for (y in 0 until h) {
+            val row = y * w
+            if (erode) { for (x in 0 until w) out[row + x] = if (sums[x] == c) 1 else 0 }
+            else { for (x in 0 until w) out[row + x] = if (sums[x] > 0) 1 else 0 }
+            val add = y + r + 1; val rem = y - r
+            if (add < h) { val a = add * w; for (x in 0 until w) sums[x] += tmp[a + x]; c++ }
+            if (rem >= 0) { val b = rem * w; for (x in 0 until w) sums[x] -= tmp[b + x]; c-- }
         }
         return out
     }
