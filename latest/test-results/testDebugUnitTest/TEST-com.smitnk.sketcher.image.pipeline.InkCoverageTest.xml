@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.InkCoverageTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-15T10:55:01" hostname="runnervmccnms" time="0.02">
+<testsuite name="com.smitnk.sketcher.image.pipeline.InkCoverageTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-17T13:43:21" hostname="runnervmccnms" time="0.015">
   <properties/>
   <testcase name="nothingToAddWhenAlreadyCovered" classname="com.smitnk.sketcher.image.pipeline.InkCoverageTest" time="0.002"/>
-  <testcase name="uncoveredInkGetsCoveredWithinRadius" classname="com.smitnk.sketcher.image.pipeline.InkCoverageTest" time="0.013"/>
-  <testcase name="visibilityZeroesBackground" classname="com.smitnk.sketcher.image.pipeline.InkCoverageTest" time="0.005"/>
+  <testcase name="uncoveredInkGetsCoveredWithinRadius" classname="com.smitnk.sketcher.image.pipeline.InkCoverageTest" time="0.01"/>
+  <testcase name="visibilityZeroesBackground" classname="com.smitnk.sketcher.image.pipeline.InkCoverageTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

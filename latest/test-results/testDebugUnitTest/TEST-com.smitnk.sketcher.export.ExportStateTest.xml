@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.export.ExportStateTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-15T10:55:00" hostname="runnervmccnms" time="0.005">
+<testsuite name="com.smitnk.sketcher.export.ExportStateTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-17T13:43:20" hostname="runnervmccnms" time="0.005">
   <properties/>
-  <testcase name="runningBlocksButDoneAndFailedDoNot" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.001"/>
+  <testcase name="runningBlocksButDoneAndFailedDoNot" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.002"/>
   <testcase name="generatingBlocksEverything" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.0"/>
-  <testcase name="partialSuccessIsReportedHonestly" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.004"/>
-  <testcase name="inkAlphaCurveIsMonotonicAndSolid" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.0"/>
+  <testcase name="partialSuccessIsReportedHonestly" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.002"/>
+  <testcase name="inkAlphaCurveIsMonotonicAndSolid" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

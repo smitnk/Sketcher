@@ -2,7 +2,7 @@ crop: x0=154 y0=190 x1=498 y1=1024 of 734x1024 bgFraction=0.82500523
 lineSource=AI
 model=informative
 accelActive=CPU + XNNPACK fallback=null
-inferenceMs=16338 (wrapped=17046) genMs=20086
+inferenceMs=17271 (wrapped=17996) genMs=20044
 ink: min=0.0 mean=0.0506171795824862 max=0.9268768 (317x768)
 strokes: outline=437 shading=0 fill=0
 inkW=734 inkH=1024 drawing=734x1024 revealWidth=11.0
