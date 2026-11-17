@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.data.ProjectCodecFramesTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-17T13:43:20" hostname="runnervmccnms" time="0.014">
+<testsuite name="com.smitnk.sketcher.data.ProjectCodecFramesTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-17T14:06:56" hostname="runnervmccnms" time="0.014">
   <properties/>
-  <testcase name="corruptFrameCountIsRejected" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.002"/>
-  <testcase name="v3ReEncodesAsV4" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.002"/>
-  <testcase name="duplicateFrameIdsAreMadeUnique" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.002"/>
+  <testcase name="corruptFrameCountIsRejected" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.003"/>
+  <testcase name="v3ReEncodesAsV4" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.003"/>
+  <testcase name="duplicateFrameIdsAreMadeUnique" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.003"/>
   <testcase name="v4RoundTripKeepsEveryFrame" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.002"/>
   <testcase name="v3LoadsAsSingleFrame" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.001"/>
   <testcase name="mirrorFieldsDescribeTheOpenFrame" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.0"/>
   <testcase name="versionIsFour" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.0"/>
-  <testcase name="legacyConstructorIsOneFrame" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.001"/>
+  <testcase name="legacyConstructorIsOneFrame" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.0"/>
   <testcase name="openFrameIndexIsClampedOnDecode" classname="com.smitnk.sketcher.data.ProjectCodecFramesTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
