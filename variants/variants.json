@@ -1,0 +1,162 @@
+{
+ "informative_fp32.onnx": {
+  "model": "informative",
+  "kind": "fp32",
+  "mb": 17.19,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 520.1,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "informative_int8.onnx": {
+  "model": "informative",
+  "kind": "int8",
+  "mb": 5.45,
+  "mean_abs_diff": 0.0014,
+  "p999_diff": 0.0407,
+  "cpu_ms_runner": 2329.9,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "informative_fp32.ort": {
+  "model": "informative",
+  "kind": "fp32.ort",
+  "mb": 17.22,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 538.6,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "informative_int8.ort": {
+  "model": "informative",
+  "kind": "int8.ort",
+  "mb": 5.49,
+  "mean_abs_diff": 0.0014,
+  "p999_diff": 0.0407,
+  "cpu_ms_runner": 2329.4,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "realistic_fp32.onnx": {
+  "model": "realistic",
+  "kind": "fp32",
+  "mb": 17.22,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 520.7,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "realistic_int8.onnx": {
+  "model": "realistic",
+  "kind": "int8",
+  "mb": 5.49,
+  "mean_abs_diff": 0.0014,
+  "p999_diff": 0.0407,
+  "cpu_ms_runner": 2228.6,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "realistic_fp32.ort": {
+  "model": "realistic",
+  "kind": "fp32.ort",
+  "mb": 17.23,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 532.6,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "realistic_int8.ort": {
+  "model": "realistic",
+  "kind": "int8.ort",
+  "mb": 5.51,
+  "mean_abs_diff": 0.0014,
+  "p999_diff": 0.0407,
+  "cpu_ms_runner": 2066.5,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "coarse_fp32.onnx": {
+  "model": "coarse",
+  "kind": "fp32",
+  "mb": 17.22,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 510.8,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "coarse_int8.onnx": {
+  "model": "coarse",
+  "kind": "int8",
+  "mb": 5.49,
+  "mean_abs_diff": 0.0018,
+  "p999_diff": 0.0515,
+  "cpu_ms_runner": 2307.5,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "coarse_fp32.ort": {
+  "model": "coarse",
+  "kind": "fp32.ort",
+  "mb": 17.23,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 544.6,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "coarse_int8.ort": {
+  "model": "coarse",
+  "kind": "int8.ort",
+  "mb": 5.51,
+  "mean_abs_diff": 0.0018,
+  "p999_diff": 0.0515,
+  "cpu_ms_runner": 2328.8,
+  "verdict": "pass",
+  "publishable_branch": true
+ },
+ "anime_fp32.onnx": {
+  "model": "anime",
+  "kind": "fp32",
+  "mb": 217.69,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 201.8,
+  "verdict": "pass",
+  "publishable_branch": false
+ },
+ "anime_int8.onnx": {
+  "model": "anime",
+  "kind": "int8",
+  "mb": 159.12,
+  "mean_abs_diff": 0.00153,
+  "p999_diff": 0.108,
+  "cpu_ms_runner": 404.1,
+  "verdict": "pass",
+  "publishable_branch": false
+ },
+ "anime_fp32.ort": {
+  "model": "anime",
+  "kind": "fp32.ort",
+  "mb": 217.71,
+  "mean_abs_diff": 0.0,
+  "p999_diff": 0.0,
+  "cpu_ms_runner": 213.9,
+  "verdict": "pass",
+  "publishable_branch": false
+ },
+ "anime_int8.ort": {
+  "model": "anime",
+  "kind": "int8.ort",
+  "mb": 159.15,
+  "mean_abs_diff": 0.00153,
+  "p999_diff": 0.108,
+  "cpu_ms_runner": 408.0,
+  "verdict": "pass",
+  "publishable_branch": false
+ }
+}

@@ -1,0 +1,6 @@
+lineart_anime.onnx	217.69 MB
+lineart_anime_fp16.onnx	108.87 MB
+lineart_coarse.onnx	17.22 MB
+lineart_coarse_fp16.onnx	8.64 MB
+lineart_realistic.onnx	17.22 MB
+lineart_realistic_fp16.onnx	8.64 MB
