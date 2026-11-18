@@ -1,0 +1,5 @@
+--------- beginning of main
+11-18 12:21:11.781  8990  8990 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=CREAM, misregisterColour=true, post=NONE, onTwos=false, seed=1)
+11-18 12:21:43.064  8990  8990 I SketcherGen: GEN_DONE ms=29487 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-18 12:21:45.444  8990  9012 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_riso
+11-18 12:22:04.467  8990  8990 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

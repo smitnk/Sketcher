@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.look.StrokeFeelGeometryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-18T09:59:05" hostname="runnervmccnms" time="0.009">
+<testsuite name="com.smitnk.sketcher.look.StrokeFeelGeometryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-18T12:03:59" hostname="runnervmccnms" time="0.01">
   <properties/>
-  <testcase name="plotterHasPooledDotAndIsStraight" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.003"/>
-  <testcase name="pressureRampsInAndTapersOut" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
+  <testcase name="plotterHasPooledDotAndIsStraight" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.002"/>
+  <testcase name="pressureRampsInAndTapersOut" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
   <testcase name="boilChangesPerDrawingButNotWithinOne" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
   <testcase name="wobbleBoundedAnchoredAndDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
   <testcase name="cleanIsNullAndShapesDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
