@@ -1,4 +1,4 @@
 --------- beginning of main
-11-17 14:39:03.891  6606  6606 I SketcherGen: GEN_DONE ms=31821 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-17 14:39:05.138  6606  6629 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_informative_ai_pencil
-11-17 14:39:17.350  6606  6606 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-18 10:04:48.411  6601  6601 I SketcherGen: GEN_DONE ms=31249 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-18 10:04:50.123  6601  6636 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_informative_ai_pencil
+11-18 10:05:01.989  6601  6601 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

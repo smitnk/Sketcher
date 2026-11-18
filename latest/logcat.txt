@@ -1,75 +1,73 @@
-11-17 14:50:08.203   519   819 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
-11-17 14:50:08.207   753   805 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=37 suggestType=3
-11-17 14:50:08.212   519   839 V ActivityManager: Got obituary of 8829:com.smitnk.sketcher
-11-17 14:50:08.236   519   564 I ActivityManager: Start proc 8998:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
-11-17 14:50:08.419  8998  8998 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
-11-17 14:50:10.666   519   552 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s459ms
-11-17 14:50:10.807  8998  8998 I SketcherML: generate begin run=1 model=informative accel=cpu src=745x1024 [java=5/512MB native=27MB]
-11-17 14:50:11.207   519   819 W InputManager-JNI: Input channel object 'dd0f0c8 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
-11-17 14:50:11.575  8998  9022 I SketcherML: stage "Preparing image" at 696 ms (progress 2%) [java=9/512MB native=39MB]
-11-17 14:50:11.741  8998  9033 I SketcherML: session create informative accel=CPU [java=10/512MB native=41MB]
-11-17 14:50:12.550  8998  9022 I SketcherML: stage "Analysing image" at 1753 ms (progress 6%) [java=46/512MB native=57MB]
-11-17 14:50:13.389  8998  9022 I SketcherML: stage "Extracting cartoon lines" at 2593 ms (progress 10%) [java=46/512MB native=59MB]
-11-17 14:50:13.395  8998  9033 I SketcherML: session ready informative accel=CPU (wanted CPU) in 1653 ms [java=49/512MB native=59MB]
-11-17 14:50:14.210  8998  9008 I smitnk.sketche: JIT allocated 82KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
-11-17 14:50:14.211  8998  9008 I smitnk.sketche: Compiler allocated 11MB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
-11-17 14:50:14.301  8998  9040 D ProfileInstaller: Installing profile for com.smitnk.sketcher
-11-17 14:50:14.462  8998  9022 I SketcherML: stage "Running AI line-art model" at 3665 ms (progress 20%) [java=55/512MB native=52MB]
-11-17 14:50:14.673  8998  9044 I SketcherML: infer start informative 614x768 -> 616x768 (473088 px, cap 589824) fp16=false [java=41/512MB native=52MB]
-11-17 14:50:15.292  8998  9044 I SketcherML: infer preprocessed in 620 ms [java=46/512MB native=52MB]
-11-17 14:50:15.292  8998  9044 I SketcherML: run begin informative accel=CPU [java=48/512MB native=52MB]
-11-17 14:50:59.772  8998  9022 W SketcherML: WATCHDOG infer informative timed out after 45s [java=27/512MB native=142MB]
-11-17 14:51:01.773  8998  9022 W SketcherML: engine still held after terminate: tripping circuit breaker [java=27/512MB native=142MB]
-11-17 14:51:02.754  8998  9022 I SketcherML: stage "Vectorising lines" at 51957 ms (progress 40%) [java=62/512MB native=141MB]
-11-17 14:51:03.349  8998  9022 I SketcherML: stage "Colour fill" at 52553 ms (progress 80%) [java=55/512MB native=36MB]
-11-17 14:51:03.840  8998  9008 I smitnk.sketche: Compiler allocated 4251KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
-11-17 14:51:04.087  8998  9008 I smitnk.sketche: Compiler allocated 4743KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
-11-17 14:51:04.375  8998  9022 I SketcherML: stage "Pencil texture" at 53578 ms (progress 95%) [java=74/512MB native=36MB]
-11-17 14:51:04.645  8998  9022 I SketcherML: stage "Done" at 53849 ms (progress 100%) [java=42/512MB native=36MB]
-11-17 14:51:04.796  8998  8998 I SketcherGen: GEN_DONE ms=54000 outline=111 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-17 14:51:05.788  8998  9022 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run
-11-17 14:51:05.939  8998  8998 I SketcherML: generate done in 55143 ms source=CARTOON timings={prep=0, crop=925, analyse=838, cartoonInk=1037, model=47124, vectorize=575, coverage=163, total=53153} [java=48/512MB native=54MB]
-11-17 14:51:09.156   519   819 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@4472971
-11-17 14:51:22.120  8998  8998 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-11-17 14:51:29.006   519   819 I ActivityManager: Force stopping com.smitnk.sketcher appid=10145 user=0: from pid 9112
-11-17 14:51:29.008   519   819 I ActivityManager: Killing 8998:com.smitnk.sketcher/u0a145 (adj 0): stop com.smitnk.sketcher due to from pid 9112
-11-17 14:51:29.015   519   819 W ActivityTaskManager: Force removing ActivityRecord{2d21aba u0 com.smitnk.sketcher/.MainActivity t37 f}}: app died, no saved state
-11-17 14:51:29.016   519   819 W InputManager-JNI: Input channel object 'd847f0e com.smitnk.sketcher/com.smitnk.sketcher.MainActivity (client)' was disposed without first being removed with the input manager!
-11-17 14:51:29.044   519  1601 V ActivityManager: Got obituary of 8998:com.smitnk.sketcher
-11-17 14:51:29.106   519   819 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
-11-17 14:51:29.110   753   805 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=38 suggestType=3
-11-17 14:51:29.151   519   564 I ActivityManager: Start proc 9123:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
-11-17 14:51:29.433  9123  9123 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
-11-17 14:51:31.599   519   552 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s489ms
-11-17 14:51:31.943   519   863 W InputManager-JNI: Input channel object '8923451 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
-11-17 14:51:32.033  9123  9123 I SketcherML: generate begin run=1 model=informative accel=cpu src=768x1024 [java=6/512MB native=31MB]
-11-17 14:51:32.251  9123  9147 I SketcherML: stage "Preparing image" at 241 ms (progress 2%) [java=9/512MB native=30MB]
-11-17 14:51:33.066  9123  9147 I SketcherML: stage "Analysing image" at 1056 ms (progress 6%) [java=10/512MB native=31MB]
-11-17 14:51:33.362  9123  9152 I SketcherML: session create informative accel=CPU [java=11/512MB native=40MB]
-11-17 14:51:33.704  9123  9147 I SketcherML: stage "Extracting cartoon lines" at 1694 ms (progress 10%) [java=45/512MB native=35MB]
-11-17 14:51:34.750  9123  9129 I smitnk.sketche: JIT allocated 82KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
-11-17 14:51:34.751  9123  9129 I smitnk.sketche: Compiler allocated 11MB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
-11-17 14:51:34.932  9123  9152 I SketcherML: session ready informative accel=CPU (wanted CPU) in 1569 ms [java=60/512MB native=53MB]
-11-17 14:51:34.992  9123  9156 D ProfileInstaller: Installing profile for com.smitnk.sketcher
-11-17 14:51:35.120  9123  9147 I SketcherML: stage "Running AI line-art model" at 3109 ms (progress 20%) [java=55/512MB native=53MB]
-11-17 14:51:35.135  9123  9157 I SketcherML: infer start informative 375x768 -> 376x768 (288768 px, cap 589824) fp16=false [java=58/512MB native=53MB]
-11-17 14:51:37.897  9123  9157 I SketcherML: infer preprocessed in 2761 ms [java=61/512MB native=53MB]
-11-17 14:51:37.898  9123  9157 I SketcherML: run begin informative accel=CPU [java=62/512MB native=53MB]
-11-17 14:51:55.076   519   550 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
-11-17 14:51:56.782  9123  9123 I SketcherML: generate begin run=2 model=informative accel=cpu src=768x1024 [java=22/512MB native=68MB]
-11-17 14:51:56.792  9123  9146 I SketcherML: stage "Preparing image" at 1011 ms (progress 2%) [java=25/512MB native=68MB]
-11-17 14:51:57.242  9123  9146 I SketcherML: stage "Analysing image" at 1461 ms (progress 6%) [java=28/512MB native=68MB]
-11-17 14:51:57.630  9123  9146 I SketcherML: stage "Extracting cartoon lines" at 1848 ms (progress 10%) [java=30/512MB native=68MB]
-11-17 14:51:58.499  9123  9146 I SketcherML: stage "Running AI line-art model" at 2718 ms (progress 20%) [java=44/512MB native=53MB]
-11-17 14:51:58.583  9123  9167 I SketcherML: infer start informative 375x768 -> 376x768 (288768 px, cap 589824) fp16=false [java=47/512MB native=53MB]
-11-17 14:52:01.532  9123  9167 I SketcherML: infer preprocessed in 2949 ms [java=47/512MB native=54MB]
-11-17 14:52:01.533  9123  9167 I SketcherML: run begin informative accel=CPU [java=48/512MB native=54MB]
-11-17 14:52:34.535  9123  9167 I SketcherML: infer done informative 375x768 -> 376x768 accel=CPU pre=2949ms run=32794ms post=208ms total=35951ms [java=23/512MB native=54MB]
-11-17 14:52:35.991  9123  9146 I SketcherML: stage "Vectorising lines" at 40210 ms (progress 40%) [java=59/512MB native=54MB]
-11-17 14:52:36.242  9123  9146 I SketcherML: stage "Pencil texture" at 40461 ms (progress 95%) [java=61/512MB native=54MB]
-11-17 14:52:37.185  9123  9146 I SketcherML: stage "Done" at 41404 ms (progress 100%) [java=20/512MB native=54MB]
-11-17 14:52:37.193  9123  9123 I SketcherGen: GEN_DONE ms=41411 outline=112 shading=0 fill=0 size=768x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-17 14:52:38.111  9123  9146 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run
-11-17 14:52:38.233  9123  9123 I SketcherML: generate done in 42451 ms source=CARTOON timings={prep=0, crop=449, analyse=386, cartoonInk=840, model=35961, vectorize=650, coverage=373, total=40392} [java=27/512MB native=73MB]
-11-17 14:52:41.461   519  1251 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@e1a3667
-11-17 14:52:51.300  9123  9123 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-18 10:15:22.555   520  1038 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-18 10:15:22.604   766   812 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=37 suggestType=3
+11-18 10:15:22.627   520   565 I ActivityManager: Start proc 8948:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-18 10:15:22.764  8948  8948 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-18 10:15:25.171   520   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s608ms
+11-18 10:15:25.600   520  2379 W InputManager-JNI: Input channel object 'd8fe3a3 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-18 10:15:25.891  8948  8980 I SketcherML: session create informative accel=CPU [java=6/512MB native=35MB]
+11-18 10:15:26.083  8948  8980 I SketcherML: session ready informative accel=CPU (wanted CPU) in 192 ms [java=38/512MB native=59MB]
+11-18 10:15:26.231  8948  8948 I SketcherML: generate begin run=1 model=informative accel=cpu src=745x1024 [java=38/512MB native=59MB]
+11-18 10:15:26.243  8948  8968 I SketcherML: stage "Preparing image" at 938 ms (progress 2%) [java=41/512MB native=58MB]
+11-18 10:15:26.829  8948  8968 I SketcherML: stage "Analysing image" at 1524 ms (progress 6%) [java=44/512MB native=59MB]
+11-18 10:15:27.438  8948  8968 I SketcherML: stage "Extracting cartoon lines" at 2133 ms (progress 10%) [java=47/512MB native=59MB]
+11-18 10:15:28.201  8948  8954 I smitnk.sketche: JIT allocated 85KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-18 10:15:28.201  8948  8954 I smitnk.sketche: Compiler allocated 12MB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-18 10:15:28.520  8948  8988 D ProfileInstaller: Installing profile for com.smitnk.sketcher
+11-18 10:15:28.563  8948  8968 I SketcherML: stage "Running AI line-art model" at 3258 ms (progress 20%) [java=39/512MB native=52MB]
+11-18 10:15:28.607  8948  8989 I SketcherML: infer start informative 614x768 -> 616x768 (473088 px, cap 589824) fp16=false [java=44/512MB native=52MB]
+11-18 10:15:28.955  8948  8989 I SketcherML: infer preprocessed in 362 ms [java=49/512MB native=52MB]
+11-18 10:15:28.955  8948  8989 I SketcherML: run begin informative accel=CPU [java=51/512MB native=52MB]
+11-18 10:16:13.613  8948  8968 W SketcherML: WATCHDOG infer informative timed out after 45s [java=27/512MB native=142MB]
+11-18 10:16:15.263  8948  8968 I SketcherML: stage "Vectorising lines" at 49958 ms (progress 40%) [java=58/512MB native=53MB]
+11-18 10:16:15.949  8948  8968 I SketcherML: stage "Colour fill" at 50644 ms (progress 80%) [java=79/512MB native=53MB]
+11-18 10:16:16.542  8948  8954 I smitnk.sketche: Compiler allocated 4251KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
+11-18 10:16:16.704  8948  8954 I smitnk.sketche: Compiler allocated 4743KB to compile java.util.List com.smitnk.sketcher.image.ColorStrokeGenerator.generateFill(int[], int, int, int, int, int, float, boolean)
+11-18 10:16:16.771  8948  8968 I SketcherML: stage "Pencil texture" at 51466 ms (progress 95%) [java=60/512MB native=53MB]
+11-18 10:16:16.969  8948  8968 I SketcherML: stage "Done" at 51665 ms (progress 100%) [java=85/512MB native=53MB]
+11-18 10:16:17.234  8948  8948 I SketcherGen: GEN_DONE ms=51863 outline=111 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-18 10:16:18.396  8948  8968 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run
+11-18 10:16:18.506  8948  8948 I SketcherML: generate done in 53201 ms source=CARTOON timings={prep=0, crop=580, analyse=608, cartoonInk=1100, model=45711, vectorize=684, coverage=130, total=50728} [java=40/512MB native=71MB]
+11-18 10:16:21.558   520  1486 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@9a1258e
+11-18 10:16:34.061  8948  8948 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-18 10:16:43.533   520  1486 I ActivityManager: Force stopping com.smitnk.sketcher appid=10145 user=0: from pid 9051
+11-18 10:16:43.534   520  1486 I ActivityManager: Killing 8948:com.smitnk.sketcher/u0a145 (adj 0): stop com.smitnk.sketcher due to from pid 9051
+11-18 10:16:43.536   520  1486 W ActivityTaskManager: Force removing ActivityRecord{1fb27a u0 com.smitnk.sketcher/.MainActivity t37 f}}: app died, no saved state
+11-18 10:16:43.537   520  1486 W InputManager-JNI: Input channel object '676c385 com.smitnk.sketcher/com.smitnk.sketcher.MainActivity (client)' was disposed without first being removed with the input manager!
+11-18 10:16:43.568   520  1058 V ActivityManager: Got obituary of 8948:com.smitnk.sketcher
+11-18 10:16:43.577   520  1038 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-18 10:16:43.641   766   812 D StartingSurfaceDrawer: addSplashScreen com.smitnk.sketcher theme=7f0a000a task=38 suggestType=3
+11-18 10:16:43.644   520   565 I ActivityManager: Start proc 9060:com.smitnk.sketcher/u0a145 for pre-top-activity {com.smitnk.sketcher/com.smitnk.sketcher.MainActivity}
+11-18 10:16:43.754  9060  9060 V GraphicsEnvironment: ANGLE Developer option for 'com.smitnk.sketcher' set to: 'default'
+11-18 10:16:45.917   520   553 I ActivityTaskManager: Displayed com.smitnk.sketcher/.MainActivity: +2s337ms
+11-18 10:16:46.417  9060  9091 I SketcherML: session create informative accel=CPU [java=5/512MB native=37MB]
+11-18 10:16:46.426   520   548 W InputManager-JNI: Input channel object '73f1af0 Splash Screen com.smitnk.sketcher (client)' was disposed without first being removed with the input manager!
+11-18 10:16:46.769  9060  9060 I SketcherML: generate begin run=1 model=informative accel=cpu src=768x1024 [java=22/512MB native=35MB]
+11-18 10:16:47.019  9060  9089 I SketcherML: stage "Preparing image" at 877 ms (progress 2%) [java=43/512MB native=55MB]
+11-18 10:16:47.505  9060  9089 I SketcherML: stage "Analysing image" at 1363 ms (progress 6%) [java=44/512MB native=62MB]
+11-18 10:16:48.358  9060  9091 I SketcherML: session ready informative accel=CPU (wanted CPU) in 1940 ms [java=46/512MB native=54MB]
+11-18 10:16:48.408  9060  9089 I SketcherML: stage "Extracting cartoon lines" at 2266 ms (progress 10%) [java=46/512MB native=57MB]
+11-18 10:16:48.532  9060  9067 I smitnk.sketche: JIT allocated 85KB for compiled code of void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-18 10:16:48.538  9060  9067 I smitnk.sketche: Compiler allocated 12MB to compile void com.smitnk.sketcher.ui.editor.EditorScreenKt.EditorScreen(com.smitnk.sketcher.ui.SketchViewModel, kotlin.jvm.functions.Function0, java.lang.String, kotlin.jvm.functions.Function0, androidx.compose.runtime.Composer, int, int)
+11-18 10:16:49.378  9060  9089 I SketcherML: stage "Running AI line-art model" at 3236 ms (progress 20%) [java=42/512MB native=53MB]
+11-18 10:16:49.401  9060  9094 I SketcherML: infer start informative 375x768 -> 376x768 (288768 px, cap 589824) fp16=false [java=45/512MB native=53MB]
+11-18 10:16:49.913  9060  9094 I SketcherML: infer preprocessed in 512 ms [java=49/512MB native=53MB]
+11-18 10:16:49.914  9060  9094 I SketcherML: run begin informative accel=CPU [java=50/512MB native=53MB]
+11-18 10:16:50.017  9060  9095 D ProfileInstaller: Installing profile for com.smitnk.sketcher
+11-18 10:17:09.551   520  1486 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smitnk.sketcher/.MainActivity (has extras)} from uid 2000
+11-18 10:17:11.099  9060  9060 I SketcherML: generate begin run=2 model=informative accel=cpu src=768x1024 [java=19/512MB native=63MB]
+11-18 10:17:11.104  9060  9084 I SketcherML: stage "Preparing image" at 860 ms (progress 2%) [java=22/512MB native=63MB]
+11-18 10:17:11.389  9060  9084 I SketcherML: stage "Analysing image" at 1145 ms (progress 6%) [java=25/512MB native=63MB]
+11-18 10:17:11.908  9060  9084 I SketcherML: stage "Extracting cartoon lines" at 1664 ms (progress 10%) [java=27/512MB native=64MB]
+11-18 10:17:12.828  9060  9084 I SketcherML: stage "Running AI line-art model" at 2584 ms (progress 20%) [java=44/512MB native=53MB]
+11-18 10:17:12.845  9060  9106 I SketcherML: infer start informative 375x768 -> 376x768 (288768 px, cap 589824) fp16=false [java=47/512MB native=53MB]
+11-18 10:17:13.604  9060  9106 I SketcherML: infer preprocessed in 758 ms [java=47/512MB native=53MB]
+11-18 10:17:13.604  9060  9106 I SketcherML: run begin informative accel=CPU [java=48/512MB native=53MB]
+11-18 10:17:48.843  9060  9106 I SketcherML: infer done informative 375x768 -> 376x768 accel=CPU pre=758ms run=35048ms post=191ms total=35998ms [java=23/512MB native=54MB]
+11-18 10:17:49.817  9060  9084 I SketcherML: stage "Vectorising lines" at 39573 ms (progress 40%) [java=59/512MB native=54MB]
+11-18 10:17:50.006  9060  9084 I SketcherML: stage "Pencil texture" at 39762 ms (progress 95%) [java=56/512MB native=54MB]
+11-18 10:17:50.189  9060  9084 I SketcherML: stage "Done" at 39945 ms (progress 100%) [java=28/512MB native=54MB]
+11-18 10:17:50.423  9060  9060 I SketcherGen: GEN_DONE ms=40179 outline=112 shading=0 fill=0 size=768x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-18 10:17:51.657  9060  9084 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run
+11-18 10:17:51.787  9060  9060 I SketcherML: generate done in 41543 ms source=CARTOON timings={prep=0, crop=284, analyse=518, cartoonInk=895, model=36000, vectorize=401, coverage=115, total=39085} [java=36/512MB native=73MB]
+11-18 10:17:54.617   520  1486 W NotificationService: Toast already killed. pkg=com.smitnk.sketcher token=android.os.BinderProxy@c75229d
+11-18 10:18:03.955  9060  9060 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
