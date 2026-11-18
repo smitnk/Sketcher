@@ -15,3 +15,6 @@ Quoted from docstrings in skimage/data/_fetchers.py (scikit-image 0.26).
 
 Not obtainable: eagle, lily (skimage data hosted on gitlab.com, blocked here, download failed; skipped).
 Skipped deliberately: cat (duplicate of chelsea), astro/medical/texture/non-photo sets.
+
+| person1.jpg | Wikimedia Commons "File:Jessica Meir full length portrait (cropped).jpg" (https://commons.wikimedia.org/wiki/File:Jessica_Meir_full_length_portrait_(cropped).jpg); author NASA / Robert Markowitz (NASA JSC); original https://www.flickr.com/photos/nasa2explore/25538006340/; resized to long side 1024 | Public domain (work of NASA, US government) |
+| person2.jpg | Wikimedia Commons "File:Black History observance through dance 130210-A-GT718-005.jpg" (https://commons.wikimedia.org/wiki/File:Black_History_observance_through_dance_130210-A-GT718-005.jpg); author Sgt. 1st Class Walter Talens, US Army (source https://www.dvidshub.net/image/878801); resized to long side 1024 | Public domain (work of a US Army soldier, official duties) |
