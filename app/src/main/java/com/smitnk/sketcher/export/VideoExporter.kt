@@ -16,6 +16,7 @@ import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.view.Surface
+import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.model.Layer
 import java.io.File
 import java.io.FileOutputStream
@@ -140,8 +141,10 @@ object VideoExporter {
         baseName: String,
         onProgress: (Float) -> Unit,
         checkCancel: () -> Unit,
+        look: LookSettings = LookSettings(),
     ): String? {
         val (outW, outH) = fitSize(width, height, MAX_LONG_SIDE, 16)
+        val lookFrame = LookFrame(outW, outH, look)
         val target = OutputTarget.create(context, true, exportFileName(baseName, "mp4"), "video/mp4") ?: return null
 
         var codec: MediaCodec? = null
@@ -216,7 +219,8 @@ object VideoExporter {
 
             for (i in 0 until total) {
                 checkCancel()
-                val progress = if (i >= animFrames) 1f else i.toFloat() / animFrames
+                val drawn = if (look.onTwos) (i * 12 / FPS) * FPS / 12 else i // 12 drawings per second
+                val progress = if (i >= animFrames) 1f else drawn.toFloat() / animFrames
                 val canvas = if (useHardware) {
                     try {
                         inputSurface.lockHardwareCanvas()
@@ -228,13 +232,7 @@ object VideoExporter {
                     inputSurface.lockCanvas(null)
                 }
                 try {
-                    canvas.drawColor(Color.WHITE)
-                    canvas.save()
-                    canvas.translate(dx, dy)
-                    canvas.scale(s, s)
-                    canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
-                    Renderer.drawPartial(canvas, width, height, layers, progress)
-                    canvas.restore()
+                    lookFrame.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look) }
                 } finally {
                     inputSurface.unlockCanvasAndPost(canvas)
                 }
@@ -252,6 +250,7 @@ object VideoExporter {
             try { if (muxerStarted) muxer?.stop() } catch (e: Exception) { ok = false }
             try { muxer?.release() } catch (e: Exception) { }
             try { pfd?.close() } catch (e: Exception) { }
+            lookFrame.release()
             if (ok) target.commit() else target.abort()
         }
         return if (ok) target.displayPath else null
@@ -270,10 +269,12 @@ object VideoExporter {
         baseName: String,
         onProgress: (Float) -> Unit,
         checkCancel: () -> Unit,
+        look: LookSettings = LookSettings(),
     ): String? {
         if (frames.isEmpty()) return null
         val rate = fps.coerceIn(1, 60)
         val (outW, outH) = fitSize(width, height, MAX_LONG_SIDE, 16)
+        val lookFrame = LookFrame(outW, outH, look)
         val target = OutputTarget.create(context, true, exportFileName(baseName, "mp4"), "video/mp4") ?: return null
 
         var codec: MediaCodec? = null
@@ -359,13 +360,7 @@ object VideoExporter {
                     inputSurface.lockCanvas(null)
                 }
                 try {
-                    canvas.drawColor(Color.WHITE)
-                    canvas.save()
-                    canvas.translate(dx, dy)
-                    canvas.scale(s, s)
-                    canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
-                    Renderer.drawLayers(canvas, width, height, layers)
-                    canvas.restore()
+                    lookFrame.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawLayers(c, width, height, layers, look = look) }
                 } finally {
                     inputSurface.unlockCanvasAndPost(canvas)
                 }
@@ -383,6 +378,7 @@ object VideoExporter {
             try { if (muxerStarted) muxer?.stop() } catch (e: Exception) { ok = false }
             try { muxer?.release() } catch (e: Exception) { }
             try { pfd?.close() } catch (e: Exception) { }
+            lookFrame.release()
             if (ok) target.commit() else target.abort()
         }
         return if (ok) target.displayPath else null

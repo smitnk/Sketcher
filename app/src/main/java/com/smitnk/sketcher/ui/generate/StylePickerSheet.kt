@@ -132,6 +132,9 @@ fun StylePickerSheet(
     onOpenMlSettings: (() -> Unit)? = null,
     /** True while a drawing is running: "Draw it" is disabled and shows progress. */
     generating: Boolean = false,
+    /** Per-project Look (paper / misregistration / post filter); the section is hidden when [onLookChange] is null. */
+    look: com.smitnk.sketcher.look.LookSettings = com.smitnk.sketcher.look.LookSettings(),
+    onLookChange: ((com.smitnk.sketcher.look.LookSettings) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     @Suppress("NAME_SHADOWING")
@@ -386,6 +389,9 @@ fun StylePickerSheet(
                             valueText = "%.1f px".format(settings.fillSpacing),
                         )
                     }
+                }
+                if (onLookChange != null) {
+                    com.smitnk.sketcher.ui.look.LookPicker(look, onLookChange)
                 }
                 Spacer(Modifier.height(SketcherTokens.space4))
             }

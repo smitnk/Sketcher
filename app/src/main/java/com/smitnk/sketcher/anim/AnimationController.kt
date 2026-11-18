@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.model.Layer
 
 /**
@@ -81,10 +82,13 @@ class AnimationController {
      * How much stroke length may be shown per layer id, or null when the full drawing is shown.
      * Layers that are hidden or excluded from the animation have no entry (= drawn fully).
      */
-    fun allowances(layers: List<Layer>): Map<Long, Float>? {
+    fun allowances(layers: List<Layer>, look: LookSettings = LookSettings()): Map<Long, Float>? {
         if (!active) return null
-        return LayerTimeline.allowances(layers, progress)
+        return LayerTimeline.allowances(layers, progress, look, durationSec)
     }
+
+    /** Drawing index (1/12 s steps) for the scratch-film boil at the current progress; pass to Renderer as `drawing`. */
+    fun drawingIndex(look: LookSettings): Int = LookTiming.drawingIndex(progress, durationSec, look)
 
     companion object {
         const val END_HOLD_SEC = 0.6f

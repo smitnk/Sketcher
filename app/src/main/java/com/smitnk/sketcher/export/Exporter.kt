@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.PaperRender
 import com.smitnk.sketcher.model.Layer
 import kotlin.math.max
 import kotlin.math.min
@@ -61,6 +63,7 @@ object Exporter {
         ignoreLayerState: Boolean = false,
         originalWidth: Int = 0,
         originalHeight: Int = 0,
+        look: LookSettings = LookSettings(),
     ): Bitmap {
         val (outW, outH) = targetSize(width, height, scale, originalWidth, originalHeight)
         val bmp = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
@@ -68,7 +71,10 @@ object Exporter {
         val baked = ArrayList<Bitmap>()
         try {
             val canvas = Canvas(bmp)
-            if (!transparent) canvas.drawColor(Color.WHITE)
+            if (!transparent) {
+                canvas.drawColor(Color.WHITE)
+                PaperRender.drawPaper(canvas, outW, outH, look) // transparent PNG: no paper
+            }
             canvas.scale(outW.toFloat() / width, outH.toFloat() / height)
             val prepared = layers.map { l ->
                 val tex = l.inkTexture?.takeIf { !it.isRecycled } ?: return@map l
@@ -83,10 +89,12 @@ object Exporter {
                 height = height,
                 layers = prepared,
                 ignoreLayerState = ignoreLayerState,
+                look = look,
             )
         } finally {
             for (b in baked) b.recycle()
         }
+        PaperRender.applyPost(bmp, look, transparent)
         return bmp
     }
 

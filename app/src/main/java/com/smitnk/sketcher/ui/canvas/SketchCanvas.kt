@@ -28,6 +28,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.export.Renderer
+import com.smitnk.sketcher.look.PaperRender
+import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.ui.SketchViewModel
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.min
@@ -76,6 +78,8 @@ fun SketchCanvas(
     val paperColor = com.smitnk.sketcher.ui.theme.LightExtraColors.paper.toArgb() // always light paper, both themes
     val layerCache = remember { Renderer.LayerCache() }
     DisposableEffect(layerCache) { onDispose { layerCache.release() } }
+    val postPreview = remember { PostPreviewCache() }
+    DisposableEffect(postPreview) { onDispose { postPreview.release() } }
     val onionCache = remember { OnionCache() }
     DisposableEffect(onionCache) { onDispose { onionCache.release() } }
     val onionPrevTint = MaterialTheme.colorScheme.primary.toArgb() // vermilion: previous frame
@@ -202,6 +206,7 @@ fun SketchCanvas(
         val allowances = vm.anim.allowances(project.layers)
         val live = vm.liveStroke()
         val liveLayerId = vm.liveLayerId
+        val look = vm.lookSettings
 
         // Soft shadow under the sheet (stacked translucent rounded rects; works on every API level).
         val sheetSize = Size(pw * s, ph * s)
@@ -228,6 +233,7 @@ fun SketchCanvas(
             c.scale(s, s)
             c.drawRect(0f, 0f, pw.toFloat(), ph.toFloat(), paperPaint)
             c.clipRect(0f, 0f, pw.toFloat(), ph.toFloat())
+            PaperRender.drawPaper(c, pw, ph, look) // Look: tooth / fibre paper over the plain sheet
             Renderer.drawBackground(c, project)
             c.restore()
             // Onion skin (screen only): neighbours of the open frame, tinted, under its own drawing.
@@ -244,7 +250,11 @@ fun SketchCanvas(
                     nextAlpha = (strength * 0.8f * 255f).toInt(),
                 )
             }
-            layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId)
+            // Post filter (1-bit / halftone) is costly: preview it only when nothing is drawn or played.
+            val still = live == null && !vm.anim.active && !vm.flipbookPlaying
+            val filtered = look.post != PostFilter.NONE && still &&
+                postPreview.draw(c, s, pw, ph, project.layers, look)
+            if (!filtered) layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId, look)
             c.restore()
         }
     }

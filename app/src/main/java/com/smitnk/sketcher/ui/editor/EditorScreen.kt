@@ -98,6 +98,7 @@ fun EditorScreen(
         styleDraft = vm.pipelineSettings
         overlay = EditorOverlay.Style
     }
+    var showLook by remember { mutableStateOf(false) }
     val openLayers = { overlay = EditorOverlay.Layers }
     val openMl: () -> Unit = {
         styleFromMl = overlay == EditorOverlay.Style
@@ -278,6 +279,7 @@ fun EditorScreen(
                 onGenerate = { vm.generate() },
                 onSettings = onOpenSettings,
                 onProcessing = { openMl() },
+                onLook = { showLook = true },
                 modifier = Modifier
                     .onSizeChanged { topBarPx = it.height }
                     .statusBarsPadding()
@@ -528,7 +530,13 @@ fun EditorScreen(
             onSelectModel = { vm.selectLineModel(it) },
             onDownloadModel = { vm.downloadLineModel(it) },
             onOpenMlSettings = { openMl() },
+            look = vm.lookSettings,
+            onLookChange = { vm.setLook(it) },
         )
+    }
+
+    if (showLook) {
+        com.smitnk.sketcher.ui.look.LookSheet(vm.lookSettings, { vm.setLook(it) }, { showLook = false })
     }
 
     if (overlay == EditorOverlay.MlSettings) {

@@ -17,7 +17,7 @@ fun Project.toSnapshot(animationSeconds: Float = 0f): ProjectSnapshot {
         val secs = if (i == cur && animationSeconds > 0f) animationSeconds else f.durationSec
         f.toSnapshot(secs, cached = i != cur)
     }
-    return ProjectSnapshot.ofFrames(width, height, fs, cur)
+    return ProjectSnapshot.ofFrames(width, height, fs, cur, look)
 }
 
 // Layer snapshots of frames that are not being edited only change through frame operations, so they are reused
@@ -84,6 +84,7 @@ fun Frame.toSnapshot(animationSeconds: Float, cached: Boolean = false): FrameSna
 fun Project.applySnapshot(s: ProjectSnapshot) {
     width = s.width
     height = s.height
+    look = s.look
     frames.clear()
     val brushes = BrushType.values()
     for (fs in s.frames) {

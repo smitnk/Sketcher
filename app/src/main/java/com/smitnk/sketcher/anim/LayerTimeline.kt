@@ -1,6 +1,8 @@
 package com.smitnk.sketcher.anim
 
 import com.smitnk.sketcher.image.BrushType
+import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.model.Layer
 import com.smitnk.sketcher.model.LayerKind
 
@@ -15,10 +17,11 @@ object LayerTimeline {
     private fun playing(layers: List<Layer>): List<Layer> =
         layers.filter { it.visible && it.inAnimation }.sortedBy { it.animPriority }
 
-    private fun signature(ls: List<Layer>): LongArray {
-        val out = LongArray(ls.size * 7 + 1)
+    private fun signature(ls: List<Layer>, feel: StrokeFeel): LongArray {
+        val out = LongArray(ls.size * 7 + 2)
         out[0] = ls.size.toLong()
-        var o = 1
+        out[1] = feel.ordinal.toLong()
+        var o = 2
         for (l in ls) {
             val st = l.strokes
             val n = st.size
@@ -33,7 +36,7 @@ object LayerTimeline {
         return out
     }
 
-    private fun build(ls: List<Layer>): DrawTimeline.Timeline = DrawTimeline.build(ls.map { l ->
+    private fun build(ls: List<Layer>, feel: StrokeFeel): DrawTimeline.Timeline = DrawTimeline.build(ls.map { l ->
         val n = l.strokes.size
         val sx = FloatArray(n); val sy = FloatArray(n); val ex = FloatArray(n); val ey = FloatArray(n)
         val len = FloatArray(n)
@@ -50,18 +53,23 @@ object LayerTimeline {
             }
         }
         DrawTimeline.LayerSpec(l.id, len, sx, sy, ex, ey, mul)
-    })
+    }, feel)
 
-    fun timelineFor(layers: List<Layer>): DrawTimeline.Timeline {
+    fun timelineFor(layers: List<Layer>, look: LookSettings = LookSettings()): DrawTimeline.Timeline {
         val ls = playing(layers)
-        val sig = signature(ls)
+        val sig = signature(ls, look.feel)
         synchronized(lock) { cached?.let { if (it.sig.contentEquals(sig)) return it.timeline } }
-        val tl = build(ls)
+        val tl = build(ls, look.feel)
         synchronized(lock) { cached = Entry(sig, tl) }
         return tl
     }
 
     /** Per layer id length allowance at [progress]; hidden / excluded layers have no entry. */
-    fun allowances(layers: List<Layer>, progress: Float): Map<Long, Float> =
-        timelineFor(layers).allowances(progress)
+    fun allowances(
+        layers: List<Layer>,
+        progress: Float,
+        look: LookSettings = LookSettings(),
+        durationSec: Float = 12f,
+    ): Map<Long, Float> =
+        timelineFor(layers, look).allowances(LookTiming.effectiveProgress(progress, durationSec, look))
 }

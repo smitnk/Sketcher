@@ -83,6 +83,9 @@ class Project {
     var width by mutableIntStateOf(1024)
     var height by mutableIntStateOf(1024)
 
+    /** Per-project rendering style (paper, misregistration, post filter...). Persisted by ProjectCodec v5. */
+    var look by mutableStateOf(com.smitnk.sketcher.look.LookSettings())
+
     val frames = mutableStateListOf<Frame>()
     var currentFrameIndex by mutableIntStateOf(0)
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.model.Layer
 import java.io.BufferedOutputStream
 import java.io.OutputStream
@@ -27,6 +28,7 @@ object GifExporter {
         baseName: String,
         onProgress: (Float) -> Unit,
         checkCancel: () -> Unit,
+        look: LookSettings = LookSettings(),
     ): String? {
         val (w, h) = fitSize(width, height, MAX_LONG_SIDE, 1)
         val target = OutputTarget.create(context, false, exportFileName(baseName, "gif"), "image/gif") ?: return null
@@ -40,14 +42,9 @@ object GifExporter {
         val pixels = IntArray(w * h)
         val indices = ByteArray(w * h)
 
+        val lf = LookFrame(w, h, look)
         fun render(progress: Float) {
-            canvas.drawColor(Color.WHITE)
-            canvas.save()
-            canvas.translate(dx, dy)
-            canvas.scale(s, s)
-            canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
-            Renderer.drawPartial(canvas, width, height, layers, progress)
-            canvas.restore()
+            lf.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look) }
             bmp.getPixels(pixels, 0, w, 0, 0, w, h)
         }
 
@@ -80,6 +77,7 @@ object GifExporter {
         } finally {
             try { out?.close() } catch (e: Exception) { ok = false }
             bmp.recycle()
+            lf.release()
             if (ok) target.commit() else target.abort()
         }
         return if (ok) target.displayPath else null
@@ -98,6 +96,7 @@ object GifExporter {
         baseName: String,
         onProgress: (Float) -> Unit,
         checkCancel: () -> Unit,
+        look: LookSettings = LookSettings(),
     ): String? {
         if (frames.isEmpty()) return null
         val rate = fps.coerceIn(1, 60)
@@ -112,14 +111,9 @@ object GifExporter {
         val pixels = IntArray(w * h)
         val indices = ByteArray(w * h)
 
+        val lf = LookFrame(w, h, look)
         fun render(layers: List<Layer>) {
-            canvas.drawColor(Color.WHITE)
-            canvas.save()
-            canvas.translate(dx, dy)
-            canvas.scale(s, s)
-            canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
-            Renderer.drawLayers(canvas, width, height, layers)
-            canvas.restore()
+            lf.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawLayers(c, width, height, layers, look = look) }
             bmp.getPixels(pixels, 0, w, 0, 0, w, h)
         }
 
@@ -157,6 +151,7 @@ object GifExporter {
         } finally {
             try { out?.close() } catch (e: Exception) { ok = false }
             bmp.recycle()
+            lf.release()
             if (ok) target.commit() else target.abort()
         }
         return if (ok) target.displayPath else null

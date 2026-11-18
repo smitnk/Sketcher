@@ -54,6 +54,15 @@ Not included in release builds. Sources are from scikit-image sample data.
 - cartoon.jpg: generated synthetic work, no restrictions.
 - toy_grass.jpg: chelsea.jpg (CC0) with a procedural noisy grass texture added at the bottom.
 
+## 8. Lemo-Opuscar (Look presets)
+
+The Atkinson / Bayer / halftone post filters, paper texture and colour-fill misregistration are Kotlin ports of
+techniques from the MIT-licensed JavaScript demos of Lemo-Opuscar. Its CC BY-NC style documents are not used.
+
+- Copyright (c) 2026 Lemomo (LemoLab)
+- Licence: MIT (full text at the end of this file)
+- https://github.com/lemomo-ai/lemo-opuscar
+
 ## MIT License
 
 The text below applies to items 1 and 2. The copyright lines for each are given in their sections above.
@@ -76,4 +85,27 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## MIT License (item 8: Lemo-Opuscar)
+
+```
+MIT License
+
+Copyright (c) 2026 Lemomo (LemoLab)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```

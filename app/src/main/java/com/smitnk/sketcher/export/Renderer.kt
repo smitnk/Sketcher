@@ -7,7 +7,12 @@ import android.graphics.Path
 import android.graphics.RectF
 import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.Stroke
+import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.Misregister
+import com.smitnk.sketcher.look.StrokeFeel
+import com.smitnk.sketcher.look.StrokeFeelGeometry
 import com.smitnk.sketcher.model.Layer
+import com.smitnk.sketcher.model.LayerKind
 import com.smitnk.sketcher.model.Project
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -82,7 +87,11 @@ object Renderer {
         live: Stroke? = null,
         liveLayerId: Long = -1L,
         ignoreLayerState: Boolean = false,
-    ) = drawLayerRange(canvas, width, height, layers, 0, layers.size, allowances, live, liveLayerId, ignoreLayerState)
+        look: LookSettings = NO_LOOK,
+        drawing: Int = 0,
+    ) = drawLayerRange(canvas, width, height, layers, 0, layers.size, allowances, live, liveLayerId, ignoreLayerState, look, drawing)
+
+    private val NO_LOOK = LookSettings()
 
     internal fun drawLayerRange(
         canvas: Canvas,
@@ -95,8 +104,11 @@ object Renderer {
         live: Stroke?,
         liveLayerId: Long,
         ignoreLayerState: Boolean = false,
+        look: LookSettings = NO_LOOK,
+        drawing: Int = 0,
     ) {
         val sc = scratchTl.get()!!
+        val misreg = if (look.misregisterColour) Misregister.offset(look.seed) else null
         val paint = sc.paint
         val path = sc.path
         paint.style = Paint.Style.STROKE
@@ -110,6 +122,10 @@ object Renderer {
             if (alpha == 0) continue
 
             var budget = allowances?.get(layer.id) ?: Float.MAX_VALUE
+            // Riso / woodblock look: the colour-fill plate is printed slightly off-register.
+            val shifted = misreg != null && layer.kind == LayerKind.AUTO_FILL
+            val shiftSave = if (shifted) canvas.save() else -1
+            if (shifted) canvas.translate(misreg!!.first, misreg.second)
             val saved = if (alpha < 255) {
                 canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), alpha)
             } else {
@@ -122,13 +138,14 @@ object Renderer {
             } else for (i in 0 until strokes.size) {
                 if (budget <= 0f) break
                 val stroke = strokes[i]
-                drawStroke(canvas, paint, path, stroke, budget)
+                drawStroke(canvas, paint, path, stroke, budget, look, drawing)
                 budget -= stroke.length
             }
             if (live != null && layer.id == liveLayerId) {
-                drawStroke(canvas, paint, path, live, Float.MAX_VALUE)
+                drawStroke(canvas, paint, path, live, Float.MAX_VALUE, look, drawing)
             }
             if (saved >= 0) canvas.restoreToCount(saved)
+            if (shiftSave >= 0) canvas.restoreToCount(shiftSave)
         }
     }
 
@@ -197,6 +214,8 @@ object Renderer {
         private val bmpPaint = Paint()
         private var cachedS = 0f
         private var cachedK = -1
+        private var cachedLook = 0L
+        private var curLook: LookSettings = NO_LOOK
         private var sig = LongArray(0)
         private var tmp = LongArray(0)
 
@@ -218,7 +237,12 @@ object Renderer {
             allowances: Map<Long, Float>?,
             live: Stroke?,
             liveLayerId: Long,
+            look: LookSettings = NO_LOOK,
+            drawing: Int = 0,
         ) {
+            curLook = look
+            val lookKey = (if (look.misregisterColour) (1L shl 32) or (look.seed.toLong() and 0xFFFFFFFFL) else 0L) or
+                (look.feel.ordinal.toLong() shl 40) or (if (look.feel != StrokeFeel.CLEAN) (look.seed.toLong() and 0xFFFFFFFFL) else 0L)
             val n = layers.size
             var k = n
             if (allowances != null) {
@@ -241,8 +265,9 @@ object Renderer {
 
             val bw = ceil(pw * s).toInt()
             val bh = ceil(ph * s).toInt()
-            val usable = k > 0 && bw > 0 && bh > 0 && bw <= MAX_SIDE && bh <= MAX_SIDE &&
-                bw.toLong() * bh <= MAX_PIXELS && ensure(k, s, bw, bh, pw, ph, layers)
+            // Scratch-film boil re-seeds every 1/12 s, so nothing below the top can stay baked into the cache.
+            val usable = look.feel != StrokeFeel.SCRATCH_BOIL && k > 0 && bw > 0 && bh > 0 && bw <= MAX_SIDE && bh <= MAX_SIDE &&
+                bw.toLong() * bh <= MAX_PIXELS && ensure(k, s, bw, bh, pw, ph, layers, look, lookKey)
 
             val sc = canvas.save()
             if (usable) {
@@ -254,14 +279,14 @@ object Renderer {
                     val alpha = (l.opacity * 255f).roundToInt().coerceIn(0, 255)
                     val sv = if (alpha < 255) canvas.saveLayerAlpha(0f, 0f, pw.toFloat(), ph.toFloat(), alpha) else -1
                     val sk = scratchTl.get()!!
-                    drawStroke(canvas, sk.paint, sk.path, live, Float.MAX_VALUE)
+                    drawStroke(canvas, sk.paint, sk.path, live, Float.MAX_VALUE, look, drawing)
                     if (sv >= 0) canvas.restoreToCount(sv)
                 }
-                drawLayerRange(canvas, pw, ph, layers, k, n, allowances, live, liveLayerId)
+                drawLayerRange(canvas, pw, ph, layers, k, n, allowances, live, liveLayerId, look = look, drawing = drawing)
             } else {
                 canvas.scale(s, s)
                 canvas.clipRect(0f, 0f, pw.toFloat(), ph.toFloat())
-                drawLayerRange(canvas, pw, ph, layers, 0, n, allowances, live, liveLayerId)
+                drawLayerRange(canvas, pw, ph, layers, 0, n, allowances, live, liveLayerId, look = look, drawing = drawing)
             }
             canvas.restoreToCount(sc)
         }
@@ -285,10 +310,10 @@ object Renderer {
             }
         }
 
-        private fun ensure(k: Int, s: Float, bw: Int, bh: Int, pw: Int, ph: Int, layers: List<Layer>): Boolean {
+        private fun ensure(k: Int, s: Float, bw: Int, bh: Int, pw: Int, ph: Int, layers: List<Layer>, look: LookSettings, lookKey: Long): Boolean {
             fillSig(k, pw, ph, layers)
             val need = HEADER + REC * k
-            val scaleOk = bmp != null && cachedK == k && abs(s - cachedS) <= cachedS * 0.002f
+            val scaleOk = bmp != null && cachedK == k && cachedLook == lookKey && abs(s - cachedS) <= cachedS * 0.002f
             if (scaleOk) {
                 var same = true
                 var i = 0
@@ -302,10 +327,11 @@ object Renderer {
             bmpCanvas.setBitmap(b)
             bmpCanvas.save()
             bmpCanvas.scale(s, s)
-            drawLayerRange(bmpCanvas, pw, ph, layers, 0, k, null, null, -1L)
+            drawLayerRange(bmpCanvas, pw, ph, layers, 0, k, null, null, -1L, look = look)
             bmpCanvas.restore()
             cachedS = s
             cachedK = k
+            cachedLook = lookKey
             swapSig()
             return true
         }
@@ -325,7 +351,7 @@ object Renderer {
             bmpCanvas.setBitmap(bmp)
             bmpCanvas.save()
             bmpCanvas.scale(s, s)
-            for (i in oldSize until st.size) drawStroke(bmpCanvas, sc.paint, sc.path, st[i], Float.MAX_VALUE)
+            for (i in oldSize until st.size) drawStroke(bmpCanvas, sc.paint, sc.path, st[i], Float.MAX_VALUE, curLook)
             bmpCanvas.restore()
             return true
         }
@@ -359,12 +385,17 @@ object Renderer {
     }
 
     /** Same timeline as AnimationController.allowances (shared [LayerTimeline] cache), as a pure function of [progress]. */
-    fun allowancesFor(layers: List<Layer>, progress: Float): Map<Long, Float> =
-        com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress)
+    fun allowancesFor(layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = 12f): Map<Long, Float> =
+        com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress, look, durationSec)
 
     /** Draws the animation state at [progress] (0..1), as the on-screen animation would. */
-    fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float) {
-        drawLayers(canvas, width, height, layers, allowances = allowancesFor(layers, progress))
+    fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = 12f) {
+        drawLayers(
+            canvas, width, height, layers,
+            allowances = allowancesFor(layers, progress, look, durationSec),
+            look = look,
+            drawing = com.smitnk.sketcher.anim.LookTiming.drawingIndex(progress, durationSec, look),
+        )
     }
 
     /**
@@ -372,10 +403,14 @@ object Renderer {
      * (screen, live stroke, animation, PNG/MP4/GIF export) draws through [drawLayers] -> here.
      * Geometry depends only on arc length, so animation truncation never makes texture flicker.
      */
-    fun drawStroke(canvas: Canvas, paint: Paint, path: Path, stroke: Stroke, limit: Float) {
+    fun drawStroke(
+        canvas: Canvas, paint: Paint, path: Path, stroke: Stroke, limit: Float,
+        look: LookSettings = NO_LOOK, drawing: Int = 0,
+    ) {
         val p = stroke.points
         if (p.size < 2) return
         val w = stroke.width
+        if (look.feel != StrokeFeel.CLEAN && drawFelt(canvas, paint, path, stroke, limit, look, drawing)) return
         val a = (android.graphics.Color.alpha(stroke.color) / 255f) * stroke.alpha.coerceIn(0f, 1f)
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
@@ -423,6 +458,64 @@ object Renderer {
     }
 
     private val SOFT_PASSES = floatArrayOf(2f, 1.3f, 0.7f)
+
+    /**
+     * Stroke "feel" (whiteboard ribbon, plotter dot, scratch boil). Geometry comes from the cached, seeded
+     * [StrokeFeelGeometry.Shape]; [limit] is the reveal length in ORIGINAL stroke units, mapped to a fraction so the
+     * final frame always shows the complete shape. Returns false when the brush keeps its own look.
+     */
+    private fun drawFelt(
+        canvas: Canvas, paint: Paint, path: Path, stroke: Stroke, limit: Float, look: LookSettings, drawing: Int,
+    ): Boolean {
+        val brush = stroke.brush
+        if (brush != BrushType.PEN && brush != BrushType.PENCIL && brush != BrushType.MARKER) return false
+        val p = stroke.points
+        val w = if (brush == BrushType.MARKER) stroke.width * 1.5f else if (brush == BrushType.PENCIL) max(1f, stroke.width * 0.6f) else stroke.width
+        val shape = StrokeFeelGeometry.shapeFor(p, w, look.feel, look.seed, drawing) ?: return false
+        val total = stroke.length
+        val f = if (limit >= total) 2f else if (total <= 0f) 1f else limit / total
+        if (f <= 0f && p.size > 2) return true
+        val a = (android.graphics.Color.alpha(stroke.color) / 255f) * stroke.alpha.coerceIn(0f, 1f)
+        paint.color = stroke.color
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeJoin = Paint.Join.ROUND
+        val half = shape.half
+        if (half != null) {
+            val line = shape.lines[0]
+            val poly = StrokeFeelGeometry.ribbonOutline(line.pts, half, line.limitFor(f))
+            if (poly.size >= 6) {
+                path.rewind()
+                path.moveTo(poly[0], poly[1])
+                var i = 2
+                while (i < poly.size) { path.lineTo(poly[i], poly[i + 1]); i += 2 }
+                path.close()
+                paint.style = Paint.Style.FILL
+                paint.alpha = a255(a)
+                canvas.drawPath(path, paint)
+            }
+        } else {
+            paint.style = Paint.Style.STROKE
+            for (line in shape.lines) {
+                val lim = line.limitFor(f)
+                if (lim <= 0f && f < 2f && line.from > 0f) continue
+                buildPath(path, line.pts, lim)
+                paint.strokeWidth = max(0.6f, w * line.widthMul)
+                paint.alpha = a255(a * line.alphaMul)
+                canvas.drawPath(path, paint)
+            }
+        }
+        if (shape.dotR > 0f) {
+            path.rewind()
+            path.addCircle(shape.dotX, shape.dotY, shape.dotR, Path.Direction.CW)
+            paint.style = Paint.Style.FILL
+            paint.alpha = a255(a)
+            canvas.drawPath(path, paint)
+            paint.style = Paint.Style.STROKE
+        }
+        paint.style = Paint.Style.STROKE
+        paint.alpha = 255
+        return true
+    }
 
     private fun a255(a: Float) = (a * 255f).roundToInt().coerceIn(0, 255)
 

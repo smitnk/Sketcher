@@ -6,6 +6,10 @@ import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.Paper
+import com.smitnk.sketcher.look.PostFilter
+import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.model.LayerKind
 
 /** Pure-Kotlin mirror of a stroke (brush stored as BrushType ordinal). */
@@ -66,6 +70,8 @@ class ProjectSnapshot(
         FrameSnapshot(1L, layers, selectedIndex, backgroundVisible, backgroundOpacity, animationSeconds),
     ),
     val currentFrameIndex: Int = 0,
+    /** v5: per-project Look (default for older files). */
+    val look: LookSettings = LookSettings(),
 ) {
     /** Same project with the given reference photos attached (frame id -> bitmap). */
     fun withSources(sources: Map<Long, Bitmap?>): ProjectSnapshot = ofFrames(
@@ -74,16 +80,17 @@ class ProjectSnapshot(
             FrameSnapshot(f.id, f.layers, f.selectedIndex, f.backgroundVisible, f.backgroundOpacity, f.animationSeconds, sources[f.id] ?: f.source)
         },
         currentFrameIndex,
+        look,
     )
 
     companion object {
-        fun ofFrames(width: Int, height: Int, frames: List<FrameSnapshot>, currentFrameIndex: Int): ProjectSnapshot {
+        fun ofFrames(width: Int, height: Int, frames: List<FrameSnapshot>, currentFrameIndex: Int, look: LookSettings = LookSettings()): ProjectSnapshot {
             require(frames.isNotEmpty()) { "a project needs at least one frame" }
             val ci = currentFrameIndex.coerceIn(0, frames.lastIndex)
             val c = frames[ci]
             return ProjectSnapshot(
                 width, height, c.layers, c.selectedIndex, c.backgroundVisible, c.backgroundOpacity, c.animationSeconds,
-                frames, ci,
+                frames, ci, look,
             )
         }
     }
@@ -91,10 +98,11 @@ class ProjectSnapshot(
 
 /**
  * Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an
- * optional per-layer ink PNG; v4 stores a list of frames (v1-v3 files load as a single frame).
+ * optional per-layer ink PNG; v4 stores a list of frames (v1-v3 files load as a single frame); v5 appends the project Look after the frames
+ * (older files load with the default Look).
  */
 object ProjectCodec {
-    const val VERSION = 4
+    const val VERSION = 5
     private const val MAX_INK_BYTES = 200_000_000
     private const val MAX_DIM = 8192
     private const val MIN_LAYER_BYTES = 20
@@ -123,8 +131,29 @@ object ProjectCodec {
             out.writeFloat(f.animationSeconds)
             writeLayers(out, f.layers)
         }
+        writeLook(out, s.look)
         out.flush()
         return bos.toByteArray()
+    }
+
+    private fun writeLook(out: DataOutputStream, l: LookSettings) {
+        out.writeByte(l.feel.ordinal)
+        out.writeByte(l.paper.ordinal)
+        out.writeBoolean(l.misregisterColour)
+        out.writeByte(l.post.ordinal)
+        out.writeBoolean(l.onTwos)
+        out.writeInt(l.seed)
+    }
+
+    /** Unknown enum ordinals (a newer app wrote them) fall back to the default value. */
+    private fun readLook(inp: DataInputStream): LookSettings {
+        val feel = StrokeFeel.values().getOrElse(inp.readUnsignedByte()) { StrokeFeel.CLEAN }
+        val paper = Paper.values().getOrElse(inp.readUnsignedByte()) { Paper.PLAIN }
+        val misreg = inp.readBoolean()
+        val post = PostFilter.values().getOrElse(inp.readUnsignedByte()) { PostFilter.NONE }
+        val twos = inp.readBoolean()
+        val seed = inp.readInt()
+        return LookSettings(feel, paper, misreg, post, twos, seed)
     }
 
     private fun writeLayers(out: DataOutputStream, layers: List<LayerSnapshot>) {
@@ -197,7 +226,8 @@ object ProjectCodec {
                 val uniqueId = if (seen.add(id)) id else { maxId += 1; seen.add(maxId); maxId }
                 frames.add(FrameSnapshot(uniqueId, layers, selected, bgVisible, bgOpacity, animSeconds))
             }
-            return ProjectSnapshot.ofFrames(width, height, frames, current)
+            val look = if (version >= 5) readLook(inp) else LookSettings()
+            return ProjectSnapshot.ofFrames(width, height, frames, current, look)
         }
         val selected = inp.readInt()
         val bgVisible = inp.readBoolean()

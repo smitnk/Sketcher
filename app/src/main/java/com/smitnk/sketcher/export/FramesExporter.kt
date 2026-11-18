@@ -1,6 +1,7 @@
 package com.smitnk.sketcher.export
 
 import android.content.Context
+import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.model.FrameOps
 import com.smitnk.sketcher.model.Layer
 import java.io.IOException
@@ -24,12 +25,13 @@ object FramesExporter {
         projectName: String,
         onProgress: (Float) -> Unit,
         checkCancel: () -> Unit,
+        look: LookSettings = LookSettings(),
     ): String {
         val sub = FrameOps.safeName(projectName)
         var folder = "Pictures/Sketcher/$sub"
         for ((i, layers) in frames.withIndex()) {
             checkCancel()
-            val bmp = Exporter.render(width, height, layers, 1, transparent = true)
+            val bmp = Exporter.render(width, height, layers, 1, transparent = true, look = look)
             val where = try {
                 Exporter.save(
                     context, bmp, ExportFormat.PNG, sub, checkCancel,

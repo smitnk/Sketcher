@@ -1,5 +1,9 @@
 package com.smitnk.sketcher.data
 
+import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.Paper
+import com.smitnk.sketcher.look.PostFilter
+import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.model.LayerKind
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -136,5 +140,21 @@ class ProjectCodecFramesTest {
         try { ProjectCodec.decode(bytes.copyOf(bytes.size - 5)); fail() } catch (e: IOException) { assertTrue(true) }
     }
 
-    @Test fun versionIsFour() = assertEquals(4, ProjectCodec.VERSION)
+    @Test fun versionIsFive() = assertEquals(5, ProjectCodec.VERSION)
+
+    @Test fun lookRoundTrips() {
+        val look = LookSettings(StrokeFeel.PEN_PLOTTER, Paper.ENGRAVING, true, PostFilter.HALFTONE, true, 77)
+        val back = ProjectCodec.decode(ProjectCodec.encode(ProjectSnapshot.ofFrames(10, 10, frames(), 0, look)))
+        assertEquals(look, back.look)
+        assertEquals(LookSettings(), ProjectCodec.decode(ProjectCodec.encode(ProjectSnapshot.ofFrames(10, 10, frames(), 0))).look)
+    }
+
+    @Test fun v4FileWithoutLookLoadsWithDefaultLook() {
+        val v5 = ProjectCodec.encode(ProjectSnapshot.ofFrames(10, 10, frames(), 0))
+        val v4 = v5.copyOf(v5.size - 9) // the look block is the trailing 9 bytes
+        v4[7] = 4 // version int, big endian, at offset 4..7
+        val back = ProjectCodec.decode(v4)
+        assertEquals(LookSettings(), back.look)
+        assertEquals(3, back.frames.size)
+    }
 }

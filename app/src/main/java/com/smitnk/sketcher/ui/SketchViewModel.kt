@@ -1476,6 +1476,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ frames
 
+    /** Per-project Look (paper, misregistration, post filter, on twos); stored in the project file. */
+    val lookSettings: com.smitnk.sketcher.look.LookSettings get() = project.look
+
+    fun setLook(look: com.smitnk.sketcher.look.LookSettings) {
+        if (look == project.look) return
+        project.look = look
+        markDirty()
+    }
+
     /** Onion skin (screen only, never exported): previous frame red, next frame blue, under the open frame. */
     var onionEnabled by mutableStateOf(false)
     var onionOpacity by mutableFloatStateOf(0.25f)
@@ -2064,7 +2073,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     private fun runImageJob(job: ImageJob, kind: ExportKind, check: () -> Unit): ExportResult = try {
-        val bmp = Exporter.render(job.w, job.h, job.layers, job.scale, job.transparent, job.ignoreState, job.origW, job.origH)
+        val bmp = Exporter.render(job.w, job.h, job.layers, job.scale, job.transparent, job.ignoreState, job.origW, job.origH, project.look)
         val where = try {
             check()
             Exporter.save(app, bmp, job.fmt, job.name, check)
@@ -2207,18 +2216,18 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             try {
                 when (kind) {
                     FramesExportKind.PNG_SEQUENCE -> {
-                        val where = FramesExporter.pngSequence(app, w, h, frames, name, onProgress, check)
+                        val where = FramesExporter.pngSequence(app, w, h, frames, name, onProgress, check, project.look)
                         done.add(ExportResult(ExportKind.FRAMES, null, where, true))
                     }
                     FramesExportKind.GIF -> {
-                        val where = GifExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check)
+                        val where = GifExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check, project.look)
                         done.add(
                             if (where != null) ExportResult(ExportKind.GIF, resolveSavedUri(where, "image/gif")?.toString(), where, true)
                             else ExportResult(ExportKind.GIF, null, null, false, "Could not write the GIF file"),
                         )
                     }
                     FramesExportKind.VIDEO -> {
-                        val where = VideoExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check)
+                        val where = VideoExporter.exportFrames(app, w, h, frames, rate, "${safe}_flipbook", onProgress, check, project.look)
                         done.add(
                             if (where != null) ExportResult(ExportKind.VIDEO, resolveSavedUri(where, "video/mp4")?.toString(), where, true)
                             else ExportResult(ExportKind.VIDEO, null, null, false, "Could not write the MP4 file"),
@@ -2261,9 +2270,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val check = { ensureActive() }
                 try {
                     val where = if (k == AnimExportKind.VIDEO) {
-                        VideoExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
+                        VideoExporter.export(app, w, h, layers, duration, "animation", onProgress, check, project.look)
                     } else {
-                        GifExporter.export(app, w, h, layers, duration, "animation", onProgress, check)
+                        GifExporter.export(app, w, h, layers, duration, "animation", onProgress, check, project.look)
                     }
                     val mime = if (k == AnimExportKind.VIDEO) "video/mp4" else "image/gif"
                     done.add(
