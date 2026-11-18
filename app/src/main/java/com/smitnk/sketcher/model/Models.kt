@@ -75,7 +75,7 @@ class Frame(val id: Long) {
     var thumbSig = 0L
 
     companion object {
-        const val DEFAULT_DURATION_SEC = 12f
+        const val DEFAULT_DURATION_SEC = 20f
     }
 }
 

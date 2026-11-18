@@ -203,10 +203,11 @@ fun SketchCanvas(
         val o = vt.origin(size.width, size.height, pw, ph, s)
         @Suppress("UNUSED_VARIABLE")
         val tick = vm.liveTick // subscribe to live stroke changes
-        val allowances = vm.anim.allowances(project.layers)
+        val look = vm.lookSettings
+        val allowances = vm.anim.allowances(project.layers, look)
+        val drawingIdx = if (vm.anim.active) vm.anim.drawingIndex(look) else 0
         val live = vm.liveStroke()
         val liveLayerId = vm.liveLayerId
-        val look = vm.lookSettings
 
         // Soft shadow under the sheet (stacked translucent rounded rects; works on every API level).
         val sheetSize = Size(pw * s, ph * s)
@@ -254,7 +255,7 @@ fun SketchCanvas(
             val still = live == null && !vm.anim.active && !vm.flipbookPlaying
             val filtered = look.post != PostFilter.NONE && still &&
                 postPreview.draw(c, s, pw, ph, project.layers, look)
-            if (!filtered) layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId, look)
+            if (!filtered) layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId, look, drawingIdx)
             c.restore()
         }
     }

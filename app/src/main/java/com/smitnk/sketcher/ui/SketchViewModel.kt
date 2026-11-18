@@ -1101,6 +1101,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             flushPendingSave()
             resetProject()
+            intentLook?.let { setLook(it) }
             sessionActions = armed
             projectName = if (recentProjects.none { it.name == "Demo" }) "Demo" else autoName("Demo")
             setSource(bmp)
@@ -1148,8 +1149,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         accel: String? = null,
         outline: String? = null,
         label: String? = null,
+        look: String? = null,
     ) {
         if (label != null) DebugDump.runLabel = label
+        if (look != null) {
+            intentLook = lookFromName(look)
+            intentLook?.let { setLook(it) }
+        }
         armedActions = buildSet {
             if (autoVideo) add(EditorAutoAction.AUTO_VIDEO)
             if (showLayers) add(EditorAutoAction.SHOW_LAYERS)
@@ -1358,6 +1364,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     val genMs = android.os.SystemClock.elapsedRealtime() - genStart
                     val a = activeAccelLabel; val fb = fallbackReason; val inf = lastInferenceMs; val mid = selectedLineModelId
                     withContext(Dispatchers.Default) {
+                        DebugDump.look = project.look
                         DebugDump.afterGeneration(app, drawing, bmp, ps, snap, mid, a, fb, inf, genMs, SketchPipeline.lastLineSource)
                     }
                 }
@@ -1482,7 +1489,23 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setLook(look: com.smitnk.sketcher.look.LookSettings) {
         if (look == project.look) return
         project.look = look
+        android.util.Log.i("SketcherGen", "LOOK_APPLIED $look")
+        DebugDump.look = look
+        anim.showFinished() // picking a preset shows the finished drawing in the new look straight away
         markDirty()
+    }
+
+    /** Intent extra `look=<preset>` (CI): applied right before generation. Names: whiteboard, pen_plotter, ... */
+    private var intentLook: com.smitnk.sketcher.look.LookSettings? = null
+
+    fun lookFromName(name: String?): com.smitnk.sketcher.look.LookSettings? {
+        val key = name?.lowercase()?.replace(Regex("[^a-z0-9]+"), "_")?.trim('_') ?: return null
+        val aliases = mapOf("woodblock" to "riso", "woodblock_riso" to "riso", "1_bit_dither" to "dither", "1bit" to "dither", "clean" to "clean")
+        val k = aliases[key] ?: key
+        return com.smitnk.sketcher.look.LookSettings.PRESETS.firstOrNull { (n, _) ->
+            val pn = n.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+            pn == k || pn.startsWith(k) || (k == "riso" && pn.contains("riso")) || (k == "dither" && pn.contains("dither"))
+        }?.second
     }
 
     /** Onion skin (screen only, never exported): previous frame red, next frame blue, under the open frame. */

@@ -123,7 +123,7 @@ object Renderer {
 
             var budget = allowances?.get(layer.id) ?: Float.MAX_VALUE
             // Riso / woodblock look: the colour-fill plate is printed slightly off-register.
-            val shifted = misreg != null && layer.kind == LayerKind.AUTO_FILL
+            val shifted = misreg != null && layer.kind != LayerKind.AUTO_OUTLINE // every colour plate (fill/shading/manual)
             val shiftSave = if (shifted) canvas.save() else -1
             if (shifted) canvas.translate(misreg!!.first, misreg.second)
             val saved = if (alpha < 255) {
@@ -133,7 +133,9 @@ object Renderer {
             }
             val strokes = layer.strokes
             val ink = layer.inkTexture
-            if (ink != null && !ink.isRecycled) {
+            // A felt look (whiteboard/plotter/boil) needs real strokes: the pencil-reveal bitmap cannot be wobbled.
+            val feltInk = look.feel != StrokeFeel.CLEAN && strokes.size > 0
+            if (ink != null && !ink.isRecycled && !feltInk) {
                 drawInkLayer(canvas, sc, layer, ink, width, height, budget)
             } else for (i in 0 until strokes.size) {
                 if (budget <= 0f) break
@@ -385,11 +387,11 @@ object Renderer {
     }
 
     /** Same timeline as AnimationController.allowances (shared [LayerTimeline] cache), as a pure function of [progress]. */
-    fun allowancesFor(layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = 12f): Map<Long, Float> =
+    fun allowancesFor(layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = com.smitnk.sketcher.anim.AnimationController.DEFAULT_DURATION_SEC): Map<Long, Float> =
         com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress, look, durationSec)
 
     /** Draws the animation state at [progress] (0..1), as the on-screen animation would. */
-    fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = 12f) {
+    fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = com.smitnk.sketcher.anim.AnimationController.DEFAULT_DURATION_SEC) {
         drawLayers(
             canvas, width, height, layers,
             allowances = allowancesFor(layers, progress, look, durationSec),

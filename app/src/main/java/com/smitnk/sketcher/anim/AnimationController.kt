@@ -22,7 +22,7 @@ class AnimationController {
         private set
 
     /** Total animation length in seconds (2..60). */
-    var durationSec by mutableFloatStateOf(12f)
+    var durationSec by mutableFloatStateOf(DEFAULT_DURATION_SEC)
 
     /** Seconds left of the end hold (final frame shown at progress 1 before [playing] turns off). */
     private var holdLeft = 0f
@@ -91,6 +91,8 @@ class AnimationController {
     fun drawingIndex(look: LookSettings): Int = LookTiming.drawingIndex(progress, durationSec, look)
 
     companion object {
+        /** Default animation length (seconds) of a new project / frame. */
+        const val DEFAULT_DURATION_SEC = 20f
         const val END_HOLD_SEC = 0.6f
         const val MAX_FRAME_SEC = 0.1f
     }

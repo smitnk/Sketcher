@@ -44,7 +44,7 @@ object GifExporter {
 
         val lf = LookFrame(w, h, look)
         fun render(progress: Float) {
-            lf.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look) }
+            lf.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look, durationSec) }
             bmp.getPixels(pixels, 0, w, 0, 0, w, h)
         }
 

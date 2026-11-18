@@ -67,7 +67,9 @@ dbg_run() {
   if [ $seen -eq 1 ]; then
     sleep 3; shot "${label}_t03"
     sleep 4; shot "${label}_t07"
-    sleep 13; shot "${label}_end"
+    sleep 5; shot "${label}_t12"
+    sleep 5; shot "${label}_t17"
+    sleep 7; shot "${label}_end"
   else
     sleep 5; shot "${label}_nogen"
   fi
@@ -76,12 +78,15 @@ dbg_run() {
   adb pull /sdcard/Android/data/$PKG/files/debug/$label $OUT/debug/ >/dev/null 2>&1
 }
 
-for img in beard elf cartoon; do
-  models="informative realistic coarse"
-  [ "$img" = beard ] && models="$models anime"
+for img in beard elf cartoon tpose person1 person2; do
+  models="informative"
+  [ "$img" = beard ] && models="informative coarse anime"
   for m in $models; do
     dbg_run "${img}_${m}_ai_pencil" "$img" --es engine ai --es model "$m" --es outline pencil
   done
+done
+for lk in whiteboard pen_plotter colored_pencil scratch_film riso dither halftone; do
+  dbg_run "tpose_look_${lk}" tpose --es engine ai --es model informative --es outline pencil --es look "$lk"
 done
 dbg_run beard_cartoon_vector beard --es engine cartoon --es outline vector
 for acc in cpu nnapi_gpu; do

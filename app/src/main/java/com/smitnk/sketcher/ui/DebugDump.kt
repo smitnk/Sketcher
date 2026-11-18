@@ -31,6 +31,7 @@ object DebugDump {
     @Volatile private var rawH = 0
     @Volatile private var inferMs = 0L
     @Volatile var layersRef: List<Layer>? = null
+    @Volatile var look: Any? = null // current LookSettings (set by the view model)
 
     fun enabled(app: Application) = (app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
@@ -107,15 +108,17 @@ object DebugDump {
                 "crop: $cropInfo\nlineSource=$lineSource\nmodel=$modelId\naccelActive=$accelLabel fallback=$fallback\n" +
                     "inferenceMs=$vmInferMs (wrapped=$inferMs) genMs=$genMs\nink: $stats\n" +
                     "strokes: outline=${drawing.outline.size} shading=${drawing.shading.size} fill=${drawing.fill.size}\n" +
+                    "look=${look}\n" +
                     "inkW=${drawing.inkW} inkH=${drawing.inkH} drawing=${dw}x$dh revealWidth=$reveal\nsettings=$ps\n",
             )
 
             // render-path check through the real renderer
             val visible = layers.filter { it.visible }
-            val fin = Exporter.render(dw, dh, visible, 1, false)
+            val lk = (look as? com.smitnk.sketcher.look.LookSettings) ?: com.smitnk.sketcher.look.LookSettings()
+            val fin = Exporter.render(dw, dh, visible, 1, false, look = lk)
             save(fin, File(dir, "final_render.png"))
             val mid = Bitmap.createBitmap(dw, dh, Bitmap.Config.ARGB_8888)
-            Canvas(mid).apply { drawColor(Color.WHITE); Renderer.drawPartial(this, dw, dh, visible, 0.5f) }
+            Canvas(mid).apply { drawColor(Color.WHITE); Renderer.drawPartial(this, dw, dh, visible, 0.5f, lk) }
             save(mid, File(dir, "mid_render.png"))
             android.util.Log.i(TAG, "DEBUG_DUMP dir=${dir.absolutePath}")
         } catch (t: Throwable) {

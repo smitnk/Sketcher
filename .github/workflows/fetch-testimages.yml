@@ -1,0 +1,52 @@
+name: Fetch test images
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/fetch-testimages.yml']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download, resize, record attribution
+        run: |
+          pip install -q pillow
+          D=app/src/debug/assets/testimages
+          mkdir -p $D /tmp/dl
+          UA="sketcher-ci/1.0 (https://github.com/smitnk/Sketcher; test image fetch)"
+          fetch() { # name thumb-url filepath-name
+            curl -fL -A "$UA" -o "/tmp/dl/$1.raw" "$2" || \
+            curl -fL -A "$UA" -o "/tmp/dl/$1.raw" "https://commons.wikimedia.org/wiki/Special:FilePath/$3?width=1200"
+          }
+          fetch person1 "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Jessica_Meir_full_length_portrait_(cropped).jpg/1200px-Jessica_Meir_full_length_portrait_(cropped).jpg" "Jessica_Meir_full_length_portrait_(cropped).jpg"
+          fetch person2 "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Black_History_observance_through_dance_130210-A-GT718-005.jpg/1200px-Black_History_observance_through_dance_130210-A-GT718-005.jpg" "Black_History_observance_through_dance_130210-A-GT718-005.jpg"
+          python3 - <<'PY'
+          from PIL import Image
+          for n in ("person1", "person2"):
+              im = Image.open(f"/tmp/dl/{n}.raw").convert("RGB")
+              s = 1024 / max(im.size)
+              if s < 1:
+                  im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+              im.save(f"app/src/debug/assets/testimages/{n}.jpg", quality=92)
+              print(n, im.size)
+          PY
+          if ! grep -q person1 $D/LICENSES.md; then
+            cat >> $D/LICENSES.md <<'LIC'
+
+          | person1.jpg | Wikimedia Commons "File:Jessica Meir full length portrait (cropped).jpg" (https://commons.wikimedia.org/wiki/File:Jessica_Meir_full_length_portrait_(cropped).jpg); author NASA / Robert Markowitz (NASA JSC); original https://www.flickr.com/photos/nasa2explore/25538006340/; resized to long side 1024 | Public domain (work of NASA, US government) |
+          | person2.jpg | Wikimedia Commons "File:Black History observance through dance 130210-A-GT718-005.jpg" (https://commons.wikimedia.org/wiki/File:Black_History_observance_through_dance_130210-A-GT718-005.jpg); author Sgt. 1st Class Walter Talens, US Army (source https://www.dvidshub.net/image/878801); resized to long side 1024 | Public domain (work of a US Army soldier, official duties) |
+          LIC
+          fi
+      - name: Commit
+        run: |
+          git config user.name sketcher-ci && git config user.email ci@users.noreply.github.com
+          git add app/src/debug/assets/testimages
+          git diff --cached --quiet && exit 0
+          git commit -m "Add person1/person2 public-domain test images"
+          git pull --rebase origin main
+          git push origin HEAD:main

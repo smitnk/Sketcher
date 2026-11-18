@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
             accel = intent.getStringExtra("accel"),
             outline = intent.getStringExtra("outline"),
             label = intent.getStringExtra("label"),
+            look = intent.getStringExtra("look"),
         )
     }
 }

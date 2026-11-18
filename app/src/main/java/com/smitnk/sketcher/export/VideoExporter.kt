@@ -232,7 +232,7 @@ object VideoExporter {
                     inputSurface.lockCanvas(null)
                 }
                 try {
-                    lookFrame.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look) }
+                    lookFrame.draw(canvas, dx, dy, s, width, height) { c -> Renderer.drawPartial(c, width, height, layers, progress, look, durationSec) }
                 } finally {
                     inputSurface.unlockCanvasAndPost(canvas)
                 }

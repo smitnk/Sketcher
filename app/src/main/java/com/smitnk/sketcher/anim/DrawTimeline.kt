@@ -43,6 +43,12 @@ object DrawTimeline {
         val endX: FloatArray,
         val endY: FloatArray,
         val speedMul: FloatArray,
+        /**
+         * Pencil-reveal layers: pre-planned seconds per stroke (see [InkReveal.durations]). The reveal front moves at a
+         * constant pace within each piece and there are no pen-lift pauses inside the layer, because a pause or a
+         * slow-in/out shows nothing new on screen (the ink is only uncovered, never drawn).
+         */
+        val fixedSeconds: DoubleArray? = null,
     )
 
     class Timeline internal constructor(
@@ -58,6 +64,8 @@ object DrawTimeline {
         private val feel: StrokeFeel = StrokeFeel.CLEAN,
         /** Plotter only: acceleration-ramp share (0..0.5) of each stroke's time; empty otherwise. */
         private val ramp: FloatArray = FloatArray(0),
+        /** Per stroke: constant-speed reveal (pencil-reveal pieces); empty = none. */
+        private val linear: BooleanArray = BooleanArray(0),
     ) {
         val strokeCount get() = len.size
 
@@ -84,7 +92,7 @@ object DrawTimeline {
             val curLayer = strokeLayer[cur]
             val d = tEnd[cur] - tStart[cur]
             val u = if (d <= 0.0) 1.0 else ((p - tStart[cur]) / d).coerceIn(0.0, 1.0)
-            val partial = (lenBefore[cur] + len[cur] * easeFor(feel, u, if (ramp.isEmpty()) 0.0 else ramp[cur].toDouble()).toFloat()).coerceIn(0f, layerTotal[curLayer])
+            val partial = (lenBefore[cur] + len[cur] * (if (linear.isNotEmpty() && linear[cur]) u else easeFor(feel, u, if (ramp.isEmpty()) 0.0 else ramp[cur].toDouble())).toFloat()).coerceIn(0f, layerTotal[curLayer])
             for (l in layerIds.indices) {
                 map[layerIds[l]] = when {
                     l < curLayer -> layerTotal[l]
@@ -151,6 +159,7 @@ object DrawTimeline {
         val ln = FloatArray(n)
         val lb = FloatArray(n)
         val dur = DoubleArray(n)
+        val lin = BooleanArray(n)
         val pause = DoubleArray(n) // pen-lift / layer pause BEFORE stroke k (0 for the first)
         var drawTotal = 0.0
         var pauseTotal = 0.0
@@ -160,7 +169,9 @@ object DrawTimeline {
             var cum = 0f
             for (s in l.lengths.indices) {
                 val mul = l.speedMul[s].toDouble().coerceAtLeast(0.01)
-                if (havePrev) {
+                val fixed = l.fixedSeconds
+                if (fixed != null) lin[k] = true
+                if (havePrev && (fixed == null || s == 0)) {
                     pause[k] = if (s == 0) LAYER_PAUSE_SEC else {
                         val dist = hypot(
                             (l.startX[s] - l.endX[s - 1]).toDouble(),
@@ -175,7 +186,9 @@ object DrawTimeline {
                 }
                 // Tiny strokes (coverage hairs) must not cost a full stroke's setup time.
                 val base = BASE_SEC * min(1.0, TINY_FLOOR + l.lengths[s] / TINY_LEN_PX)
-                if (plotter) {
+                if (fixed != null) {
+                    dur[k] = fixed[s]
+                } else if (plotter) {
                     val L = l.lengths[s].toDouble()
                     dur[k] = maxOf(0.03, trapezoidTime(L, SPEED_PX_PER_SEC.toDouble(), PLOT_ACCEL)) / mul
                     ramp[k] = trapezoidRamp(L, SPEED_PX_PER_SEC.toDouble(), PLOT_ACCEL).toFloat()
@@ -199,6 +212,6 @@ object DrawTimeline {
         }
         if (t > 0.0) for (i in 0 until n) { ts[i] /= t; te[i] /= t }
         if (n > 0) te[n - 1] = 1.0 // exact: progress 1 == the last stroke completes
-        return Timeline(ids, totals, sl, ts, te, ln, lb, t, feel, ramp)
+        return Timeline(ids, totals, sl, ts, te, ln, lb, t, feel, ramp, lin)
     }
 }
