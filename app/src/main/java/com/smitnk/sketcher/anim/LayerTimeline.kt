@@ -13,16 +13,40 @@ object LayerTimeline {
     private val lock = Any()
     private var cached: Entry? = null
 
-    /** Visible, in-animation layers sorted by animPriority (stable: ties keep list order). */
-    private fun playing(layers: List<Layer>): List<Layer> =
-        layers.filter { it.visible && it.inAnimation }.sortedBy { it.animPriority }
+    /** Scratch reused by every [timelineFor] call (guarded by [lock]) so a cache hit allocates nothing. */
+    private var order = IntArray(16)
+    private var scratch = LongArray(16 * SIG_REC + 2)
 
-    private fun signature(ls: List<Layer>, feel: StrokeFeel): LongArray {
-        val out = LongArray(ls.size * 9 + 2)
-        out[0] = ls.size.toLong()
+    /**
+     * Fills [order] with the indices of the visible, in-animation layers sorted by animPriority (stable: ties keep list
+     * order; insertion sort, no allocation) and returns their count. Caller holds [lock].
+     */
+    private fun fillOrder(layers: List<Layer>): Int {
+        val n = layers.size
+        if (order.size < n) order = IntArray(n + 16)
+        val o = order
+        var c = 0
+        for (i in 0 until n) {
+            val l = layers[i]
+            if (!l.visible || !l.inAnimation) continue
+            var j = c
+            while (j > 0 && layers[o[j - 1]].animPriority > l.animPriority) { o[j] = o[j - 1]; j-- }
+            o[j] = i
+            c++
+        }
+        return c
+    }
+
+    /** Writes the signature of the first [cnt] layers of [order] into [scratch] and returns its length. Caller holds [lock]. */
+    private fun fillSignature(layers: List<Layer>, cnt: Int, feel: StrokeFeel): Int {
+        val need = cnt * SIG_REC + 2
+        if (scratch.size < need) scratch = LongArray(need + 16 * SIG_REC)
+        val out = scratch
+        out[0] = cnt.toLong()
         out[1] = feel.ordinal.toLong()
         var o = 2
-        for (l in ls) {
+        for (k in 0 until cnt) {
+            val l = layers[order[k]]
             val st = l.strokes
             val n = st.size
             out[o++] = l.id
@@ -36,7 +60,13 @@ object LayerTimeline {
             out[o++] = if (tex != null && !tex.isRecycled) System.identityHashCode(tex).toLong() * 1_000_003L + l.inkRev else 0L
             out[o++] = l.revealWidthPx.toBits().toLong()
         }
-        return out
+        return need
+    }
+
+    private fun sameSig(a: LongArray, b: LongArray, len: Int): Boolean {
+        if (a.size != len) return false
+        for (i in 0 until len) if (a[i] != b[i]) return false
+        return true
     }
 
     /**
@@ -51,11 +81,12 @@ object LayerTimeline {
             val px = IntArray(w * h)
             tex.getPixels(px, 0, w, 0, 0, w, h)
             val alpha = ByteArray(w * h) { (px[it] ushr 24).toByte() }
-            val pts = ArrayList<FloatArray>(); val lens = ArrayList<Float>()
-            for (s in l.strokes) {
-                if (s.points.size < 2) { pts.add(floatArrayOf(0f, 0f)); lens.add(0f); continue }
+            val pts = ArrayList<FloatArray>(); val lens = ArrayList<Float>(); val sIdx = ArrayList<Int>()
+            for ((si, s) in l.strokes.withIndex()) {
+                if (s.points.size < 2) { pts.add(floatArrayOf(0f, 0f)); lens.add(0f); sIdx.add(si); continue }
                 val c = InkReveal.chunk(s.points, s.length)
                 pts.addAll(c.points); for (x in c.lengths) lens.add(x)
+                for (x in c.lengths) sIdx.add(si)
             }
             val n = pts.size
             val len = lens.toFloatArray()
@@ -64,7 +95,7 @@ object LayerTimeline {
             val dur = InkReveal.durations(len, ink, naturalSec)
             val sx = FloatArray(n) { pts[it][0] }; val sy = FloatArray(n) { pts[it][1] }
             val ex = FloatArray(n) { pts[it][pts[it].size - 2] }; val ey = FloatArray(n) { pts[it][pts[it].size - 1] }
-            DrawTimeline.LayerSpec(l.id, len, sx, sy, ex, ey, FloatArray(n) { 1f }, dur)
+            DrawTimeline.LayerSpec(l.id, len, sx, sy, ex, ey, FloatArray(n) { 1f }, dur, points = pts.toTypedArray(), strokeIndex = sIdx.toIntArray())
         } catch (_: Exception) { null } catch (_: OutOfMemoryError) { null }
     }
 
@@ -74,35 +105,75 @@ object LayerTimeline {
         val sx = FloatArray(n); val sy = FloatArray(n); val ex = FloatArray(n); val ey = FloatArray(n)
         val len = FloatArray(n)
         val mul = FloatArray(n)
+        val human = feel == StrokeFeel.CLEAN || feel == StrokeFeel.WHITEBOARD_MARKER
+        val hand = if (human) FloatArray(n) else null
         for (i in 0 until n) {
             val s = l.strokes[i]
             val p = s.points
             if (p.size >= 2) { sx[i] = p[0]; sy[i] = p[1]; ex[i] = p[p.size - 2]; ey[i] = p[p.size - 1] }
             len[i] = s.length
+            if (hand != null) hand[i] = HandSpeed.strokeMul(l.id, i, p, s.length)
             mul[i] = when {
                 l.kind == LayerKind.AUTO_FILL -> DrawTimeline.FILL_MUL.toFloat()
                 l.kind == LayerKind.AUTO_SHADING || s.brush == BrushType.HATCH -> DrawTimeline.SHADING_MUL.toFloat()
                 else -> 1f
             }
         }
-        DrawTimeline.LayerSpec(l.id, len, sx, sy, ex, ey, mul)
+        DrawTimeline.LayerSpec(l.id, len, sx, sy, ex, ey, mul, handSpeed = hand, points = Array(n) { l.strokes[it].points })
     }, feel)
 
+    /** Cached timeline for [layers] / [look]. A cache hit allocates nothing (scratch signature compared in place). */
     fun timelineFor(layers: List<Layer>, look: LookSettings = LookSettings()): DrawTimeline.Timeline {
-        val ls = playing(layers)
-        val sig = signature(ls, look.feel)
-        synchronized(lock) { cached?.let { if (it.sig.contentEquals(sig)) return it.timeline } }
+        var ls: List<Layer> = emptyList()
+        var sig = EMPTY_SIG
+        synchronized(lock) {
+            val cnt = fillOrder(layers)
+            val len = fillSignature(layers, cnt, look.feel)
+            val c = cached
+            if (c != null && sameSig(c.sig, scratch, len)) return c.timeline
+            sig = scratch.copyOf(len)
+            ls = ArrayList<Layer>(cnt).also { for (k in 0 until cnt) it.add(layers[order[k]]) }
+        }
         val tl = build(ls, look.feel)
         synchronized(lock) { cached = Entry(sig, tl) }
         return tl
     }
 
-    /** Per layer id length allowance at [progress]; hidden / excluded layers have no entry. */
+    /**
+     * Fills [out] with the per-layer length allowance at [progress]; hidden / excluded layers have no entry. Pass a reused
+     * [Allowances] for a zero-allocation frame (cache hit); the default allocates a fresh one (safe across threads).
+     */
     fun allowances(
         layers: List<Layer>,
         progress: Float,
         look: LookSettings = LookSettings(),
         durationSec: Float = AnimationController.DEFAULT_DURATION_SEC,
-    ): Map<Long, Float> =
-        timelineFor(layers, look).allowances(LookTiming.effectiveProgress(progress, durationSec, look))
+        out: Allowances = Allowances(),
+    ): Allowances {
+        timelineFor(layers, look).fillAllowances(LookTiming.effectiveProgress(progress, durationSec, look), out)
+        return out
+    }
+
+    /**
+     * Pen tip for a project's [layers] at [progress] (same cached timeline as [allowances]); [TipState.layerIndex] is the
+     * index into [layers], [TipState.strokeIndex] the stroke inside it. See [TimelineQuery] and docs/wiring/tip.md.
+     */
+    fun tipAt(
+        layers: List<Layer>,
+        progress: Float,
+        look: LookSettings = LookSettings(),
+        durationSec: Float = AnimationController.DEFAULT_DURATION_SEC,
+        out: TipState = TipState(),
+    ): TipState {
+        TimelineQuery.tipAt(timelineFor(layers, look), LookTiming.effectiveProgress(progress, durationSec, look), durationSec, out)
+        if (out.layerId >= 0L) {
+            var idx = -1
+            for (i in 0 until layers.size) if (layers[i].id == out.layerId) { idx = i; break }
+            out.layerIndex = idx
+        }
+        return out
+    }
+
+    private const val SIG_REC = 9
+    private val EMPTY_SIG = LongArray(0)
 }

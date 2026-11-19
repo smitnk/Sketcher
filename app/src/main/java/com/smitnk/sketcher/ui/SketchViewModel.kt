@@ -1197,10 +1197,17 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         outline: String? = null,
         label: String? = null,
         look: String? = null,
+        pen: Boolean? = null,
+        camera: Boolean? = null,
     ) {
         if (label != null) DebugDump.runLabel = label
         if (look != null) {
             intentLook = lookFromName(look)
+            intentLook?.let { setLook(it) }
+        }
+        if (pen != null || camera != null) { // CI: `--ez pen true --ez camera true` on top of the (optional) look preset
+            val base = intentLook ?: project.look
+            intentLook = base.copy(showPen = pen ?: base.showPen, cameraFollow = camera ?: base.cameraFollow)
             intentLook?.let { setLook(it) }
         }
         armedActions = buildSet {

@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -182,6 +183,13 @@ fun MlSettingsSheet(
                     Text("Testing…", style = MaterialTheme.typography.titleSmall)
                 } else {
                     Text("Test speed on this phone", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("GPU reveal (beta)", style = MaterialTheme.typography.titleSmall)
+                    Switch(checked = com.smitnk.sketcher.look.ArrivalReveal.enabled, onCheckedChange = { com.smitnk.sketcher.look.ArrivalReveal.enabled = it })
                 }
             }
 

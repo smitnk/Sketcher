@@ -5,9 +5,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import com.smitnk.sketcher.anim.Allowances
 import com.smitnk.sketcher.image.BrushType
 import com.smitnk.sketcher.image.Stroke
 import com.smitnk.sketcher.look.LookSettings
+import com.smitnk.sketcher.look.applyTo
 import com.smitnk.sketcher.look.Misregister
 import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.look.StrokeFeelGeometry
@@ -83,7 +85,7 @@ object Renderer {
         width: Int,
         height: Int,
         layers: List<Layer>,
-        allowances: Map<Long, Float>? = null,
+        allowances: Allowances? = null,
         live: Stroke? = null,
         liveLayerId: Long = -1L,
         ignoreLayerState: Boolean = false,
@@ -100,7 +102,7 @@ object Renderer {
         layers: List<Layer>,
         from: Int,
         to: Int,
-        allowances: Map<Long, Float>?,
+        allowances: Allowances?,
         live: Stroke?,
         liveLayerId: Long,
         ignoreLayerState: Boolean = false,
@@ -121,7 +123,7 @@ object Renderer {
             val alpha = if (ignoreLayerState) 255 else (layer.opacity * 255f).roundToInt().coerceIn(0, 255)
             if (alpha == 0) continue
 
-            var budget = allowances?.get(layer.id) ?: Float.MAX_VALUE
+            var budget = allowances?.budget(layer.id) ?: Float.MAX_VALUE
             // Riso / woodblock look: the colour-fill plate is printed slightly off-register.
             val shifted = misreg != null && layer.kind != LayerKind.AUTO_OUTLINE // every colour plate (fill/shading/manual)
             val shiftSave = if (shifted) canvas.save() else -1
@@ -136,7 +138,7 @@ object Renderer {
             // A felt look (whiteboard/plotter/boil) needs real strokes: the pencil-reveal bitmap cannot be wobbled.
             val feltInk = look.feel != StrokeFeel.CLEAN && strokes.size > 0
             if (ink != null && !ink.isRecycled && !feltInk) {
-                drawInkLayer(canvas, sc, layer, ink, width, height, budget)
+                drawInkLayer(canvas, sc, layer, ink, width, height, budget, allowances == null || allowances.isFull(layer.id))
             } else for (i in 0 until strokes.size) {
                 if (budget <= 0f) break
                 val stroke = strokes[i]
@@ -155,14 +157,16 @@ object Renderer {
      * Pencil-reveal layer: fully revealed -> just the texture; partial -> one offscreen pass where the reveal
      * strokes (width revealWidthPx) are drawn as a mask and the texture is drawn through it (SRC_IN).
      */
-    private fun drawInkLayer(canvas: Canvas, sc: Scratch, layer: Layer, ink: Bitmap, width: Int, height: Int, budget: Float) {
+    private fun drawInkLayer(canvas: Canvas, sc: Scratch, layer: Layer, ink: Bitmap, width: Int, height: Int, budget: Float, full: Boolean) {
         if (budget <= 0f) return
         sc.rect.set(0f, 0f, width.toFloat(), height.toFloat())
         val strokes = layer.strokes
-        if (budget >= layer.totalLength() - 0.01f || strokes.isEmpty()) {
+        if (full || strokes.isEmpty()) {
             canvas.drawBitmap(ink, null, sc.rect, sc.inkPaint)
             return
         }
+        // GPU reveal (API 33+, hardware canvas, arrival map baked): one AGSL pass, no saveLayer.
+        if (com.smitnk.sketcher.look.ArrivalReveal.tryDraw(canvas, layer, ink, width, height, budget, sc.rect)) return
         val path = sc.path
         path.rewind()
         var remaining = budget
@@ -236,7 +240,7 @@ object Renderer {
             pw: Int,
             ph: Int,
             layers: List<Layer>,
-            allowances: Map<Long, Float>?,
+            allowances: Allowances?,
             live: Stroke?,
             liveLayerId: Long,
             look: LookSettings = NO_LOOK,
@@ -251,8 +255,7 @@ object Renderer {
                 for (i in 0 until n) {
                     val l = layers[i]
                     if (!l.visible) continue
-                    val a = allowances[l.id]
-                    if (a != null && a < l.totalLength()) { k = i; break }
+                    if (allowances.isPartial(l.id)) { k = i; break }
                 }
             }
             var liveIdx = -1
@@ -387,11 +390,25 @@ object Renderer {
     }
 
     /** Same timeline as AnimationController.allowances (shared [LayerTimeline] cache), as a pure function of [progress]. */
-    fun allowancesFor(layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = com.smitnk.sketcher.anim.AnimationController.DEFAULT_DURATION_SEC): Map<Long, Float> =
-        com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress, look, durationSec)
+    fun allowancesFor(layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = com.smitnk.sketcher.anim.AnimationController.DEFAULT_DURATION_SEC, out: Allowances = Allowances()): Allowances =
+        com.smitnk.sketcher.anim.LayerTimeline.allowances(layers, progress, look, durationSec, out)
 
     /** Draws the animation state at [progress] (0..1), as the on-screen animation would. */
     fun drawPartial(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float, look: LookSettings = NO_LOOK, durationSec: Float = com.smitnk.sketcher.anim.AnimationController.DEFAULT_DURATION_SEC) {
+        // Motion hook (pen sprite + follow camera): same MotionFx the on-screen player uses. Null when off / finished.
+        val motion = com.smitnk.sketcher.look.MotionFx.prepare(layers, look, progress, durationSec, width, height)
+        if (motion != null) {
+            canvas.save()
+            motion.camera.applyTo(canvas)
+        }
+        drawPartialLayers(canvas, width, height, layers, progress, look, durationSec)
+        if (motion != null) {
+            motion.drawPen(canvas, layers)
+            canvas.restore()
+        }
+    }
+
+    private fun drawPartialLayers(canvas: Canvas, width: Int, height: Int, layers: List<Layer>, progress: Float, look: LookSettings, durationSec: Float) {
         drawLayers(
             canvas, width, height, layers,
             allowances = allowancesFor(layers, progress, look, durationSec),

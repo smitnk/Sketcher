@@ -17,10 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -31,16 +36,22 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.smitnk.sketcher.look.CameraFollow
 import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.look.Misregister
 import com.smitnk.sketcher.look.Paper
 import com.smitnk.sketcher.look.PaperTexture
+import com.smitnk.sketcher.look.PenStyle
 import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.look.PostFilters
 import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.ui.theme.SketcherTokens
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -84,6 +95,41 @@ fun LookPicker(look: LookSettings, onChange: (LookSettings) -> Unit, modifier: M
         ) { onChange(look.copy(post = it)) }
 
         ToggleRow("On twos", "Redraw 12 times a second in exported video", look.onTwos) { onChange(look.copy(onTwos = it)) }
+
+        MotionSection(look, onChange)
+    }
+}
+
+/** "Motion": pen sprite at the tip and the follow camera. Playback and MP4/GIF export look the same. */
+@Composable
+private fun MotionSection(look: LookSettings, onChange: (LookSettings) -> Unit) {
+    Text("Motion", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ToggleRow("Show pen while drawing", "A pen follows the line, lifting between strokes", look.showPen) {
+        onChange(look.copy(showPen = it))
+    }
+    if (look.showPen) {
+        ChipRow(
+            listOf(PenStyle.PENCIL to "Pencil", PenStyle.MARKER to "Marker", PenStyle.BRUSH to "Brush"),
+            look.penStyle,
+        ) { onChange(look.copy(penStyle = it)) }
+    }
+    ToggleRow("Camera follows pen", "Zooms in on the pen, then shows the whole drawing at the end", look.cameraFollow) {
+        onChange(look.copy(cameraFollow = it))
+    }
+    if (look.cameraFollow) {
+        var zoom by remember(look.cameraZoom) { mutableFloatStateOf(look.cameraZoom) }
+        val label = "%.1fx".format(java.util.Locale.US, zoom)
+        Row(Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget), verticalAlignment = Alignment.CenterVertically) {
+            Text("Zoom", style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(56.dp))
+            Slider(
+                value = zoom,
+                onValueChange = { zoom = (it * 10f).roundToInt() / 10f },
+                onValueChangeFinished = { onChange(look.copy(cameraZoom = zoom.coerceIn(CameraFollow.ZOOM_MIN, CameraFollow.ZOOM_MAX))) },
+                valueRange = CameraFollow.ZOOM_MIN..CameraFollow.ZOOM_MAX,
+                modifier = Modifier.weight(1f).semantics { contentDescription = "Camera zoom"; stateDescription = label },
+            )
+            Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
+        }
     }
 }
 

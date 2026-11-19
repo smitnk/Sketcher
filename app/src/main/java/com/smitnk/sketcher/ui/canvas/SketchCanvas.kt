@@ -28,7 +28,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.unit.dp
 import com.smitnk.sketcher.export.Renderer
+import com.smitnk.sketcher.look.CameraFollow
+import com.smitnk.sketcher.look.MotionFx
 import com.smitnk.sketcher.look.PaperRender
+import com.smitnk.sketcher.look.applyTo
 import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.ui.SketchViewModel
 import com.smitnk.sketcher.ui.theme.SketcherTokens
@@ -208,6 +211,10 @@ fun SketchCanvas(
         val drawingIdx = if (vm.anim.active) vm.anim.drawingIndex(look) else 0
         val live = vm.liveStroke()
         val liveLayerId = vm.liveLayerId
+        // Pen sprite + follow camera: playback only (never while the user draws, pinches or pans). Same MotionFx as export.
+        val motion = if (vm.anim.active && live == null && vt.zoom == 1f && vt.pan == Offset.Zero) {
+            MotionFx.prepare(project.layers, look, vm.anim.progress, vm.anim.durationSec, pw, ph)
+        } else null
 
         // Soft shadow under the sheet (stacked translucent rounded rects; works on every API level).
         val sheetSize = Size(pw * s, ph * s)
@@ -255,7 +262,30 @@ fun SketchCanvas(
             val still = live == null && !vm.anim.active && !vm.flipbookPlaying
             val filtered = look.post != PostFilter.NONE && still &&
                 postPreview.draw(c, s, pw, ph, project.layers, look)
-            if (!filtered) layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId, look, drawingIdx)
+            if (filtered) {
+                // nothing: the post-filtered still was drawn above
+            } else if (motion != null && look.cameraFollow) {
+                // Camera: the layer cache stays at ONE scale (s * full zoom) for the whole playback and is scaled
+                // down by zoom/fullZoom, so it never rebuilds per frame and stays sharp when zoomed in.
+                val zp = look.cameraZoom.coerceIn(CameraFollow.ZOOM_MIN, CameraFollow.ZOOM_MAX)
+                val cam = motion.camera
+                c.save()
+                c.clipRect(0f, 0f, pw * s, ph * s)
+                c.translate(cam.tx * s, cam.ty * s)
+                c.scale(cam.zoom / zp, cam.zoom / zp)
+                layerCache.draw(c, s * zp, pw, ph, project.layers, allowances, live, liveLayerId, look, drawingIdx)
+                c.restore()
+            } else {
+                layerCache.draw(c, s, pw, ph, project.layers, allowances, live, liveLayerId, look, drawingIdx)
+            }
+            if (motion != null && look.showPen) {
+                c.save()
+                c.clipRect(0f, 0f, pw * s, ph * s)
+                c.scale(s, s)
+                motion.camera.applyTo(c)
+                motion.drawPen(c, project.layers)
+                c.restore()
+            }
             c.restore()
         }
     }

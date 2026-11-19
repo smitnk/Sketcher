@@ -1,5 +1,7 @@
 #!/bin/bash
 # Installs Sketcher on the emulator, runs the test-image generation matrix,
+# NOTE: the CI emulator is API 31, so the GPU reveal (AGSL, API 33+) is NOT exercised here: logcat shows REVEAL_PATH=cpu (saveLayer path).
+# The gpu path (REVEAL_PATH=gpu) needs an API 33+ device/emulator.
 # the autoexport/autovideo runs, and captures screenshots + logs.
 set +e
 set -x
@@ -88,6 +90,8 @@ done
 for lk in whiteboard pen_plotter colored_pencil scratch_film riso dither halftone; do
   dbg_run "tpose_look_${lk}" tpose --es engine ai --es model informative --es outline pencil --es look "$lk"
 done
+# Motion: pen sprite + follow camera (whiteboard feel) on tpose; screenshots at t03/t07/t12/t17/end
+dbg_run "tpose_motion_pen_camera" tpose --es engine ai --es model informative --es outline pencil --es look whiteboard --ez pen true --ez camera true
 for img in tpose beard person1 cartoon; do
   dbg_run "${img}_flow_pencil" "$img" --es engine flow --es outline pencil
 done

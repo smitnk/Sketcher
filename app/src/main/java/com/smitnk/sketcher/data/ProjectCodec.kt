@@ -8,6 +8,7 @@ import java.io.DataOutputStream
 import java.io.IOException
 import com.smitnk.sketcher.look.LookSettings
 import com.smitnk.sketcher.look.Paper
+import com.smitnk.sketcher.look.PenStyle
 import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.model.LayerKind
@@ -99,10 +100,10 @@ class ProjectSnapshot(
 /**
  * Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an
  * optional per-layer ink PNG; v4 stores a list of frames (v1-v3 files load as a single frame); v5 appends the project Look after the frames
- * (older files load with the default Look).
+ * (older files load with the default Look); v6 appends a Motion block after the Look (pen sprite + follow camera; older files load with both off).
  */
 object ProjectCodec {
-    const val VERSION = 5
+    const val VERSION = 6
     private const val MAX_INK_BYTES = 200_000_000
     private const val MAX_DIM = 8192
     private const val MIN_LAYER_BYTES = 20
@@ -132,6 +133,7 @@ object ProjectCodec {
             writeLayers(out, f.layers)
         }
         writeLook(out, s.look)
+        writeMotion(out, s.look)
         out.flush()
         return bos.toByteArray()
     }
@@ -143,6 +145,22 @@ object ProjectCodec {
         out.writeByte(l.post.ordinal)
         out.writeBoolean(l.onTwos)
         out.writeInt(l.seed)
+    }
+
+    private fun writeMotion(out: DataOutputStream, l: LookSettings) {
+        out.writeBoolean(l.showPen)
+        out.writeByte(l.penStyle.ordinal)
+        out.writeBoolean(l.cameraFollow)
+        out.writeFloat(l.cameraZoom)
+    }
+
+    /** v6 motion block, merged into [base]. A NaN / out-of-range zoom falls back to the default. */
+    private fun readMotion(inp: DataInputStream, base: LookSettings): LookSettings {
+        val pen = inp.readBoolean()
+        val style = PenStyle.values().getOrElse(inp.readUnsignedByte()) { PenStyle.PENCIL }
+        val cam = inp.readBoolean()
+        val z = inp.readFloat()
+        return base.copy(showPen = pen, penStyle = style, cameraFollow = cam, cameraZoom = if (z in 1f..2.5f) z else 1.6f)
     }
 
     /** Unknown enum ordinals (a newer app wrote them) fall back to the default value. */
@@ -226,7 +244,7 @@ object ProjectCodec {
                 val uniqueId = if (seen.add(id)) id else { maxId += 1; seen.add(maxId); maxId }
                 frames.add(FrameSnapshot(uniqueId, layers, selected, bgVisible, bgOpacity, animSeconds))
             }
-            val look = if (version >= 5) readLook(inp) else LookSettings()
+            val look = if (version >= 5) readLook(inp).let { if (version >= 6) readMotion(inp, it) else it } else LookSettings()
             return ProjectSnapshot.ofFrames(width, height, frames, current, look)
         }
         val selected = inp.readInt()

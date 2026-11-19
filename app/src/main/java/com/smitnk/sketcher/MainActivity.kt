@@ -65,6 +65,8 @@ class MainActivity : ComponentActivity() {
             outline = intent.getStringExtra("outline"),
             label = intent.getStringExtra("label"),
             look = intent.getStringExtra("look"),
+            pen = if (intent.hasExtra("pen")) intent.getBooleanExtra("pen", false) else null,
+            camera = if (intent.hasExtra("camera")) intent.getBooleanExtra("camera", false) else null,
         )
     }
 }

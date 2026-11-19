@@ -53,7 +53,14 @@ object GifExporter {
         try {
             // The finished drawing contains every colour, so build one global palette from it.
             render(1f)
-            val palette = GifQuantizer.palette(pixels)
+            var palettePixels = pixels
+            if (look.showPen) {
+                // The finished frame has no pen sprite: add a mid-animation frame so its colours get palette entries.
+                val done = pixels.copyOf()
+                render(0.5f)
+                palettePixels = done + pixels
+            }
+            val palette = GifQuantizer.palette(palettePixels)
             val lut = IntArray(32768) { -1 }
 
             val stream = BufferedOutputStream(target.openStream() ?: return null, 1 shl 16)

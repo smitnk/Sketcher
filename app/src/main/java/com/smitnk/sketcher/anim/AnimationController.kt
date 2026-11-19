@@ -79,13 +79,17 @@ class AnimationController {
     }
 
     /**
-     * How much stroke length may be shown per layer id, or null when the full drawing is shown.
+     * How much stroke length may be shown per layer id, or null when the full drawing is shown. Zero allocation per frame
+     * on a timeline cache hit: the returned instance is reused (valid until the next call).
      * Layers that are hidden or excluded from the animation have no entry (= drawn fully).
      */
-    fun allowances(layers: List<Layer>, look: LookSettings = LookSettings()): Map<Long, Float>? {
+    fun allowances(layers: List<Layer>, look: LookSettings = LookSettings()): Allowances? {
         if (!active) return null
-        return LayerTimeline.allowances(layers, progress, look, durationSec)
+        return LayerTimeline.allowances(layers, progress, look, durationSec, reuse)
     }
+
+    /** Refilled every frame; the render pass reads it before the next frame, so one instance is enough. */
+    private val reuse = Allowances()
 
     /** Drawing index (1/12 s steps) for the scratch-film boil at the current progress; pass to Renderer as `drawing`. */
     fun drawingIndex(look: LookSettings): Int = LookTiming.drawingIndex(progress, durationSec, look)
