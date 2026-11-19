@@ -1,5 +1,6 @@
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/look/TipTrack.kt:169:31 No value passed for parameter 'source'.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/look/TipTrack.kt:169:44 Argument type mismatch: actual type is 'kotlin.Function1<ERROR CLASS: Unknown return lambda parameter type, ERROR CLASS: Unknown return lambda parameter type>', but 'kotlin.Int' was expected.
-e: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketcher/look/TipTrack.kt:169:46 Cannot infer type for this parameter. Please specify it explicitly.
-> Task :app:compileDebugKotlin FAILED
-BUILD FAILED in 47s
+> Task :app:compileDebugUnitTestKotlin FAILED
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/anim/AnimPerfTest.kt:7:18 Unresolved reference 'management'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/anim/AnimPerfTest.kt:24:10 Unresolved reference 'ManagementFactory'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/anim/AnimPerfTest.kt:24:53 Unresolved reference 'sun'.
+e: file:///home/runner/work/Sketcher/Sketcher/app/src/test/java/com/smitnk/sketcher/anim/AnimPerfTest.kt:24:82 Unresolved reference 'getThreadAllocatedBytes'.
+BUILD FAILED in 1m 10s
