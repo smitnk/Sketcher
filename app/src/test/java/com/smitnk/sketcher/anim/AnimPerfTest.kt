@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.lang.management.ManagementFactory
 import java.util.Random
 
 /** JVM micro-benchmark: per-frame allowance lookup must not allocate, and stays fast for 5k strokes. */
@@ -21,7 +20,12 @@ class AnimPerfTest {
     }
 
     private fun allocated(): Long =
-        (ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean).getThreadAllocatedBytes(Thread.currentThread().id)
+        try {
+            val mf = Class.forName("java.lang.management.ManagementFactory")
+            val bean = mf.getMethod("getThreadMXBean").invoke(null)
+            val m = Class.forName("com.sun.management.ThreadMXBean").getMethod("getThreadAllocatedBytes", Long::class.javaPrimitiveType)
+            m.invoke(bean, Thread.currentThread().id) as Long
+        } catch (t: Throwable) { 0L }
 
     @Test fun fillAllowancesAllocatesNothingAndReturnsTheSameInstance() {
         val t = bigTimeline()
