@@ -1,6 +1,0 @@
-+ adb shell ls -lR /sdcard/Movies
-/sdcard/Movies:
-total 0
-+ adb shell ls -lR /sdcard/Pictures
-/sdcard/Pictures:
-total 0
