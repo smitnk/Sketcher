@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.anim.InkRevealTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:39" hostname="runnervmccnms" time="0.571">
+  <properties/>
+  <testcase name="chunkingKeepsExactLength" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.004"/>
+  <testcase name="newInkCountsEachPixelOnce" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.002"/>
+  <testcase name="layerPausesOnlyAtLayerStart" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.003"/>
+  <testcase name="noStallsWhileInkRemains" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.138"/>
+  <testcase name="durationsSumAndRespectSpeedCap" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.001"/>
+  <testcase name="lengthPacingFailsTheSameMetric" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.214"/>
+  <testcase name="visibleInkIsLinearInTime" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.209"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
