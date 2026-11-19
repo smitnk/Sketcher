@@ -14,12 +14,12 @@ import java.security.MessageDigest
  */
 class ModelManager(
     private val dir: File,
-    private val specs: List<ModelSpec> = ModelSpecs.ALL,
+    private val specs: List<ModelSpec> = ModelSpecs.EVERY,
     private val hasAsset: (String) -> Boolean = { true },
 ) {
     constructor(context: Context) : this(
         File(context.applicationContext.filesDir, "models"),
-        ModelSpecs.ALL,
+        ModelSpecs.EVERY,
         { path -> assetExists(context.applicationContext, path) },
     )
 

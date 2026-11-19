@@ -293,6 +293,8 @@ fun EditorScreen(
                 "AI" -> "AI line art"
                 "CARTOON" -> "Cartoon lines"
                 "CLASSIC" -> "Classic edges"
+                "FLOW_LINES" -> "Flow lines"
+                "FAST_EDGES" -> "Fast edges"
                 else -> null
             }
         }
@@ -529,6 +531,9 @@ fun EditorScreen(
             selectedModelId = vm.selectedLineModelId,
             onSelectModel = { vm.selectLineModel(it) },
             onDownloadModel = { vm.downloadLineModel(it) },
+            fastModels = vm.fastModels,
+            selectedFastModelId = vm.fastModelId,
+            onSelectFastModel = { vm.selectFastModel(it) },
             onOpenMlSettings = { openMl() },
             look = vm.lookSettings,
             onLookChange = { vm.setLook(it) },

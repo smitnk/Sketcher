@@ -88,6 +88,12 @@ done
 for lk in whiteboard pen_plotter colored_pencil scratch_film riso dither halftone; do
   dbg_run "tpose_look_${lk}" tpose --es engine ai --es model informative --es outline pencil --es look "$lk"
 done
+for img in tpose beard person1 cartoon; do
+  dbg_run "${img}_flow_pencil" "$img" --es engine flow --es outline pencil
+done
+for img in tpose beard person1; do
+  dbg_run "${img}_fast_pencil" "$img" --es engine fast --es outline pencil
+done
 dbg_run beard_cartoon_vector beard --es engine cartoon --es outline vector
 for acc in cpu nnapi_gpu; do
   dbg_run "beard_accel_${acc}" beard --es engine ai --es model informative --es accel "$acc" --es outline pencil

@@ -1,6 +1,6 @@
 package com.smitnk.sketcher.image.pipeline
 
-enum class LineSource { AUTO, AI, CARTOON, CLASSIC }       // AUTO: cartoon detector -> CARTOON else AI (CLASSIC if model unavailable)
+enum class LineSource { AUTO, AI, CARTOON, CLASSIC, FLOW_LINES, FAST_EDGES }       // AUTO: cartoon detector -> CARTOON else AI (CLASSIC if model unavailable)
 enum class ShadingLevel { NONE, LIGHT, MEDIUM, HEAVY }
 enum class ShadingStyle { HATCH, CROSS_HATCH, SCRIBBLE }
 

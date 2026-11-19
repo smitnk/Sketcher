@@ -28,6 +28,16 @@ jobs:
         run: python tools/model_lab/evaluate.py app/src/debug/assets/testimages out out
       - name: Variants (int8 dynamic, ORT format, quality + timing vs fp32)
         run: python tools/model_lab/variants.py app/src/debug/assets/testimages out out
+      - name: Export TEED + MTEED (tiny edge detectors, ~250 KB each)
+        run: |
+          set -e
+          git clone --depth 1 https://github.com/xavysp/TEED.git /tmp/TEED
+          mkdir -p weights
+          curl -fL -o weights/MTEED.pth https://huggingface.co/TheMistoAI/MistoLine/resolve/main/Anyline/MTEED.pth
+          # TEED (MIT): BIPED epoch 5 = repo default checkpoint; BGR mean subtraction baked into the graph, fused head
+          python tools/model_lab/export_teed.py --ted-dir /tmp/TEED --weights /tmp/TEED/checkpoints/BIPED/5/5_model.pth --out out/teed.onnx --mean bgr --mode fused
+          # MTEED (OpenRAIL++, TheMistoAI/MistoLine): no mean subtraction, sigmoid of mean logits (controlnet_aux TEEDdetector)
+          python tools/model_lab/export_teed.py --ted-dir /tmp/TEED --weights weights/MTEED.pth --out out/mteed.onnx --mean none --mode avglogit
       - name: Publish
         run: |
           set -e

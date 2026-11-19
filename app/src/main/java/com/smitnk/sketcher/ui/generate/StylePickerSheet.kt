@@ -129,6 +129,10 @@ fun StylePickerSheet(
     selectedModelId: String? = null,
     onSelectModel: (String) -> Unit = {},
     onDownloadModel: (String) -> Unit = {},
+    /** Fast edges (TEED / MTEED) cards, shown when the Fast engine is selected. */
+    fastModels: List<LineModelUi> = emptyList(),
+    selectedFastModelId: String? = null,
+    onSelectFastModel: (String) -> Unit = {},
     onOpenMlSettings: (() -> Unit)? = null,
     /** True while a drawing is running: "Draw it" is disabled and shows progress. */
     generating: Boolean = false,
@@ -216,22 +220,54 @@ fun StylePickerSheet(
                     LineSource.AI to "AI line art",
                     LineSource.CARTOON to "Cartoon",
                     LineSource.CLASSIC to "Classic",
+                    LineSource.FLOW_LINES to "Flow",
+                    LineSource.FAST_EDGES to "Fast",
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    engines.forEachIndexed { index, (source, name) ->
-                        SegmentedButton(
-                            selected = settings.lineSource == source,
-                            onClick = { onSettingsChange(settings.copy(lineSource = source)) },
-                            shape = SegmentedButtonDefaults.itemShape(index, engines.size),
-                            icon = {},
-                            modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
+                // Six options do not fit one row at 360dp: two rows of three.
+                for (rowItems in engines.chunked(3)) {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        rowItems.forEachIndexed { index, (source, name) ->
+                            SegmentedButton(
+                                selected = settings.lineSource == source,
+                                onClick = { onSettingsChange(settings.copy(lineSource = source)) },
+                                shape = SegmentedButtonDefaults.itemShape(index, rowItems.size),
+                                icon = {},
+                                modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
+                            ) {
+                                Text(
+                                    name,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    textAlign = TextAlign.Center,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = settings.lineSource == LineSource.FAST_EDGES,
+                    enter = fadeIn(tween(SketcherTokens.MotionMedium)) + expandVertically(tween(SketcherTokens.MotionMedium)),
+                    exit = fadeOut(tween(160)) + shrinkVertically(tween(160)),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                        Text(
+                            "Fast edges \u2014 tiny model, near-instant, technical outlines",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (fastModels.isNotEmpty()) Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8),
                         ) {
-                            Text(
-                                name,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                textAlign = TextAlign.Center,
-                            )
+                            for (m in fastModels) {
+                                LineModelCard(
+                                    model = m,
+                                    selected = m.id == selectedFastModelId,
+                                    onSelect = { onSelectFastModel(m.id) },
+                                    onDownload = { onDownloadModel(m.id) },
+                                )
+                            }
                         }
                     }
                 }

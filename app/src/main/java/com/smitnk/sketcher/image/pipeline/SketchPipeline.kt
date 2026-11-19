@@ -53,8 +53,13 @@ object SketchPipeline {
         model: LineArtModel?,
         progress: (stage: String, fraction: Float) -> Unit = { _, _ -> },
         alphaMask: BooleanArray? = null,
+        /** TEED/MTEED raw edge model for [LineSource.FAST_EDGES] (separate from the user's [model]); null = Classic fallback. */
+        fastModel: LineArtModel? = null,
     ): GeneratedDrawing = withContext(Dispatchers.Default) {
         lastError = null
+        val fastSel = settings.lineSource == LineSource.FAST_EDGES
+        @Suppress("NAME_SHADOWING")
+        val model = if (fastSel && fastModel != null) FastEdgesModel(fastModel) { settings.detail } else model
         val (argb, alphaFull) = flattenAlpha(argbIn, w, h, alphaMask)
         val tm = Timer()
         val tTotal = System.nanoTime()
@@ -69,7 +74,7 @@ object SketchPipeline {
         val alphaBg = alphaFull?.let { downscaleMask(it, w, h, pw, ph) }
         val sub = tm.time("crop") { SubjectCrop.detect(px, pw, ph, alphaBg = alphaBg) }
         // choose line source
-        var source = settings.lineSource
+        var source = if (fastSel) (if (fastModel != null) LineSource.AI else LineSource.CLASSIC) else settings.lineSource
         if (source == LineSource.AUTO) {
             progress("Analysing image", 0.06f)
             source = when {
@@ -137,11 +142,31 @@ object SketchPipeline {
                 fusedInk = ai != null
             }
         }
-        lastLineSource = source.name
+        lastLineSource = if (fastSel && source == LineSource.AI) "FAST_EDGES" else source.name
 
-        // CLASSIC (no model): the cartoon ink extractor + backdrop mask beats raw Canny tracing whenever it finds real ink.
+        // FLOW_LINES (zero-model): Coherent Line Drawing on the subject crop, background suppressed like the AI path,
+        // then the same percentile normalisation. Reuses the classicInk/classicNormalised flags so the vectoriser,
+        // pencil texture and colour-fill rules treat it as clean normalised ink.
         var classicInk = false
         var classicNormalised = false
+        if (source == LineSource.FLOW_LINES) {
+            progress("Flow lines", 0.20f)
+            val cx0 = sub.x0.coerceIn(0, pw - 8); val cy0 = sub.y0.coerceIn(0, ph - 8)
+            val cx1 = sub.x1.coerceIn(cx0 + 8, pw); val cy1 = sub.y1.coerceIn(cy0 + 8, ph)
+            val cw = cx1 - cx0; val chh = cy1 - cy0
+            val crop = IntArray(cw * chh)
+            for (y in 0 until chh) System.arraycopy(px, (cy0 + y) * pw + cx0, crop, y * cw, cw)
+            val ci = tm.time("flowInk") { FlowLines.inkMap(crop, cw, chh, FlowLines.paramsForDetail(settings.detail)) }
+            val e = FloatArray(pw * ph)
+            for (y in 0 until chh) System.arraycopy(ci, y * cw, e, (cy0 + y) * pw + cx0, cw)
+            if (bgMask != null) for (i in e.indices) if (bgMask[i]) e[i] = 0f
+            val valid = if (bgMask != null) BooleanArray(pw * ph) { !bgMask[it] } else null
+            normaliseInk(e, valid, pw, ph)
+            ink = e; classicInk = true; classicNormalised = true
+            check()
+        }
+
+        // CLASSIC (no model): the cartoon ink extractor + backdrop mask beats raw Canny tracing whenever it finds real ink.
         if (source == LineSource.CLASSIC) {
             progress("Extracting lines", 0.30f)
             val inked = tm.time("analyse") { CartoonLineExtractor.cartoonScore(px, pw, ph, sub) >= AUTO_CARTOON_CUT }

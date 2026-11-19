@@ -63,6 +63,29 @@ techniques from the MIT-licensed JavaScript demos of Lemo-Opuscar. Its CC BY-NC 
 - Licence: MIT (full text at the end of this file)
 - https://github.com/lemomo-ai/lemo-opuscar
 
+## 9. Coherent-Line-Drawing (Flow lines engine)
+
+`FlowLines.kt` is a Kotlin port of the C++ implementation of Kang, Lee, Chui, "Coherent Line Drawing" (NPAR 2007).
+Ported from SSARCandy/Coherent-Line-Drawing (MIT, (c) 2019 HSU,SHU-HSUAN).
+
+- Copyright (c) 2019 HSU,SHU-HSUAN
+- Licence: MIT (same terms as the MIT text in this file)
+- https://github.com/SSARCandy/Coherent-Line-Drawing
+
+## 10. TEED, Tiny and Efficient Edge Detector (`models/teed.onnx`, "Fast edges" engine)
+
+- Paper: Soria, Sappa, Vintimilla, Velesaca. "Tiny and Efficient Model for the Edge Detection Generalization". ICCV 2023 Workshops.
+- Code and BIPED weights (epoch 5): https://github.com/xavysp/TEED
+- Copyright (c) 2022 Xavier Soria Poma
+- Licence: MIT (same terms as the MIT text below)
+- ONNX export with baked-in preprocessing: `tools/model_lab/export_teed.py`
+
+## 11. MTEED (optional download "Fast edges+", not bundled)
+
+- TEED architecture with the Anyline weights `MTEED.pth` by TheMistoAI: https://huggingface.co/TheMistoAI/MistoLine (`Anyline/MTEED.pth`)
+- Loader and pre/post-processing reference: ComfyUI-Anyline (MIT)
+- Licence of the weights: **CreativeML OpenRAIL++, not MIT.** Use is subject to the OpenRAIL++ use-based restrictions (Attachment A of the licence, https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md). In summary you may not use the model to: violate any law; exploit, harm or endanger minors; generate or spread verifiably false information to harm others; generate or spread personal identifiable information that could harm an individual; defame, disparage or harass; make fully automated decisions that affect a person's legal rights; discriminate against or harm individuals or groups based on social behaviour or personal characteristics; exploit the vulnerabilities of a specific group; or for any use intended or likely to cause harm. These restrictions pass on to anyone who receives the model from you. The download is optional.
+
 ## MIT License
 
 The text below applies to items 1 and 2. The copyright lines for each are given in their sections above.

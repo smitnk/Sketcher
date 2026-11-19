@@ -38,6 +38,10 @@ data class ModelSpec(
     val fp16: Boolean = false,
     /** Dynamic-int8 weights: CPU EP only (ORT docs: XNNPACK/NNAPI give nothing for ConvInteger/MatMulInteger). */
     val int8: Boolean = false,
+    /** Belongs to the "Fast edges" engine (TEED/MTEED): not offered as a user-selectable AI line model. */
+    val fast: Boolean = false,
+    /** Licence shown next to optional downloads (null = permissive/bundled). */
+    val licence: String? = null,
 ) {
     init {
         require(sizeMultiple > 0) { "sizeMultiple" }
@@ -132,8 +136,42 @@ object ModelSpecs {
         fp16 = true, maxPixels = 512 * 768,
     )
 
+    /**
+     * TEED (MIT, Xavier Soria Poma): 58K-parameter edge detector, BIPED epoch 5 (repo default checkpoint). The ONNX graph
+     * takes RGB 0..1 and bakes in x255, BGR order, BIPED mean subtraction and sigmoid of the fused head (tools/model_lab/export_teed.py),
+     * so it fits ZERO_ONE in / ZERO_ONE out; edge = HIGH. Paper level is ~0.44, FastEdges.refine normalises it.
+     */
+    val TEED = ModelSpec(
+        id = "teed", name = "Fast edges",
+        description = "Tiny edge model (TEED), near-instant, technical outlines.",
+        fileName = "teed.onnx",
+        inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
+        inkPolarity = InkPolarity.INK_IS_HIGH, sizeMultiple = 8,
+        assetPath = "models/teed.onnx",
+        maxPixels = 1024 * 1024, fast = true,
+    )
+
+    /** MTEED (Anyline, OpenRAIL++): same TEED net, no mean subtraction, sigmoid of the mean of the 4 logit maps. */
+    val MTEED = ModelSpec(
+        id = "mteed", name = "Fast edges+ (MTEED)",
+        description = "Cleaner contours. Optional download, OpenRAIL++ licence.",
+        fileName = "mteed.onnx",
+        inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
+        inkPolarity = InkPolarity.INK_IS_HIGH, sizeMultiple = 8,
+        downloadUrl = "$BASE/mteed.onnx", sizeBytes = 250_000L,
+        maxPixels = 1024 * 1024, fast = true, licence = "OpenRAIL++ (TheMistoAI/MistoLine)",
+    )
+
+    /** User-selectable AI line models. */
     val ALL: List<ModelSpec> = listOf(INFORMATIVE, REALISTIC, COARSE, ANIME)
     const val DEFAULT_ID = "informative"
 
-    fun byId(id: String): ModelSpec? = ALL.firstOrNull { it.id == id }
+    /** Models of the Fast edges engine. */
+    val FAST: List<ModelSpec> = listOf(TEED, MTEED)
+    const val FAST_DEFAULT_ID = "teed"
+
+    /** Everything the ModelManager tracks. */
+    val EVERY: List<ModelSpec> = ALL + FAST
+
+    fun byId(id: String): ModelSpec? = EVERY.firstOrNull { it.id == id }
 }

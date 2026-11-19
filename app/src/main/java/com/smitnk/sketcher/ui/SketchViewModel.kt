@@ -156,6 +156,7 @@ private const val DEFAULT_PROJECT_NAME = "Untitled sketch"
 private const val AUTOSAVE_DELAY_MS = 2000L
 private const val SAVE_RETRY_MS = 10_000L
 private const val KEY_MODEL_ID = "model_id"
+private const val KEY_FAST_MODEL_ID = "fast_model_id"
 private const val KEY_ACCEL_CHOICE = "accel_choice"
 private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
 private const val PREV_JOIN_MS = 6_000L
@@ -230,7 +231,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     val generationDisplayProgress: Float? get() = if (aiStage) null else generationProgress
 
     private fun aiModelName(): String =
-        (lineArtModel?.specName ?: (ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE).name)
+        if (pipelineSettings.lineSource == LineSource.FAST_EDGES) (ModelSpecs.byId(fastModelId) ?: ModelSpecs.TEED).name
+        else (lineArtModel?.specName ?: (ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE).name)
 
     /** Progress callback of run [id]; a superseded/reset run is stopped instead of overwriting the new run's state. */
     private fun onStage(id: Long, stage: String, fraction: Float) {
@@ -283,6 +285,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun cancelEngineRuns() {
         lineArtModel?.cancelRun()
         runFallback?.cancelRun()
+        fastModelInst?.cancelRun()
     }
 
     // ------------------------------------------------------------------ line-art models / processing
@@ -295,7 +298,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Id of the line model in use (persisted). Falls back to the bundled model when the file is missing. */
     var selectedLineModelId by mutableStateOf(
-        mlPrefs.getString(KEY_MODEL_ID, null)?.takeIf { ModelSpecs.byId(it) != null } ?: ModelSpecs.DEFAULT_ID,
+        mlPrefs.getString(KEY_MODEL_ID, null)?.takeIf { id -> ModelSpecs.ALL.any { it.id == id } } ?: ModelSpecs.DEFAULT_ID,
     )
         private set
 
@@ -319,7 +322,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Rows for the style picker's model cards. */
     val lineModels: List<LineModelUi>
-        get() = models.list().map { s ->
+        get() = models.list().filter { !it.fast }.map { s ->
             LineModelUi(
                 id = s.id,
                 name = s.name,
@@ -341,6 +344,45 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 recommended = s.id == ModelSpecs.DEFAULT_ID,
             )
         }
+
+    // ---- Fast edges engine (TEED bundled / MTEED optional download). Own model instance, never replaces lineArtModel.
+    var fastModelId by mutableStateOf(
+        mlPrefs.getString(KEY_FAST_MODEL_ID, null)?.takeIf { id -> ModelSpecs.FAST.any { it.id == id } } ?: ModelSpecs.FAST_DEFAULT_ID,
+    )
+        private set
+    private var fastModelInst: OnnxLineArtModel? = null
+
+    /** Cards for the Fast edges choice: TEED (built-in) and MTEED (download, OpenRAIL++). */
+    val fastModels: List<LineModelUi>
+        get() = models.list().filter { it.fast }.map { s ->
+            LineModelUi(
+                id = s.id,
+                name = s.name,
+                subtitle = if (s.id == "teed") "Tiny model, near-instant, technical outlines"
+                else "Cleaner contours, download, ${s.licence ?: "see licences"} licence",
+                sizeLabel = if (s.isBundled) "Built-in" else "< 1 MB",
+                installed = modelStateUi[s.id] == ModelState.Installed,
+                downloading = (modelStateUi[s.id] as? ModelState.Downloading)?.progress,
+                recommended = s.id == ModelSpecs.FAST_DEFAULT_ID,
+            )
+        }
+
+    fun selectFastModel(id: String) {
+        if (id == fastModelId || ModelSpecs.FAST.none { it.id == id } || modelStates.value[id] != ModelState.Installed) return
+        mlPrefs.edit().putString(KEY_FAST_MODEL_ID, id).apply()
+        fastModelId = id
+        val old = fastModelInst
+        fastModelInst = null
+        if (old != null) { if (engineBusy) retiredModels.add(old) else closeInBackground(old) }
+    }
+
+    private fun fastModel(): OnnxLineArtModel {
+        val cur = fastModelInst
+        if (cur != null && !cur.isClosed) return cur
+        val spec = ModelSpecs.FAST.firstOrNull { it.id == fastModelId && models.isAvailable(it.id) } ?: ModelSpecs.TEED
+        return OnnxLineArtModel(app, spec, models.file(spec.id), longSide = OnnxLineArtModel.DEFAULT_LONG_SIDE)
+            .also { fastModelInst = it }
+    }
 
     var showMlSettings by mutableStateOf(false)
         private set
@@ -437,7 +479,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
                 modelStates.update { ModelStates.installed(it, id) }
                 // Never swap models under a running generation: apply afterwards.
-                if (engineBusy) pendingSelectId = id else selectLineModelNow(id)
+                if (spec.fast) selectFastModel(id) // Fast edges models never replace the user's AI line model
+                else if (engineBusy) pendingSelectId = id else selectLineModelNow(id)
                 toast("${spec.name} model ready")
             } catch (e: CancellationException) {
                 throw e
@@ -596,6 +639,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val m = lineArtModel
         lineArtModel = null
         closeInBackground(m)
+        closeInBackground(fastModelInst)
+        fastModelInst = null
         closeInBackground(runFallback)
         runFallback = null
         retiredModels.forEach { closeInBackground(it) }
@@ -610,6 +655,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             "ai" -> LineSource.AI
             "cartoon" -> LineSource.CARTOON
             "classic" -> LineSource.CLASSIC
+            "flow" -> LineSource.FLOW_LINES
+            "fast" -> LineSource.FAST_EDGES
             else -> null
         }
         val sh = when (shading?.lowercase()) {
@@ -1318,6 +1365,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val ps = pipelineSettings
                 val m = model()
                 token = m.beginRun()
+                val fm = if (ps.lineSource == LineSource.FAST_EDGES) fastModel().also { it.beginRun(); it.longSide = SketchPipeline.modelSide(ps.detail) } else null
                 m.detail = ps.detail
                 m.longSide = SketchPipeline.modelSide(ps.detail)
                 genStartMs = genStart
@@ -1332,14 +1380,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
                 // Cancelling this coroutine must stop the blocking ONNX run too, not just abandon the Job.
                 val stopper = launch {
-                    try { awaitCancellation() } finally { if (!success) { m.cancelRun(token); runFallback?.cancelRun() } }
+                    try { awaitCancellation() } finally { if (!success) { m.cancelRun(token); runFallback?.cancelRun(); fm?.cancelRun() } }
                 }
                 val (drawing, scaledBg) = try { withContext(Dispatchers.Default) {
                     val w = bmp.width
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) })
+                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) }, fastModel = fm)
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {

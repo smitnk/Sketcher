@@ -59,10 +59,43 @@ Sketcher uses the components below.
    Licence: MIT (full text at the end of this file)
    https://github.com/lemomo-ai/lemo-opuscar
 
+9. Coherent-Line-Drawing (Flow lines engine: Edge Tangent Flow + flow-based DoG;
+   FlowLines.kt is a Kotlin port of the C++ implementation, algorithm from
+   Kang, Lee, Chui "Coherent Line Drawing", NPAR 2007)
+   Ported from SSARCandy/Coherent-Line-Drawing (MIT, (c) 2019 HSU,SHU-HSUAN)
+   Copyright (c) 2019 HSU,SHU-HSUAN
+   Licence: MIT (same terms as the text below)
+   https://github.com/SSARCandy/Coherent-Line-Drawing
+
+10. TEED, Tiny and Efficient Edge Detector (models/teed.onnx, "Fast edges" engine)
+   Paper: Soria, Sappa, Vintimilla, Velesaca. "Tiny and Efficient Model for the Edge
+   Detection Generalization". ICCV 2023 Workshops.
+   Code and BIPED weights (epoch 5): https://github.com/xavysp/TEED
+   Copyright (c) 2022 Xavier Soria Poma
+   Licence: MIT (same terms as the text below)
+   ONNX export with baked-in preprocessing: tools/model_lab/export_teed.py
+
+11. MTEED (optional download "Fast edges+", not bundled)
+   TEED architecture with the Anyline weights MTEED.pth, by TheMistoAI
+   https://huggingface.co/TheMistoAI/MistoLine (Anyline/MTEED.pth)
+   Loader/pre- and post-processing reference: ComfyUI-Anyline (MIT).
+   Licence of the weights: CreativeML OpenRAIL++ (NOT MIT). Use is subject to the
+   OpenRAIL++ use-based restrictions, which include (summary, see the full licence
+   text: https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md,
+   Attachment A): you may not use the model to violate any law; to exploit, harm or
+   endanger minors; to generate or spread verifiably false information to harm
+   others; to generate or spread personal identifiable information that could harm an
+   individual; to defame, disparage or harass; for fully automated decisions that
+   affect a person's legal rights; to discriminate against or harm individuals or
+   groups based on social behaviour or personal characteristics; to exploit the
+   vulnerabilities of a specific group; or for any use that is intended to or
+   likely to cause harm. These restrictions pass on to anyone who receives the model
+   from you. Downloading it in this app is optional and your choice.
+
 ----------------------------------------------------------------------
 MIT License
 
-The text below applies to items 1 and 2. The copyright lines for each
+The text below applies to items 1, 2 and 10. The copyright lines for each
 are given in their sections above.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

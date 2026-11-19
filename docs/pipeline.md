@@ -50,3 +50,13 @@ object SketchPipeline {                      // B1 (orchestrator)
 CLASSIC = existing StrokeGenerator (B5 improves it). Colour fill = existing ColorStrokeGenerator.generateFill.
 Model: assets/models/lineart.onnx — informative-drawings (MIT, Chan et al. 2022), ONNX export by josephrocca.
 Input float32 [1,3,H,W] RGB 0..1 (H,W multiples of 8), output [1,1,H,W] where 1 = white paper, lower = ink → ink = 1 - out.
+
+## Flow lines (LineSource.FLOW_LINES, zero-model)
+`image/pipeline/FlowLines.kt`: Kang et al. Coherent Line Drawing ported from SSARCandy/Coherent-Line-Drawing (MIT).
+5x5 Sobel -> tangent = gradient rotated 90 deg -> 3 ETF refinement passes (kernel 5, paper Eq.1-5; phi*w_d collapses to a dot
+product, w_m via lookup table) -> DoG across the flow (sigma_c, sigma_s = 1.6 sigma_c, rho 0.997) -> FDoG along the flow
+(sigma_m 3, bilinear flow sampling) -> min-max + threshold tau. Runs on the subject crop at <= 768 px (rows in parallel), then
+SketchPipeline applies background suppression, `normaliseInk`, LineArtVectorizer and the pencil texture. `detail` maps to
+tau 0.70..1.0 and sigma_c 1.4..0.6 (0.5: tau 0.85, sigma_c 1.0; slightly above the C++ tau 0.8 to keep interior detail). Intent extra `engine=flow`.
+Future GPU path: `webgl/index.html` in the C++ repo has one fragment shader per stage (FS_SOBEL, FS_ETF_INIT, FS_ETF_REFINE
+ping-pong, FS_DOG, FS_FDOG, FS_THRESH, FS_COMBINE for CLD iterations); port 1:1 to GLES 3.0 / Vulkan compute.
