@@ -166,10 +166,10 @@ class TipTrack private constructor(
             val sig = signature(layers, look, durationSec)
             synchronized(lock) { cached?.let { if (it.sig.contentEquals(sig)) return it.track } }
             // Source of truth: anim/TimelineQuery via LayerTimeline.tipAt (layerIndex = index into [layers]).
-            val track = build(durationSec) { p ->
+            val track = build(durationSec, { p: Float ->
                 val t = LayerTimeline.tipAt(layers, p, look, durationSec)
                 Tip(t.x, t.y, t.layerIndex, t.strokeIndex, t.penDown, t.speed)
-            }
+            })
             synchronized(lock) { cached = Entry(sig, track) }
             return track
         }
