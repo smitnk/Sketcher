@@ -1,103 +1,138 @@
-== beard_informative_ai_pencil (GEN_DONE seen=1 after 29s)
+== beard_informative_ai_pencil (GEN_DONE seen=1 after 20s)
 --------- beginning of main
-11-18 12:37:25.772  6673  6673 I SketcherGen: GEN_DONE ms=27572 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:37:27.703  6673  6712 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_informative_ai_pencil
-11-18 12:37:47.241  6673  6673 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== beard_coarse_ai_pencil (GEN_DONE seen=1 after 21s)
+11-19 18:16:33.455  6508  6508 I SketcherGen: GEN_DONE ms=18141 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:16:34.575  6508  6532 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_informative_ai_pencil
+11-19 18:16:54.626  6508  6508 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_coarse_ai_pencil (GEN_DONE seen=1 after 17s)
 --------- beginning of main
-11-18 12:38:16.392  6877  6877 I SketcherGen: GEN_DONE ms=14483 outline=574 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:38:17.917  6877  6900 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_coarse_ai_pencil
-11-18 12:38:37.826  6877  6877 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== beard_anime_ai_pencil (GEN_DONE seen=1 after 37s)
+11-19 18:17:18.862  6679  6679 I SketcherGen: GEN_DONE ms=9436 outline=574 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:17:20.105  6679  6716 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_coarse_ai_pencil
+11-19 18:17:39.860  6679  6679 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_anime_ai_pencil (GEN_DONE seen=1 after 34s)
 --------- beginning of main
-11-18 12:39:23.494  7039  7039 I SketcherGen: GEN_DONE ms=10698 outline=347 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:39:25.744  7039  7076 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_anime_ai_pencil
-11-18 12:39:44.975  7039  7039 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== elf_informative_ai_pencil (GEN_DONE seen=1 after 32s)
+11-19 18:18:23.025  6829  6829 I SketcherGen: GEN_DONE ms=7289 outline=347 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:18:24.125  6829  6854 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_anime_ai_pencil
+11-19 18:18:44.158  6829  6829 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== elf_informative_ai_pencil (GEN_DONE seen=1 after 19s)
 --------- beginning of main
-11-18 12:40:26.656  7278  7278 I SketcherGen: GEN_DONE ms=31095 outline=437 shading=0 fill=0 size=734x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:40:28.074  7278  7302 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/elf_informative_ai_pencil
-11-18 12:40:48.924  7278  7278 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== cartoon_informative_ai_pencil (GEN_DONE seen=1 after 50s)
+11-19 18:19:11.604  7053  7053 I SketcherGen: GEN_DONE ms=17277 outline=437 shading=0 fill=0 size=734x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:19:12.677  7053  7091 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/elf_informative_ai_pencil
+11-19 18:19:33.058  7053  7053 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== cartoon_informative_ai_pencil (GEN_DONE seen=1 after 30s)
 --------- beginning of main
-11-18 12:41:48.471  7458  7458 I SketcherGen: GEN_DONE ms=49409 outline=72 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:41:50.312  7458  7483 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/cartoon_informative_ai_pencil
-11-18 12:42:10.641  7458  7458 I SketcherGen: ANIM_END progress=1.0 revealedFraction=0.9999998
-== tpose_informative_ai_pencil (GEN_DONE seen=1 after 52s)
+11-19 18:20:12.094  7200  7200 I SketcherGen: GEN_DONE ms=29740 outline=269 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:20:13.096  7200  7233 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/cartoon_informative_ai_pencil
+11-19 18:20:33.358  7200  7200 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_informative_ai_pencil (GEN_DONE seen=1 after 33s)
 --------- beginning of main
-11-18 12:43:13.225  7732  7732 I SketcherGen: GEN_DONE ms=51469 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:43:14.981  7732  7757 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_informative_ai_pencil
-11-18 12:43:35.508  7732  7732 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== person1_informative_ai_pencil (GEN_DONE seen=1 after 34s)
+11-19 18:21:15.593  7379  7379 I SketcherGen: GEN_DONE ms=30881 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:21:17.487  7379  7404 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_informative_ai_pencil
+11-19 18:21:36.942  7379  7379 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== person1_informative_ai_pencil (GEN_DONE seen=1 after 19s)
 --------- beginning of main
-11-18 12:44:17.400  7980  7980 I SketcherGen: GEN_DONE ms=32558 outline=582 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:44:18.814  7980  8002 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_informative_ai_pencil
-11-18 12:44:40.692  7980  7980 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== person2_informative_ai_pencil (GEN_DONE seen=1 after 33s)
+11-19 18:22:05.104  7630  7630 I SketcherGen: GEN_DONE ms=17186 outline=582 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:22:06.241  7630  7654 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_informative_ai_pencil
+11-19 18:22:26.625  7630  7630 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== person2_informative_ai_pencil (GEN_DONE seen=1 after 23s)
 --------- beginning of main
-11-18 12:45:20.973  8186  8186 I SketcherGen: GEN_DONE ms=31808 outline=1379 shading=0 fill=0 size=671x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:45:22.699  8186  8218 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person2_informative_ai_pencil
-11-18 12:45:43.192  8186  8186 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_whiteboard (GEN_DONE seen=1 after 52s)
+11-19 18:22:57.494  7773  7773 I SketcherGen: GEN_DONE ms=21830 outline=1379 shading=0 fill=0 size=671x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:22:58.673  7773  7796 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person2_informative_ai_pencil
+11-19 18:23:19.248  7773  7773 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_whiteboard (GEN_DONE seen=1 after 29s)
 --------- beginning of main
-11-18 12:45:49.833  8396  8396 I SketcherGen: LOOK_APPLIED LookSettings(feel=WHITEBOARD_MARKER, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1)
-11-18 12:46:44.065  8396  8396 I SketcherGen: GEN_DONE ms=51453 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:46:45.731  8396  8421 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_whiteboard
-11-18 12:47:05.508  8396  8396 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_pen_plotter (GEN_DONE seen=1 after 51s)
+11-19 18:23:24.522  7956  7956 I SketcherGen: LOOK_APPLIED LookSettings(feel=WHITEBOARD_MARKER, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1)
+11-19 18:23:54.654  7956  7956 I SketcherGen: GEN_DONE ms=28033 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:23:56.579  7956  7978 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_whiteboard
+11-19 18:24:15.631  7956  7956 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_pen_plotter (GEN_DONE seen=1 after 29s)
 --------- beginning of main
-11-18 12:47:13.273  8639  8639 I SketcherGen: LOOK_APPLIED LookSettings(feel=PEN_PLOTTER, paper=CREAM, misregisterColour=false, post=NONE, onTwos=false, seed=1)
-11-18 12:48:06.772  8639  8639 I SketcherGen: GEN_DONE ms=51022 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:48:09.941  8639  8661 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_pen_plotter
-11-18 12:48:28.722  8639  8639 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_colored_pencil (GEN_DONE seen=1 after 55s)
+11-19 18:24:23.964  8127  8127 I SketcherGen: LOOK_APPLIED LookSettings(feel=PEN_PLOTTER, paper=CREAM, misregisterColour=false, post=NONE, onTwos=false, seed=1)
+11-19 18:24:54.235  8127  8127 I SketcherGen: GEN_DONE ms=28217 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:24:55.874  8127  8149 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_pen_plotter
+11-19 18:25:15.876  8127  8127 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_colored_pencil (GEN_DONE seen=1 after 32s)
 --------- beginning of main
-11-18 12:48:41.646  8911  8911 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PENCIL_TOOTH, misregisterColour=false, post=NONE, onTwos=false, seed=1)
-11-18 12:49:39.918  8911  8911 I SketcherGen: GEN_DONE ms=55489 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:49:41.901  8911  8936 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_colored_pencil
-11-18 12:50:02.991  8911  8911 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_scratch_film (GEN_DONE seen=1 after 52s)
+11-19 18:25:27.982  8343  8343 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PENCIL_TOOTH, misregisterColour=false, post=NONE, onTwos=false, seed=1)
+11-19 18:26:00.588  8343  8343 I SketcherGen: GEN_DONE ms=30400 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:26:02.865  8343  8362 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_colored_pencil
+11-19 18:26:22.192  8343  8343 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_scratch_film (GEN_DONE seen=1 after 33s)
 --------- beginning of main
-11-18 12:50:15.265  9160  9160 I SketcherGen: LOOK_APPLIED LookSettings(feel=SCRATCH_BOIL, paper=CREAM, misregisterColour=false, post=NONE, onTwos=true, seed=1)
-11-18 12:51:09.747  9160  9160 I SketcherGen: GEN_DONE ms=51854 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:51:14.704  9160  9187 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_scratch_film
-11-18 12:51:32.226  9160  9160 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_riso (GEN_DONE seen=1 after 52s)
+11-19 18:26:33.951  8524  8524 I SketcherGen: LOOK_APPLIED LookSettings(feel=SCRATCH_BOIL, paper=CREAM, misregisterColour=false, post=NONE, onTwos=true, seed=1)
+11-19 18:27:09.061  8524  8524 I SketcherGen: GEN_DONE ms=33190 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:27:11.489  8524  8545 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_scratch_film
+11-19 18:27:30.322  8524  8524 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_riso (GEN_DONE seen=1 after 37s)
 --------- beginning of main
-11-18 12:51:42.603  9406  9406 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=CREAM, misregisterColour=true, post=NONE, onTwos=false, seed=1)
-11-18 12:52:37.529  9406  9406 I SketcherGen: GEN_DONE ms=52357 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:52:40.029  9406  9428 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_riso
-11-18 12:53:00.308  9406  9406 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_dither (GEN_DONE seen=1 after 52s)
+11-19 18:27:40.836  8715  8715 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=CREAM, misregisterColour=true, post=NONE, onTwos=false, seed=1)
+11-19 18:28:18.997  8715  8715 I SketcherGen: GEN_DONE ms=36065 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:28:21.037  8715  8736 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_riso
+11-19 18:28:40.458  8715  8715 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_dither (GEN_DONE seen=1 after 35s)
 --------- beginning of main
-11-18 12:53:12.078  9744  9744 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=ONE_BIT_ATKINSON, onTwos=false, seed=1)
-11-18 12:54:06.362  9744  9744 I SketcherGen: GEN_DONE ms=51958 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:54:08.012  9744  9766 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_dither
-11-18 12:54:28.741  9744  9744 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== tpose_look_halftone (GEN_DONE seen=1 after 52s)
+11-19 18:28:52.819  8910  8910 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=ONE_BIT_ATKINSON, onTwos=false, seed=1)
+11-19 18:29:29.584  8910  8910 I SketcherGen: GEN_DONE ms=35295 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:29:31.876  8910  8932 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_dither
+11-19 18:29:50.892  8910  8910 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_look_halftone (GEN_DONE seen=1 after 33s)
 --------- beginning of main
-11-18 12:54:35.258  9990  9990 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=HALFTONE, onTwos=false, seed=1)
-11-18 12:55:29.264  9990  9990 I SketcherGen: GEN_DONE ms=51085 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:55:32.596  9990 10010 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_halftone
-11-18 12:55:52.174  9990  9990 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== beard_cartoon_vector (GEN_DONE seen=1 after 31s)
+11-19 18:29:58.543  9098  9098 I SketcherGen: LOOK_APPLIED LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=HALFTONE, onTwos=false, seed=1)
+11-19 18:30:32.765  9098  9098 I SketcherGen: GEN_DONE ms=32719 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:30:34.879  9098  9121 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_halftone
+11-19 18:30:54.011  9098  9098 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_flow_pencil (GEN_DONE seen=1 after 6s)
 --------- beginning of main
-11-18 12:56:31.718 10232 10232 I SketcherGen: GEN_DONE ms=30064 outline=653 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=CLEAN_VECTOR)
-11-18 12:56:33.005 10232 10256 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_cartoon_vector
-11-18 12:56:53.310 10232 10232 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== beard_accel_cpu (GEN_DONE seen=1 after 31s)
+11-19 18:31:06.206  9277  9277 I SketcherGen: GEN_DONE ms=3300 outline=18 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:31:07.395  9277  9299 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_flow_pencil
+11-19 18:31:27.675  9277  9277 I SketcherGen: ANIM_END progress=1.0 revealedFraction=0.9999998
+== beard_flow_pencil (GEN_DONE seen=1 after 10s)
 --------- beginning of main
-11-18 12:57:32.056 10423 10423 I SketcherGen: GEN_DONE ms=29948 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:57:33.495 10423 10446 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_cpu
-11-18 12:57:53.758 10423 10423 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-== beard_accel_nnapi_gpu (GEN_DONE seen=1 after 31s)
+11-19 18:31:44.994  9381  9381 I SketcherGen: GEN_DONE ms=8246 outline=155 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:31:45.785  9381  9403 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_flow_pencil
+11-19 18:32:06.192  9381  9381 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== person1_flow_pencil (GEN_DONE seen=1 after 7s)
 --------- beginning of main
-11-18 12:58:33.867 10601 10601 I SketcherGen: GEN_DONE ms=30033 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 12:58:35.772 10601 10628 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_nnapi_gpu
-11-18 12:58:55.608 10601 10601 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
-+ echo '== cartoon color (GEN_DONE seen=0)'
-== cartoon color (GEN_DONE seen=0)
+11-19 18:32:18.731  9621  9621 I SketcherGen: GEN_DONE ms=4229 outline=183 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:32:20.090  9621  9645 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_flow_pencil
+11-19 18:32:40.108  9621  9621 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== cartoon_flow_pencil (GEN_DONE seen=1 after 5s)
+--------- beginning of main
+11-19 18:32:52.813  9722  9722 I SketcherGen: GEN_DONE ms=3511 outline=96 shading=0 fill=0 size=745x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:32:53.760  9722  9747 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/cartoon_flow_pencil
+11-19 18:33:14.092  9722  9722 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== tpose_fast_pencil (GEN_DONE seen=1 after 7s)
+--------- beginning of main
+11-19 18:33:27.002  9825  9825 I SketcherGen: GEN_DONE ms=4625 outline=27 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=FAST_EDGES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:33:28.280  9825  9847 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_fast_pencil
+11-19 18:33:48.492  9825  9825 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_fast_pencil (GEN_DONE seen=1 after 6s)
+--------- beginning of main
+11-19 18:34:00.954  9927  9927 I SketcherGen: GEN_DONE ms=3460 outline=215 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=FAST_EDGES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:34:02.005  9927  9952 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_fast_pencil
+11-19 18:34:22.042  9927  9927 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== person1_fast_pencil (GEN_DONE seen=1 after 7s)
+--------- beginning of main
+11-19 18:34:35.622 10033 10033 I SketcherGen: GEN_DONE ms=4321 outline=260 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=FAST_EDGES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:34:36.788 10033 10059 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_fast_pencil
+11-19 18:34:57.376 10033 10033 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_cartoon_vector (GEN_DONE seen=1 after 18s)
+--------- beginning of main
+11-19 18:35:23.358 10140 10140 I SketcherGen: GEN_DONE ms=17398 outline=653 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=CLEAN_VECTOR)
+11-19 18:35:24.503 10140 10164 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_cartoon_vector
+11-19 18:35:44.543 10140 10140 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_accel_cpu (GEN_DONE seen=1 after 20s)
+--------- beginning of main
+11-19 18:36:10.703 10278 10278 I SketcherGen: GEN_DONE ms=18249 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:36:11.744 10278 10305 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_cpu
+11-19 18:36:32.076 10278 10278 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+== beard_accel_nnapi_gpu (GEN_DONE seen=1 after 22s)
+--------- beginning of main
+11-19 18:37:01.521 10439 10439 I SketcherGen: GEN_DONE ms=20140 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:37:02.405 10439 10462 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_nnapi_gpu
+11-19 18:37:22.693 10439 10439 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
++ echo '== cartoon color (GEN_DONE seen=1)'
+== cartoon color (GEN_DONE seen=1)
 + adb logcat -d -s SketcherGen
 --------- beginning of main
-11-18 13:00:03.391 10777 10777 I SketcherGen: GEN_DONE ms=57332 outline=111 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-18 13:00:04.571 10777 10802 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run
+11-19 18:38:08.109 10585 10585 I SketcherGen: GEN_DONE ms=36282 outline=289 shading=0 fill=1702 size=745x1024 settings=PipelineSettings(lineSource=AUTO, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-19 18:38:09.107 10585 10609 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/run

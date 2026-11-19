@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.smitnk.sketcher.image.pipeline.FlowLinesTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-19T18:11:44" hostname="runnervmccnms" time="0.562">
+  <properties/>
+  <testcase name="outputIsInUnitRangeAndSizeMatchesInput" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.226"/>
+  <testcase name="circleGivesContinuousRing" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.078"/>
+  <testcase name="flatInteriorAndBackgroundAreClean" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.077"/>
+  <testcase name="detailMapsToTau" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.0"/>
+  <testcase name="largeInputIsDownscaledAndFast" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.181"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
