@@ -1,0 +1,8 @@
+{
+ "default": {
+  "error": "ModuleNotFoundError(\"No module named 'onnxscript'\")"
+ },
+ "improved": {
+  "error": "ModuleNotFoundError(\"No module named 'onnxscript'\")"
+ }
+}
