@@ -18,7 +18,7 @@ jobs:
         with: { python-version: "3.11" }
       - run: |
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-          pip install onnx onnxruntime onnxconverter-common pillow numpy
+          pip install onnx onnxscript onnxruntime onnxconverter-common pillow numpy
           git clone --depth 1 https://github.com/Mukosame/Anime2Sketch.git /tmp/A2S
           mkdir -p /tmp/A2S/weights
           curl -fL -o /tmp/A2S/weights/netG.pth https://huggingface.co/gyrojeff/Anime2Sketch/resolve/main/netG.pth

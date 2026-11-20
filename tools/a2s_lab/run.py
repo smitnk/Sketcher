@@ -10,7 +10,7 @@ res = {}
 def export(kind):
     cwd = os.getcwd(); os.chdir("/tmp/A2S"); net = M.create_model(kind).eval(); os.chdir(cwd)
     p = f"{OUT}/anime2sketch_{kind}.onnx"
-    torch.onnx.export(net, torch.zeros(1, 3, S, S), p, input_names=["input"], output_names=["output"], opset_version=17)
+    torch.onnx.export(net, torch.zeros(1, 3, S, S), p, input_names=["input"], output_names=["output"], opset_version=17, dynamo=False)
     from onnxconverter_common import float16
     import onnx
     m16 = float16.convert_float_to_float16(onnx.load(p), keep_io_types=True)
