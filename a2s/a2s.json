@@ -1,8 +1,34 @@
 {
  "default": {
-  "error": "ModuleNotFoundError(\"No module named 'onnxscript'\")"
+  "mb_fp16": 108.869159,
+  "ms": [
+   440,
+   377,
+   398,
+   398,
+   381,
+   364,
+   371,
+   388,
+   411,
+   413,
+   480
+  ]
  },
  "improved": {
-  "error": "ModuleNotFoundError(\"No module named 'onnxscript'\")"
+  "mb_fp16": 96.11489,
+  "ms": [
+   929,
+   901,
+   769,
+   822,
+   817,
+   796,
+   803,
+   800,
+   776,
+   813,
+   1528
+  ]
  }
 }
