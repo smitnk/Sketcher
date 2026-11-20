@@ -8,9 +8,9 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
+> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
-> Task :app:mergeDebugResources
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
@@ -19,10 +19,10 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
-> Task :app:mergeDebugJniLibFolders
+> Task :app:processDebugManifestForPackage
 > Task :app:compressDebugAssets
+> Task :app:mergeDebugJniLibFolders
 > Task :app:checkDebugDuplicateClasses
 > Task :app:processDebugResources
 > Task :app:mergeDebugNativeLibs
@@ -50,8 +50,8 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:mergeDebugAndroidTestResources
 > Task :app:checkDebugAndroidTestDuplicateClasses
 > Task :app:processDebugAndroidTestResources
-> Task :app:mergeExtDexDebugAndroidTest
 > Task :app:mergeLibDexDebugAndroidTest
+> Task :app:mergeExtDexDebugAndroidTest
 > Task :app:mergeDebugAndroidTestJniLibFolders
 > Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
 > Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
@@ -79,17 +79,17 @@ w: file:///home/runner/work/Sketcher/Sketcher/app/src/main/java/com/smitnk/sketc
 > Task :app:processDebugAndroidTestJavaRes
 > Task :app:mergeProjectDexDebugAndroidTest
 > Task :app:mergeDebugAndroidTestJavaResource
+> Task :app:packageDebugAndroidTest
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
-> Task :app:packageDebugAndroidTest
 > Task :app:createDebugAndroidTestApkListingFileRedirect
 > Task :app:assembleDebugAndroidTest
 > Task :app:compileDebugUnitTestKotlin
 > Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
 > Task :app:processDebugUnitTestJavaRes
 > Task :app:testDebugUnitTest
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1795115482391.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1795199684589.json
 
-BUILD SUCCESSFUL in 1m 30s
+BUILD SUCCESSFUL in 1m 36s
 67 actionable tasks: 67 executed

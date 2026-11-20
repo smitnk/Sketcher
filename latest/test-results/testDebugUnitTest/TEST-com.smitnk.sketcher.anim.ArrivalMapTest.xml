@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.ArrivalMapTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:39" hostname="runnervmccnms" time="0.13">
+<testsuite name="com.smitnk.sketcher.anim.ArrivalMapTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:07" hostname="runnervm0hi8g" time="0.135">
   <properties/>
-  <testcase name="coverageEqualsUnion" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.022"/>
-  <testcase name="monotonicAlongStroke" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.001"/>
-  <testcase name="bakeSpeed" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.107"/>
-  <testcase name="earliestWins" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.0"/>
-  <system-out><![CDATA[ARRIVAL_BAKE_MS=40
+  <testcase name="coverageEqualsUnion" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.02"/>
+  <testcase name="monotonicAlongStroke" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.0"/>
+  <testcase name="bakeSpeed" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.113"/>
+  <testcase name="earliestWins" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.001"/>
+  <system-out><![CDATA[ARRIVAL_BAKE_MS=42
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

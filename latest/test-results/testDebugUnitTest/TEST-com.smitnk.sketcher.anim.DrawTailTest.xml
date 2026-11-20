@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.DrawTailTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:39" hostname="runnervmccnms" time="0.089">
+<testsuite name="com.smitnk.sketcher.anim.DrawTailTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:07" hostname="runnervm0hi8g" time="0.077">
   <properties/>
-  <testcase name="noEarlyFinishAndNoPopAtTheEnd" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.064"/>
-  <testcase name="pausesNeverExceedQuarterOfTimeline" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.001"/>
-  <testcase name="interleavingFixesTheCoverageTail" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.012"/>
-  <testcase name="interleavePlacesHairsNextToNeighbourAndKeepsAll" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.001"/>
-  <testcase name="revealMonotonicAndExactAtEnd" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.011"/>
+  <testcase name="noEarlyFinishAndNoPopAtTheEnd" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.056"/>
+  <testcase name="pausesNeverExceedQuarterOfTimeline" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.0"/>
+  <testcase name="interleavingFixesTheCoverageTail" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.008"/>
+  <testcase name="interleavePlacesHairsNextToNeighbourAndKeepsAll" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.002"/>
+  <testcase name="revealMonotonicAndExactAtEnd" classname="com.smitnk.sketcher.anim.DrawTailTest" time="0.01"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

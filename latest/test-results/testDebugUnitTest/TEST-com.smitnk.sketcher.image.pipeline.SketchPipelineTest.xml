@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:45" hostname="runnervmccnms" time="1.597">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:13" hostname="runnervm0hi8g" time="1.635">
   <properties/>
-  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.177"/>
-  <testcase name="smoothMaskRemovesStairSteps" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
-  <testcase name="cleanVectorUsesFullDetail" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.0"/>
+  <testcase name="autoFallsBackToAiWhenCartoonInkIsAlmostAbsent" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.173"/>
+  <testcase name="smoothMaskRemovesStairSteps" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="cleanVectorUsesFullDetail" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
   <testcase name="strongModelNotDimmedNorGreyWashMuddy" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
-  <testcase name="classicWithoutModelTracesRenderWithEdgeInkRaster" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.254"/>
-  <testcase name="faintRegionIsLiftedLocallyAndBlankPaperStaysClean" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.034"/>
-  <testcase name="edgeInkFindsColourEdgeBetweenEquallyBrightRegions" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
-  <testcase name="autoCutAndStrongInkGuard" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.0"/>
-  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.183"/>
-  <testcase name="flattenAlphaCompositesOntoWhiteAndDerivesMask" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
-  <testcase name="cartoonFusionIsMaxOfAiAndCartoonAndSilhouetteOnlyReinforces" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.01"/>
-  <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
-  <testcase name="cartoonRunsModelToo" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.931"/>
+  <testcase name="classicWithoutModelTracesRenderWithEdgeInkRaster" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.378"/>
+  <testcase name="faintRegionIsLiftedLocallyAndBlankPaperStaysClean" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.02"/>
+  <testcase name="edgeInkFindsColourEdgeBetweenEquallyBrightRegions" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.0"/>
+  <testcase name="autoCutAndStrongInkGuard" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.002"/>
+  <testcase name="aiRunsOnSubjectCropAndStaysOffFrameAndBackground" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.11"/>
+  <testcase name="flattenAlphaCompositesOntoWhiteAndDerivesMask" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.0"/>
+  <testcase name="cartoonFusionIsMaxOfAiAndCartoonAndSilhouetteOnlyReinforces" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.011"/>
+  <testcase name="faintInkIsNormalisedByPercentile" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.001"/>
+  <testcase name="cartoonRunsModelToo" classname="com.smitnk.sketcher.image.pipeline.SketchPipelineTest" time="0.932"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -1,5 +1,0 @@
---------- beginning of main
-11-19 19:26:50.645  8461  8461 I SketcherGen: LOOK_APPLIED LookSettings(feel=PEN_PLOTTER, paper=CREAM, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=true, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
-11-19 19:27:28.893  8461  8461 I SketcherGen: GEN_DONE ms=36262 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-19 19:27:31.530  8461  8488 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_pen_plotter
-11-19 19:27:50.169  8461  8461 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

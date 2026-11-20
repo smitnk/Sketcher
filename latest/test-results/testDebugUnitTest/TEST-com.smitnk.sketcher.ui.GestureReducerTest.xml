@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:47" hostname="runnervmccnms" time="0.002">
+<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:15" hostname="runnervm0hi8g" time="0.004">
   <properties/>
-  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
+  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.002"/>
   <testcase name="tapDrawsDot" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
   <testcase name="secondPointerWhilePendingIsTransformNoStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
-  <testcase name="timeCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
+  <testcase name="timeCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
   <testcase name="transformKeepsTransformingWithOneFingerLeft" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="smallQuickMoveStaysPending" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="strokeExtendsAndEnds" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>

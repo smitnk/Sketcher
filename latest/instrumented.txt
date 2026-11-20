@@ -71,7 +71,7 @@ INSTRUMENTATION_STATUS: test=homeShowsActionsAndDemoOpensEditor
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 136.316
+Time: 107.253
 
 OK (5 tests)
 

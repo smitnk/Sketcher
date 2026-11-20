@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.look.PostFiltersTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-19T19:12:46" hostname="runnervmccnms" time="0.018">
+<testsuite name="com.smitnk.sketcher.look.PostFiltersTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:14" hostname="runnervm0hi8g" time="0.021">
   <properties/>
-  <testcase name="halftoneDarkerMeansMoreInk" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.007"/>
-  <testcase name="halftoneIsDeterministicAndTwoLevel" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.003"/>
+  <testcase name="halftoneDarkerMeansMoreInk" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.009"/>
+  <testcase name="halftoneIsDeterministicAndTwoLevel" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.004"/>
   <testcase name="atkinsonKeepsMeanBrightnessRoughly" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.003"/>
   <testcase name="bayerExtremesAndTwoLevels" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.0"/>
-  <testcase name="paperIsSeededDeterministicOpaqueAndMisregisterInRange" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.004"/>
+  <testcase name="paperIsSeededDeterministicOpaqueAndMisregisterInRange" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.003"/>
   <testcase name="transparentInkKeepsOnlyInk" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.0"/>
   <testcase name="bayerMapIsPermutationOf0to63" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.0"/>
   <testcase name="atkinsonOutputsOnlyTwoLevels" classname="com.smitnk.sketcher.look.PostFiltersTest" time="0.001"/>
