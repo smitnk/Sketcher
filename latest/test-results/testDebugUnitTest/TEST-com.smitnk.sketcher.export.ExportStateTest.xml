@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.export.ExportStateTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:08" hostname="runnervm0hi8g" time="0.004">
+<testsuite name="com.smitnk.sketcher.export.ExportStateTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:42:54" hostname="ip-10-0-136-153" time="0.004">
   <properties/>
-  <testcase name="runningBlocksButDoneAndFailedDoNot" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.002"/>
+  <testcase name="runningBlocksButDoneAndFailedDoNot" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.001"/>
   <testcase name="generatingBlocksEverything" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.0"/>
   <testcase name="partialSuccessIsReportedHonestly" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.001"/>
-  <testcase name="inkAlphaCurveIsMonotonicAndSolid" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.001"/>
+  <testcase name="inkAlphaCurveIsMonotonicAndSolid" classname="com.smitnk.sketcher.export.ExportStateTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

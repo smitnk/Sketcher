@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.data.ProjectSessionTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:36:08" hostname="runnervm0hi8g" time="0.141">
+<testsuite name="com.smitnk.sketcher.data.ProjectSessionTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:42:54" hostname="ip-10-0-136-153" time="0.114">
   <properties/>
-  <testcase name="deleteThenQueuedSaveDoesNotResurrect" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.075"/>
-  <testcase name="persistentFailureSurfacesErrorAndFlushRetries" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.013"/>
-  <testcase name="savesAreBlockedWhileLoadingAndFailedLoadKeepsOldProject" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.003"/>
-  <testcase name="closeStillWritesQueuedSaves" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.003"/>
-  <testcase name="resetCancelsPendingLoad" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.001"/>
-  <testcase name="renameOfOtherProjectDoesNotLeakIntoCurrent" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.006"/>
-  <testcase name="failedSaveIsRetriedThenSucceeds" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.006"/>
-  <testcase name="queuedSaveNeverOverwritesRename" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.022"/>
+  <testcase name="deleteThenQueuedSaveDoesNotResurrect" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.059"/>
+  <testcase name="persistentFailureSurfacesErrorAndFlushRetries" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.008"/>
+  <testcase name="savesAreBlockedWhileLoadingAndFailedLoadKeepsOldProject" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.002"/>
+  <testcase name="closeStillWritesQueuedSaves" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.004"/>
+  <testcase name="resetCancelsPendingLoad" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.0"/>
+  <testcase name="renameOfOtherProjectDoesNotLeakIntoCurrent" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.002"/>
+  <testcase name="failedSaveIsRetriedThenSucceeds" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.005"/>
+  <testcase name="queuedSaveNeverOverwritesRename" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.023"/>
   <testcase name="latestLoadWinsAndStaleLoadIsIgnored" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.0"/>
-  <testcase name="firstSaveAllocatesIdSynchronouslyAndConcurrentRequestsShareIt" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.007"/>
+  <testcase name="firstSaveAllocatesIdSynchronouslyAndConcurrentRequestsShareIt" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.005"/>
   <testcase name="failedSaveSurvivesSwitchingToAnotherProject" classname="com.smitnk.sketcher.data.ProjectSessionTest" time="0.005"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
