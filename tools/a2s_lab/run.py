@@ -10,7 +10,7 @@ res = {}
 def export(kind):
     cwd = os.getcwd(); os.chdir("/tmp/A2S"); net = M.create_model(kind).eval(); os.chdir(cwd)
     p = f"{OUT}/anime2sketch_{kind}.onnx"
-    torch.onnx.export(net, torch.zeros(1, 3, S, S), p, input_names=["input"], output_names=["output"], opset_version=17, dynamo=False)
+    torch.onnx.export(net, torch.zeros(1, 3, S, S), p, input_names=["input"], output_names=["output"], opset_version=17, dynamo=False, dynamic_axes={"input": {2: "h", 3: "w"}, "output": {2: "h", 3: "w"}})
     from onnxconverter_common import float16
     import onnx
     m16 = float16.convert_float_to_float16(onnx.load(p), keep_io_types=True)
@@ -47,5 +47,8 @@ for r, f in enumerate(names):
     for c, o in enumerate(outs):
         o = o.convert("RGB").resize((W, W)); sheet.paste(o, (c * W, 24 + r * (W + 20)))
     d.text((6, 24 + r * (W + 20) + W + 2), f, fill="black")
+# dynamic-shape check: 768x512 must run
+for k,sx in sessions.items():
+    y=sx.run(None,{"input":np.zeros((1,3,768,512),np.float32)})[0]; res[k]["dyn_ok"]=list(y.shape)
 sheet.save(f"{OUT}/a2s_sheet.jpg", quality=88)
 json.dump(res, open(f"{OUT}/a2s.json", "w"), indent=1); print(json.dumps(res))
