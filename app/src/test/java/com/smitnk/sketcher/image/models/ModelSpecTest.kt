@@ -67,6 +67,23 @@ class ModelSpecTest {
         }
     }
 
+    @Test fun anime2sketchAlignsTo256AndCapsPixels() {
+        val s = ModelSpecs.ANIME2SKETCH
+        assertEquals(256, s.sizeMultiple)
+        assertTrue(s.cartoon && s.fp16 && !s.fast)
+        assertTrue(ModelSpecs.byId("anime2sketch") === s)
+        assertTrue(ModelSpecs.ALL.none { it.id == "anime2sketch" })
+        assertEquals(1f, s.inkFromOutput(-1f), 1e-6f)
+        for ((w, h) in listOf(1000 to 700, 700 to 1000, 4000 to 3000, 300 to 300, 1920 to 1080)) {
+            for (ls in listOf(512, 768, 1024)) {
+                val (tw, th) = s.targetSize(w, h, ls)
+                assertEquals(0, tw % 256); assertEquals(0, th % 256)
+                assertTrue("$w x $h ls=$ls -> $tw x $th", tw.toLong() * th <= s.maxPixels)
+            }
+        }
+        assertEquals(768 to 512, s.targetSize(1000, 500, 768))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun specNeedsExactlyOneSource() {
         ModelSpec("x", "x", "x", "x.onnx", InputNorm.ZERO_ONE, OutputRange.ZERO_ONE, InkPolarity.INK_IS_LOW, 8)

@@ -55,6 +55,8 @@ object SketchPipeline {
         alphaMask: BooleanArray? = null,
         /** TEED/MTEED raw edge model for [LineSource.FAST_EDGES] (separate from the user's [model]); null = Classic fallback. */
         fastModel: LineArtModel? = null,
+        /** Optional Anime2Sketch-style model for [LineSource.CARTOON]; null or any failure = built-in cartoon extractor. */
+        cartoonModel: LineArtModel? = null,
     ): GeneratedDrawing = withContext(Dispatchers.Default) {
         lastError = null
         val fastSel = settings.lineSource == LineSource.FAST_EDGES
@@ -111,7 +113,26 @@ object SketchPipeline {
             check()
         }
         if (source == LineSource.AI) runAi()
-        if (source == LineSource.CARTOON) {
+        var cartoonModelDone = false
+        if (source == LineSource.CARTOON && cartoonModel != null) {
+            progress("Running cartoon line model", 0.10f)
+            try {
+                // long side capped at 768 (memory); the ink goes through the same normalise + vectorise as AI line art
+                val r = runModelOnSubject(argb, w, h, pw, ph, sub, bgMask, settings, cartoonModel, tm, side = CARTOON_MODEL_SIDE)
+                ink = r.first
+                aiStrokes = r.second
+                cartoonModelDone = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                lastError = t
+                runCatching { android.util.Log.w("SketchPipeline", "cartoon model failed, using built-in cartoon lines", t) }
+                ink = null
+                aiStrokes = null
+            }
+            check()
+        }
+        if (source == LineSource.CARTOON && !cartoonModelDone) {
             progress("Extracting cartoon lines", 0.10f)
             // forced CARTOON on a textured photo (no clean backdrop): smooth fur/grass first or every blade becomes a speck
             val cartoonSrc = if (settings.lineSource == LineSource.CARTOON && !sub.hasBackground &&
@@ -605,6 +626,9 @@ object SketchPipeline {
     /** Model input long side: 768 normally, 1024 at high detail (OnnxLineArtModel.longSide must be >= this). */
     internal fun modelSide(detail: Float): Int = if (detail > 0.7f) 1024 else 768
 
+    /** Cartoon (Anime2Sketch) input long side: always 768, never 1024 (fp16 UNet memory). */
+    internal const val CARTOON_MODEL_SIDE = 768
+
     /**
      * Runs the model on the subject crop (taken from the original [argb] for full detail, resampled to
      * [modelSide]), vectorises there and maps strokes back to working-image coordinates. Also returns a
@@ -613,6 +637,7 @@ object SketchPipeline {
     private fun runModelOnSubject(
         argb: IntArray, w: Int, h: Int, pw: Int, ph: Int,
         sub: SubjectCrop.Result, bgMask: BooleanArray?, settings: PipelineSettings, model: LineArtModel, tm: Timer,
+        side: Int = modelSide(settings.detail),
     ): Pair<FloatArray, List<Stroke>> {
         val fx = w.toFloat() / pw; val fy = h.toFloat() / ph
         val ox0 = (sub.x0 * fx).roundToInt().coerceIn(0, w - 8)
@@ -622,7 +647,7 @@ object SketchPipeline {
         val cw = ox1 - ox0; val ch = oy1 - oy0
         val crop = IntArray(cw * ch)
         for (y in 0 until ch) System.arraycopy(argb, (oy0 + y) * w + ox0, crop, y * cw, cw)
-        val target = min(modelSide(settings.detail), 2 * max(cw, ch))
+        val target = min(side, 2 * max(cw, ch))
         val (mpx, mw, mh) = resample(crop, cw, ch, target)
         // fur/grass -> smooth tone so the model draws contours, not every hair (high detail = less smoothing)
         // Renders/characters on a clean studio backdrop have no noisy texture; smoothing would erase

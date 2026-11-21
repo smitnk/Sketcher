@@ -157,6 +157,7 @@ private const val AUTOSAVE_DELAY_MS = 2000L
 private const val SAVE_RETRY_MS = 10_000L
 private const val KEY_MODEL_ID = "model_id"
 private const val KEY_FAST_MODEL_ID = "fast_model_id"
+private const val KEY_CARTOON_MODEL_ID = "cartoon_model_id"
 private const val KEY_ACCEL_CHOICE = "accel_choice"
 private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
 private const val PREV_JOIN_MS = 6_000L
@@ -232,6 +233,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun aiModelName(): String =
         if (pipelineSettings.lineSource == LineSource.FAST_EDGES) (ModelSpecs.byId(fastModelId) ?: ModelSpecs.TEED).name
+        else if (pipelineSettings.lineSource == LineSource.CARTOON && cartoonModelId != ModelSpecs.CARTOON_BUILTIN_ID)
+            (ModelSpecs.byId(cartoonModelId) ?: ModelSpecs.ANIME2SKETCH).name
         else (lineArtModel?.specName ?: (ModelSpecs.byId(selectedLineModelId) ?: ModelSpecs.INFORMATIVE).name)
 
     /** Progress callback of run [id]; a superseded/reset run is stopped instead of overwriting the new run's state. */
@@ -286,6 +289,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         lineArtModel?.cancelRun()
         runFallback?.cancelRun()
         fastModelInst?.cancelRun()
+        cartoonModelInst?.cancelRun()
     }
 
     // ------------------------------------------------------------------ line-art models / processing
@@ -322,7 +326,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Rows for the style picker's model cards. */
     val lineModels: List<LineModelUi>
-        get() = models.list().filter { !it.fast }.map { s ->
+        get() = models.list().filter { !it.fast && !it.cartoon }.map { s ->
             LineModelUi(
                 id = s.id,
                 name = s.name,
@@ -382,6 +386,55 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         val spec = ModelSpecs.FAST.firstOrNull { it.id == fastModelId && models.isAvailable(it.id) } ?: ModelSpecs.TEED
         return OnnxLineArtModel(app, spec, models.file(spec.id), longSide = OnnxLineArtModel.DEFAULT_LONG_SIDE)
             .also { fastModelInst = it }
+    }
+
+    // ---- Cartoon engine: built-in extractor (default) or optional Anime2Sketch download. Own model instance.
+    var cartoonModelId by mutableStateOf(
+        mlPrefs.getString(KEY_CARTOON_MODEL_ID, null)?.takeIf { id -> ModelSpecs.CARTOON.any { it.id == id } } ?: ModelSpecs.CARTOON_BUILTIN_ID,
+    )
+        private set
+    private var cartoonModelInst: OnnxLineArtModel? = null
+
+    /** Cards for the Cartoon choice: built-in extractor and Anime2Sketch (download, MIT). */
+    val cartoonModels: List<LineModelUi>
+        get() = listOf(
+            LineModelUi(
+                id = ModelSpecs.CARTOON_BUILTIN_ID,
+                name = "Cartoon (built-in)",
+                subtitle = "Fast, works offline, no download",
+                sizeLabel = "Built-in",
+                installed = true,
+                recommended = true,
+            ),
+        ) + ModelSpecs.CARTOON.map { s ->
+            LineModelUi(
+                id = s.id,
+                name = "${s.name} (Anime2Sketch)",
+                subtitle = "Bold coloring-book lines for flat cartoons. Not for photos/3D. ${s.licence ?: "See licences"}",
+                sizeLabel = "\u2193 ${((s.sizeBytes ?: 0L) / 1_000_000L).coerceAtLeast(1)} MB",
+                installed = modelStateUi[s.id] == ModelState.Installed,
+                downloading = (modelStateUi[s.id] as? ModelState.Downloading)?.progress,
+            )
+        }
+
+    fun selectCartoonModel(id: String) {
+        val ok = id == ModelSpecs.CARTOON_BUILTIN_ID ||
+            (ModelSpecs.CARTOON.any { it.id == id } && modelStates.value[id] == ModelState.Installed)
+        if (id == cartoonModelId || !ok) return
+        mlPrefs.edit().putString(KEY_CARTOON_MODEL_ID, id).apply()
+        cartoonModelId = id
+        val old = cartoonModelInst
+        cartoonModelInst = null
+        if (old != null) { if (engineBusy) retiredModels.add(old) else closeInBackground(old) }
+    }
+
+    /** The Anime2Sketch session wrapper, or null when the built-in cartoon extractor is selected / the file is missing. */
+    private fun cartoonModelOrNull(): OnnxLineArtModel? {
+        val spec = ModelSpecs.CARTOON.firstOrNull { it.id == cartoonModelId && models.isAvailable(it.id) } ?: return null
+        val cur = cartoonModelInst
+        if (cur != null && !cur.isClosed) return cur
+        return OnnxLineArtModel(app, spec, models.file(spec.id), longSide = SketchPipeline.CARTOON_MODEL_SIDE)
+            .also { cartoonModelInst = it }
     }
 
     var showMlSettings by mutableStateOf(false)
@@ -480,6 +533,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 modelStates.update { ModelStates.installed(it, id) }
                 // Never swap models under a running generation: apply afterwards.
                 if (spec.fast) selectFastModel(id) // Fast edges models never replace the user's AI line model
+                else if (spec.cartoon) selectCartoonModel(id)
                 else if (engineBusy) pendingSelectId = id else selectLineModelNow(id)
                 toast("${spec.name} model ready")
             } catch (e: CancellationException) {
@@ -641,6 +695,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         closeInBackground(m)
         closeInBackground(fastModelInst)
         fastModelInst = null
+        closeInBackground(cartoonModelInst)
+        cartoonModelInst = null
         closeInBackground(runFallback)
         runFallback = null
         retiredModels.forEach { closeInBackground(it) }
@@ -1199,6 +1255,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         look: String? = null,
         pen: Boolean? = null,
         camera: Boolean? = null,
+        cartoonModel: String? = null,
     ) {
         if (label != null) DebugDump.runLabel = label
         if (look != null) {
@@ -1226,6 +1283,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             "color" -> settings = settings.copy(mode = DrawMode.COLOUR_FILL)
         }
         applyIntentOptions(engine, shading)
+        // cartoonModel=anime2sketch selects an already-downloaded model (never downloads); cartoonModel=builtin resets
+        cartoonModel?.lowercase()?.let { selectCartoonModel(if (it == "builtin") ModelSpecs.CARTOON_BUILTIN_ID else it) }
         when (outline?.lowercase()) {
             "pencil" -> pipelineSettings = pipelineSettings.copy(outlineStyle = com.smitnk.sketcher.image.pipeline.OutlineStyle.PENCIL_REVEAL)
             "vector" -> pipelineSettings = pipelineSettings.copy(outlineStyle = com.smitnk.sketcher.image.pipeline.OutlineStyle.CLEAN_VECTOR)
@@ -1373,6 +1432,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val m = model()
                 token = m.beginRun()
                 val fm = if (ps.lineSource == LineSource.FAST_EDGES) fastModel().also { it.beginRun(); it.longSide = SketchPipeline.modelSide(ps.detail) } else null
+                val cm = if (ps.lineSource == LineSource.CARTOON) cartoonModelOrNull()?.also { it.beginRun(); it.longSide = SketchPipeline.CARTOON_MODEL_SIDE } else null
                 m.detail = ps.detail
                 m.longSide = SketchPipeline.modelSide(ps.detail)
                 genStartMs = genStart
@@ -1387,14 +1447,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 }
                 // Cancelling this coroutine must stop the blocking ONNX run too, not just abandon the Job.
                 val stopper = launch {
-                    try { awaitCancellation() } finally { if (!success) { m.cancelRun(token); runFallback?.cancelRun(); fm?.cancelRun() } }
+                    try { awaitCancellation() } finally { if (!success) { m.cancelRun(token); runFallback?.cancelRun(); fm?.cancelRun(); cm?.cancelRun() } }
                 }
                 val (drawing, scaledBg) = try { withContext(Dispatchers.Default) {
                     val w = bmp.width
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) }, fastModel = fm)
+                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) }, fastModel = fm, cartoonModel = cm)
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {

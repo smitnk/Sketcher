@@ -40,6 +40,8 @@ data class ModelSpec(
     val int8: Boolean = false,
     /** Belongs to the "Fast edges" engine (TEED/MTEED): not offered as a user-selectable AI line model. */
     val fast: Boolean = false,
+    /** Belongs to the Cartoon engine (Anime2Sketch): not offered as a user-selectable AI line model. */
+    val cartoon: Boolean = false,
     /** Licence shown next to optional downloads (null = permissive/bundled). */
     val licence: String? = null,
 ) {
@@ -162,6 +164,21 @@ object ModelSpecs {
         maxPixels = 1024 * 1024, fast = true, licence = "OpenRAIL++ (TheMistoAI/MistoLine)",
     )
 
+    /**
+     * Anime2Sketch (MIT, Xiaoyu Xiang / Mukosame), "improved" artifact-free weights, fp16. UNet with 8 stride-2 stages
+     * (sizeMultiple 256); input RGB -1..1 (graph input "input"), tanh output, ink = 1 - out. Cartoon engine only.
+     */
+    val ANIME2SKETCH = ModelSpec(
+        id = "anime2sketch", name = "Bold cartoon lines",
+        description = "Download ~96 MB. Bold clean coloring-book lines for flat cartoons. Not for photos/3D.",
+        fileName = "anime2sketch_improved_fp16.onnx",
+        inputNorm = InputNorm.MINUS_ONE_ONE, outputRange = OutputRange.MINUS_ONE_ONE,
+        inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 256,
+        downloadUrl = "https://github.com/smitnk/Sketcher/releases/download/models-v1/anime2sketch_improved_fp16.onnx",
+        sizeBytes = 96_114_890L,
+        fp16 = true, maxPixels = 768 * 768, cartoon = true, licence = "MIT (Mukosame/Anime2Sketch)",
+    )
+
     /** User-selectable AI line models. */
     val ALL: List<ModelSpec> = listOf(INFORMATIVE, REALISTIC, COARSE, ANIME)
     const val DEFAULT_ID = "informative"
@@ -170,8 +187,12 @@ object ModelSpecs {
     val FAST: List<ModelSpec> = listOf(TEED, MTEED)
     const val FAST_DEFAULT_ID = "teed"
 
+    /** Optional models of the Cartoon engine. */
+    val CARTOON: List<ModelSpec> = listOf(ANIME2SKETCH)
+    const val CARTOON_BUILTIN_ID = "cartoon_builtin"
+
     /** Everything the ModelManager tracks. */
-    val EVERY: List<ModelSpec> = ALL + FAST
+    val EVERY: List<ModelSpec> = ALL + FAST + CARTOON
 
     fun byId(id: String): ModelSpec? = EVERY.firstOrNull { it.id == id }
 }

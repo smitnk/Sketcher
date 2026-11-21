@@ -133,6 +133,10 @@ fun StylePickerSheet(
     fastModels: List<LineModelUi> = emptyList(),
     selectedFastModelId: String? = null,
     onSelectFastModel: (String) -> Unit = {},
+    /** Cartoon engine cards (built-in / Anime2Sketch), shown when the Cartoon engine is selected. */
+    cartoonModels: List<LineModelUi> = emptyList(),
+    selectedCartoonModelId: String? = null,
+    onSelectCartoonModel: (String) -> Unit = {},
     onOpenMlSettings: (() -> Unit)? = null,
     /** True while a drawing is running: "Draw it" is disabled and shows progress. */
     generating: Boolean = false,
@@ -265,6 +269,33 @@ fun StylePickerSheet(
                                     model = m,
                                     selected = m.id == selectedFastModelId,
                                     onSelect = { onSelectFastModel(m.id) },
+                                    onDownload = { onDownloadModel(m.id) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = settings.lineSource == LineSource.CARTOON && cartoonModels.isNotEmpty(),
+                    enter = fadeIn(tween(SketcherTokens.MotionMedium)) + expandVertically(tween(SketcherTokens.MotionMedium)),
+                    exit = fadeOut(tween(160)) + shrinkVertically(tween(160)),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                        Text(
+                            "Cartoon \u2014 built-in lines, or bold coloring-book lines (optional download)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8),
+                        ) {
+                            for (m in cartoonModels) {
+                                LineModelCard(
+                                    model = m,
+                                    selected = m.id == selectedCartoonModelId,
+                                    onSelect = { onSelectCartoonModel(m.id) },
                                     onDownload = { onDownloadModel(m.id) },
                                 )
                             }

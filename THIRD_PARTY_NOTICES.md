@@ -86,9 +86,15 @@ Ported from SSARCandy/Coherent-Line-Drawing (MIT, (c) 2019 HSU,SHU-HSUAN).
 - Loader and pre/post-processing reference: ComfyUI-Anyline (MIT)
 - Licence of the weights: **CreativeML OpenRAIL++, not MIT.** Use is subject to the OpenRAIL++ use-based restrictions (Attachment A of the licence, https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md). In summary you may not use the model to: violate any law; exploit, harm or endanger minors; generate or spread verifiably false information to harm others; generate or spread personal identifiable information that could harm an individual; defame, disparage or harass; make fully automated decisions that affect a person's legal rights; discriminate against or harm individuals or groups based on social behaviour or personal characteristics; exploit the vulnerabilities of a specific group; or for any use intended or likely to cause harm. These restrictions pass on to anyone who receives the model from you. The download is optional.
 
+## 12. Anime2Sketch (optional download "Bold cartoon lines", not bundled)
+
+- Anime2Sketch by Xiaoyu Xiang (Mukosame): https://github.com/Mukosame/Anime2Sketch ("improved" artifact-free weights, converted to ONNX fp16)
+- Copyright (c) 2021 Xiaoyu Xiang
+- Licence: MIT (same terms as the MIT text below). Used only by the Cartoon line engine; the download is optional.
+
 ## MIT License
 
-The text below applies to items 1 and 2. The copyright lines for each are given in their sections above.
+The text below applies to items 1, 2 and 12. The copyright lines for each are given in their sections above.
 
 ```
 Permission is hereby granted, free of charge, to any person obtaining a copy

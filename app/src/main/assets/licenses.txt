@@ -92,10 +92,16 @@ Sketcher uses the components below.
    likely to cause harm. These restrictions pass on to anyone who receives the model
    from you. Downloading it in this app is optional and your choice.
 
+12. Anime2Sketch (optional download "Bold cartoon lines", not bundled)
+   Anime2Sketch by Xiaoyu Xiang (Mukosame), "improved" artifact-free weights (ONNX fp16)
+   https://github.com/Mukosame/Anime2Sketch
+   Copyright (c) 2021 Xiaoyu Xiang
+   Licence: MIT (same terms as the text below). Used only by the Cartoon line engine.
+
 ----------------------------------------------------------------------
 MIT License
 
-The text below applies to items 1, 2 and 10. The copyright lines for each
+The text below applies to items 1, 2, 10 and 12. The copyright lines for each
 are given in their sections above.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

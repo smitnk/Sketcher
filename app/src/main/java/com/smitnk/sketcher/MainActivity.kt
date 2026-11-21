@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
             demo = intent.getStringExtra("demo"),
             mode = intent.getStringExtra("mode"),
             engine = intent.getStringExtra("engine"),
+            cartoonModel = intent.getStringExtra("cartoonModel"),
             shading = intent.getStringExtra("shading"),
             testImage = intent.getStringExtra("testimage"),
             model = intent.getStringExtra("model"),
