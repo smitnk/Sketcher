@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:42:59" hostname="ip-10-0-136-153" time="0.001">
+<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:24:09" hostname="runnervm0hi8g" time="0.004">
   <properties/>
-  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
+  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.003"/>
   <testcase name="tapDrawsDot" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
   <testcase name="secondPointerWhilePendingIsTransformNoStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="timeCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>

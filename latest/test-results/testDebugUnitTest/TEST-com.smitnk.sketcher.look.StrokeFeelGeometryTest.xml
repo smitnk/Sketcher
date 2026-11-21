@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.look.StrokeFeelGeometryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:42:59" hostname="ip-10-0-136-153" time="0.006">
+<testsuite name="com.smitnk.sketcher.look.StrokeFeelGeometryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:24:08" hostname="runnervm0hi8g" time="0.007">
   <properties/>
-  <testcase name="plotterHasPooledDotAndIsStraight" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.003"/>
+  <testcase name="plotterHasPooledDotAndIsStraight" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.002"/>
   <testcase name="pressureRampsInAndTapersOut" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
   <testcase name="boilChangesPerDrawingButNotWithinOne" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
-  <testcase name="wobbleBoundedAnchoredAndDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
-  <testcase name="cleanIsNullAndShapesDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
-  <testcase name="lineLimitMapsFractionToFullLength" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
+  <testcase name="wobbleBoundedAnchoredAndDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
+  <testcase name="cleanIsNullAndShapesDeterministic" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
+  <testcase name="lineLimitMapsFractionToFullLength" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>
   <testcase name="closureOvershootExtendsPastEnd" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
   <testcase name="resampleKeepsEndsAndSpacing" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.0"/>
   <testcase name="ribbonRevealMonotonicAndClosed" classname="com.smitnk.sketcher.look.StrokeFeelGeometryTest" time="0.001"/>

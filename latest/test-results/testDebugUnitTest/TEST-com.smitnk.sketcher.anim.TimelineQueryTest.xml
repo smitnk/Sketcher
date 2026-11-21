@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.TimelineQueryTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-20T18:42:54" hostname="ip-10-0-136-153" time="0.002">
+<testsuite name="com.smitnk.sketcher.anim.TimelineQueryTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:24:02" hostname="runnervm0hi8g" time="0.005">
   <properties/>
   <testcase name="restsAtEnds" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.0"/>
-  <testcase name="emptyTimeline" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.001"/>
-  <testcase name="gapBetweenStrokesIsPenUpTravelToNextStart" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.0"/>
-  <testcase name="tipMatchesAllowanceAndStrokeIdentity" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.001"/>
+  <testcase name="emptyTimeline" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.0"/>
+  <testcase name="gapBetweenStrokesIsPenUpTravelToNextStart" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.001"/>
+  <testcase name="tipMatchesAllowanceAndStrokeIdentity" classname="com.smitnk.sketcher.anim.TimelineQueryTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
