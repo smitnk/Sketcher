@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.model.FrameOpsTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:24:09" hostname="runnervm0hi8g" time="0.012">
+<testsuite name="com.smitnk.sketcher.model.FrameOpsTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:32:58" hostname="runnervm0hi8g" time="0.01">
   <properties/>
-  <testcase name="deleteBeforeOpenKeepsSameFrameOpen" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
-  <testcase name="deleteOpenSelectsNeighbourAndClampsAtEnd" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
-  <testcase name="flipbookClockDoesNotQueueCatchUpAfterAHiccup" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
+  <testcase name="deleteBeforeOpenKeepsSameFrameOpen" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
+  <testcase name="deleteOpenSelectsNeighbourAndClampsAtEnd" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
+  <testcase name="flipbookClockDoesNotQueueCatchUpAfterAHiccup" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
   <testcase name="flipbookLoopsAndHandlesEmpty" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <testcase name="moveTargetStaysInsideTheList" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <testcase name="coverRectCropsToAspectAndCentres" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
-  <testcase name="sequenceNamesAreZeroPaddedAndSortable" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.003"/>
-  <testcase name="insertShiftsOpenIndexOnlyWhenInsertedAtOrBefore" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
+  <testcase name="sequenceNamesAreZeroPaddedAndSortable" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.002"/>
+  <testcase name="insertShiftsOpenIndexOnlyWhenInsertedAtOrBefore" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
   <testcase name="deleteAfterOpenKeepsSameFrameOpen" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <testcase name="safeNameKeepsLettersAndNeverReturnsEmpty" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.003"/>
-  <testcase name="flipbookClockStepsAtTheChosenRate" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
+  <testcase name="flipbookClockStepsAtTheChosenRate" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <testcase name="counterIsOneBased" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
-  <testcase name="moveKeepsTheOpenDrawingOpenForEveryCombination" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.002"/>
-  <testcase name="fpsCyclesThroughChoices" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.001"/>
+  <testcase name="moveKeepsTheOpenDrawingOpenForEveryCombination" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.003"/>
+  <testcase name="fpsCyclesThroughChoices" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <testcase name="moveRejectsBadIndices" classname="com.smitnk.sketcher.model.FrameOpsTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

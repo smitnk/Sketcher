@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.GenerationStateTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:24:09" hostname="runnervm0hi8g" time="0.012">
+<testsuite name="com.smitnk.sketcher.ui.GenerationStateTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:32:58" hostname="runnervm0hi8g" time="0.011">
   <properties/>
-  <testcase name="supersededRunCannotWriteOrFinish" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.003"/>
+  <testcase name="supersededRunCannotWriteOrFinish" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.002"/>
   <testcase name="modelStateProgressOnlyWhileDownloading" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="failedKeepsReasonAndFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
   <testcase name="begin_stage_finish" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
   <testcase name="persistentBusyAbortsWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.002"/>
-  <testcase name="classification" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
-  <testcase name="modelStateFailAndInstallAndScan" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
+  <testcase name="classification" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
+  <testcase name="modelStateFailAndInstallAndScan" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="staleRunStopsBeforeCallingModel" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="modelFailureFallsBackOnce" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
-  <testcase name="closedModelAborts" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
-  <testcase name="busyIsRetriedAndNeverFallsBack" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
-  <testcase name="lateStageAfterResetIsDropped" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
-  <testcase name="cancellationPropagatesWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
+  <testcase name="closedModelAborts" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
+  <testcase name="busyIsRetriedAndNeverFallsBack" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.002"/>
+  <testcase name="lateStageAfterResetIsDropped" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
+  <testcase name="cancellationPropagatesWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
