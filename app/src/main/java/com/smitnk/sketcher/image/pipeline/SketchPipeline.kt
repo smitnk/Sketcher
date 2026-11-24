@@ -234,7 +234,10 @@ object SketchPipeline {
         var fill: List<Stroke> = emptyList()
         if (settings.colourFill) {
             progress("Colour fill", 0.80f)
-            fill = ColorStrokeGenerator.generateFill(
+            fill = if (settings.fillStyle == FillStyle.FLAT_CEL) tm.time("cel") {
+                val (map, cols) = celRegions(px, pw, ph, ink, settings.gapClosing, settings.fillColors.coerceIn(6, 16))
+                LineFill.celStrokes(map, cols, settings.fillSpacing)
+            } else ColorStrokeGenerator.generateFill(
                 px, pw, ph, pw, ph, settings.fillColors.coerceIn(6, 16), settings.fillSpacing,
             )
             check()
@@ -278,6 +281,23 @@ object SketchPipeline {
         tm.ms["total"] = (System.nanoTime() - tTotal) / 1_000_000
         lastTimings = LinkedHashMap(tm.ms)
         GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth)
+    }
+
+    /**
+     * Flat cel regions + one ARGB colour per region for [argb] (w*h). Ink = [ink] > 0.5 when it matches the size,
+     * else dark pixels. Reusable by vector tracers; pure JVM, run off the main thread.
+     */
+    fun celRegions(argb: IntArray, w: Int, h: Int, ink: FloatArray?, gap: GapClosing = GapClosing.MEDIUM, paletteSize: Int = 0): Pair<RegionMap, IntArray> {
+        val n = w * h
+        val useInk = ink != null && ink.size == n
+        val mask = BooleanArray(n) {
+            if (useInk) ink!![it] > 0.5f else {
+                val c = argb[it]
+                ((c shr 16) and 255) * 299 + ((c shr 8) and 255) * 587 + (c and 255) * 114 < 80_000
+            }
+        }
+        val map = LineFill.regions(mask, w, h, gap)
+        return map to LineFill.flatColours(map, argb, paletteSize)
     }
 
     internal const val CLEAN_COVER_RADIUS = 1.5f

@@ -15,6 +15,9 @@ import kotlin.math.sqrt
 enum class ExportFormat(val mime: String, val extension: String) {
     PNG("image/png", "png"),
     JPEG("image/jpeg", "jpg"),
+
+    /** Vector: use [SvgExporter.save], not [Exporter.save]. */
+    SVG("image/svg+xml", "svg"),
 }
 
 object Exporter {
@@ -155,6 +158,7 @@ object Exporter {
         fileName: String = exportFileName(baseName, format.extension),
         subDir: String? = null,
     ): String? {
+        if (format == ExportFormat.SVG) return null // not a bitmap format: see SvgExporter.save
         val compressFormat = if (format == ExportFormat.PNG) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val quality = if (format == ExportFormat.PNG) 100 else 95
         val target = OutputTarget.create(context, false, fileName, format.mime, subDir) ?: return null

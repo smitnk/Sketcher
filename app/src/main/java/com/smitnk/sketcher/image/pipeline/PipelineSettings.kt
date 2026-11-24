@@ -7,6 +7,9 @@ enum class ShadingStyle { HATCH, CROSS_HATCH, SCRIBBLE }
 /** PENCIL_REVEAL keeps the exact AI/cartoon ink raster and animates it with reveal strokes; CLEAN_VECTOR draws vector pen strokes. */
 enum class OutlineStyle { PENCIL_REVEAL, CLEAN_VECTOR }
 
+/** Colour fill look: STROKES = hatched colour strokes; FLAT_CEL = trapped-ball flat cel regions ([LineFill]). */
+enum class FillStyle { STROKES, FLAT_CEL }
+
 data class PipelineSettings(
     val lineSource: LineSource = LineSource.AUTO,
     val detail: Float = 0.5f,            // 0..1 more/less lines
@@ -16,6 +19,8 @@ data class PipelineSettings(
     val colourFill: Boolean = false,
     val fillColors: Int = 10,
     val fillSpacing: Float = 6f,
+    val fillStyle: FillStyle = FillStyle.STROKES,
+    val gapClosing: GapClosing = GapClosing.MEDIUM, // FLAT_CEL only: how wide line gaps the fill may bridge
     val ignoreBackground: Boolean = true, // don't shade flat/background regions
     val maxStrokes: Int = 4000,
     val workingSize: Int = 1024,          // long side for vector output

@@ -98,10 +98,21 @@ Sketcher uses the components below.
    Copyright (c) 2021 Xiaoyu Xiang
    Licence: MIT (same terms as the text below). Used only by the Cartoon line engine.
 
+13. LineFiller (algorithm port, "Flat cel" colour fill; no code copied)
+   LineFiller by hepesu: https://github.com/hepesu/LineFiller
+   Copyright (c) hepesu
+   Licence: MIT (same terms as the text below).
+
+14. vtracer (algorithm port, MIT, visioncortex)
+   VectorTrace.kt ports vtracer's boundary tracing, path simplification and spline fitting.
+   https://github.com/visioncortex/vtracer
+   Copyright (c) 2020 Tsang Hao Fung (visioncortex)
+   Licence: MIT (same terms as the text below).
+
 ----------------------------------------------------------------------
 MIT License
 
-The text below applies to items 1, 2, 10 and 12. The copyright lines for each
+The text below applies to items 1, 2, 10, 12 and 14. The copyright lines for each
 are given in their sections above.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

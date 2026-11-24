@@ -92,6 +92,20 @@ Ported from SSARCandy/Coherent-Line-Drawing (MIT, (c) 2019 HSU,SHU-HSUAN).
 - Copyright (c) 2021 Xiaoyu Xiang
 - Licence: MIT (same terms as the MIT text below). Used only by the Cartoon line engine; the download is optional.
 
+## 13. LineFiller (algorithm port, "Flat cel" colour fill)
+
+- LineFiller by hepesu: https://github.com/hepesu/LineFiller (trapped-ball fill algorithm, re-implemented in Kotlin)
+- Copyright (c) hepesu
+- Licence: MIT (same terms as the MIT text below).
+
+## 14. vtracer (algorithm port, MIT, visioncortex)
+
+`VectorTrace.kt` (SVG export of colour layers) ports the boundary tracing, simplification and spline fitting of vtracer.
+
+- Copyright (c) 2020 Tsang Hao Fung (visioncortex)
+- Licence: MIT (same terms as the MIT text below)
+- https://github.com/visioncortex/vtracer
+
 ## MIT License
 
 The text below applies to items 1, 2 and 12. The copyright lines for each are given in their sections above.
