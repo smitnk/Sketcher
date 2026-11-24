@@ -1,0 +1,10 @@
+crop: x0=0 y0=26 x1=745 y1=958 of 745x1024 bgFraction=0.60853493
+lineSource=CARTOON
+model=informative
+accelActive=CPU fallback=null
+inferenceMs=25679 (wrapped=25728) genMs=30564
+ink: min=0.0 mean=0.021881853605519943 max=0.86579657 (614x768)
+strokes: outline=289 shading=0 fill=46
+look=LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=false, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
+inkW=745 inkH=1024 drawing=745x1024 revealWidth=11.0
+settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=true, fillColors=10, fillSpacing=5.0, fillStyle=FLAT_CEL, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)

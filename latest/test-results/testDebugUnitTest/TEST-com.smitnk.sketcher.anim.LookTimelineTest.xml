@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.LookTimelineTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:03:45" hostname="runnervm0hi8g" time="0.029">
+<testsuite name="com.smitnk.sketcher.anim.LookTimelineTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:06:54" hostname="runnervm0hi8g" time="0.042">
   <properties/>
-  <testcase name="boilDrawingIndexAdvancesWithTimeOnlyWhenBoiling" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.002"/>
-  <testcase name="noTailPopAndPauseCap" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.003"/>
-  <testcase name="everyFeelRevealsMonotonicallyAndEndsExactly" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.021"/>
-  <testcase name="plotterTravelTimeGrowsWithDistance" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.0"/>
+  <testcase name="boilDrawingIndexAdvancesWithTimeOnlyWhenBoiling" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.001"/>
+  <testcase name="noTailPopAndPauseCap" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.004"/>
+  <testcase name="everyFeelRevealsMonotonicallyAndEndsExactly" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.031"/>
+  <testcase name="plotterTravelTimeGrowsWithDistance" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.001"/>
   <testcase name="trapezoidTimeAndRamp" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.0"/>
-  <testcase name="onTwosQuantisesTo12PerSecondAndKeepsEnd" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.003"/>
-  <testcase name="easingEndpointsAndMonotonic" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.0"/>
+  <testcase name="onTwosQuantisesTo12PerSecondAndKeepsEnd" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.004"/>
+  <testcase name="easingEndpointsAndMonotonic" classname="com.smitnk.sketcher.anim.LookTimelineTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
