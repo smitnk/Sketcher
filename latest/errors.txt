@@ -1,0 +1,5 @@
+ModelSpecTest > registryHasExpectedIdsAndOneSourceEach FAILED
+FastEdgesTest > fastSpecsAreEdgeHighAndMultipleOf8 FAILED
+LineFillTest > regionCountStableAcrossRunsAndGaps FAILED
+> Task :app:testDebugUnitTest FAILED
+BUILD FAILED in 1m 18s
