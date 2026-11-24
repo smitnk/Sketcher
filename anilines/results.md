@@ -15,14 +15,14 @@ informative-drawings lineart.onnx bytes: 17193338
 
 | image | informative | a2s | AL basic | AL detail |
 |---|---|---|---|---|
-| astronaut.jpg | 996 | 347 | 3416 | 3492 |
-| beard.jpg | 1012 | 319 | 1735 | 1786 |
-| cartoon.jpg | 989 | 331 | 2487 | 2469 |
-| chelsea.jpg | 994 | 365 | 2249 | 2245 |
-| coffee.jpg | 991 | 317 | 2246 | 2257 |
-| elf.jpg | 994 | 329 | 2475 | 2479 |
-| person1.jpg | 974 | 357 | 2813 | 2806 |
-| person2.jpg | 958 | 349 | 2249 | 2254 |
-| rocket.jpg | 1003 | 321 | 2273 | 2237 |
-| toy_grass.jpg | 992 | 336 | 3329 | 3288 |
-| tpose.jpg | 986 | 324 | 3188 | 3103 |
+| astronaut.jpg | 566 | 172 | 1736 | 1631 |
+| beard.jpg | 552 | 160 | 811 | 801 |
+| cartoon.jpg | 506 | 151 | 1136 | 1130 |
+| chelsea.jpg | 538 | 155 | 1035 | 1026 |
+| coffee.jpg | 505 | 152 | 1066 | 1024 |
+| elf.jpg | 552 | 168 | 1213 | 1144 |
+| person1.jpg | 535 | 163 | 1331 | 1294 |
+| person2.jpg | 512 | 163 | 1069 | 1020 |
+| rocket.jpg | 514 | 153 | 1029 | 1027 |
+| toy_grass.jpg | 510 | 164 | 1557 | 1521 |
+| tpose.jpg | 512 | 148 | 1514 | 1509 |
