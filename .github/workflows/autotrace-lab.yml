@@ -1,0 +1,40 @@
+name: autotrace-lab
+on:
+  workflow_dispatch:
+  push:
+    paths: ["tools/autotrace_lab/**", ".github/workflows/autotrace-lab.yml"]
+permissions:
+  contents: write
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: Tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y autotrace
+          autotrace --version || true
+          pip install numpy scipy scikit-image opencv-python-headless
+          curl -fL -o /tmp/kc.zip https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
+          unzip -q /tmp/kc.zip -d /tmp
+      - name: Compile the unmodified app vectorizer (+ stub Stroke/BrushType) for the JVM
+        run: |
+          /tmp/kotlinc/bin/kotlinc -include-runtime -d /tmp/h.jar tools/autotrace_lab/kt/Stubs.kt tools/autotrace_lab/kt/Main.kt app/src/main/java/com/smitnk/sketcher/image/pipeline/LineArtVectorizer.kt
+      - name: Fetch AI ink maps from ci-results
+        run: |
+          git fetch origin ci-results --depth 1
+          git worktree add /tmp/ci FETCH_HEAD
+      - run: python tools/autotrace_lab/run.py /tmp/ci/latest/debug /tmp/h.jar /tmp/out
+      - name: Publish
+        run: |
+          set -e
+          git config user.name ci; git config user.email ci@users.noreply.github.com
+          git fetch origin models-lab --depth 1 && git checkout -B lab FETCH_HEAD
+          rm -rf autotrace; mkdir -p autotrace
+          cp -r /tmp/out/sheets /tmp/out/autotrace.json /tmp/out/autotrace.md autotrace/
+          git add autotrace && git commit -m "autotrace lab results" && git push origin HEAD:models-lab
