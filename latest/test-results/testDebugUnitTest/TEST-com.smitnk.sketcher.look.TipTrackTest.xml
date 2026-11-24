@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.look.TipTrackTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-21T02:32:58" hostname="runnervm0hi8g" time="0.074">
+<testsuite name="com.smitnk.sketcher.look.TipTrackTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-24T06:56:28" hostname="runnervm0hi8g" time="0.059">
   <properties/>
   <testcase name="gaussianKeepsConstantAndIsNonCausal" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.002"/>
-  <testcase name="startAndEndShowTheWholeDrawing" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.013"/>
+  <testcase name="startAndEndShowTheWholeDrawing" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.01"/>
   <testcase name="tableHasSixHundredSteps" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.001"/>
   <testcase name="penUpShowsAsLift" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.001"/>
-  <testcase name="smoothingIsDeterministic" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.003"/>
-  <testcase name="cameraWindowStaysInsideSheet" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.047"/>
+  <testcase name="smoothingIsDeterministic" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.002"/>
+  <testcase name="cameraWindowStaysInsideSheet" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.037"/>
   <testcase name="clampsAtCornersAndCentresWhenFree" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.003"/>
   <testcase name="cameraPathIsSmootherThanTip" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.002"/>
-  <testcase name="nullTrackOrOffIsIdentity" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.0"/>
-  <testcase name="penFadesOutAtTheEnd" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.001"/>
+  <testcase name="nullTrackOrOffIsIdentity" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.001"/>
+  <testcase name="penFadesOutAtTheEnd" classname="com.smitnk.sketcher.look.TipTrackTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
