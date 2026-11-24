@@ -57,7 +57,7 @@ class FastEdgesTest {
         assertTrue(ModelSpecs.TEED.isBundled)
         assertTrue(!ModelSpecs.MTEED.isBundled)
         assertEquals("OpenRAIL++ (TheMistoAI/MistoLine)", ModelSpecs.MTEED.licence)
-        assertEquals(listOf("informative", "realistic", "coarse", "anime"), ModelSpecs.ALL.map { it.id })
+        assertEquals(listOf("informative", "realistic", "coarse", "anime", "anilines"), ModelSpecs.ALL.map { it.id })
         assertTrue(ModelSpecs.byId("mteed") != null)
     }
 }

@@ -53,7 +53,9 @@ object LineFill {
             }
             // grow back r steps inside the free space; all seeds grow together so they cannot leak into each other
             var head = 0
-            for (step in 0 until r) {
+            // 4-neighbour steps cover the Euclidean erosion band only up to r*sqrt(2): without the extra steps diagonal slivers
+            // next to a big region became extra regions on later (smaller) passes.
+            for (step in 0 until (r * 3 + 1) / 2 + 1) {
                 val end = qn
                 if (head == end) break
                 while (head < end) {

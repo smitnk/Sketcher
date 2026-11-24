@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ModelSpecTest {
     @Test fun registryHasExpectedIdsAndOneSourceEach() {
-        assertEquals(listOf("informative", "realistic", "coarse", "anime"), ModelSpecs.ALL.map { it.id })
+        assertEquals(listOf("informative", "realistic", "coarse", "anime", "anilines"), ModelSpecs.ALL.map { it.id })
         assertTrue(ModelSpecs.INFORMATIVE.isBundled)
         assertTrue(ModelSpecs.ANIME.downloadUrl!!.contains("releases/download/models-v1"))
     }
