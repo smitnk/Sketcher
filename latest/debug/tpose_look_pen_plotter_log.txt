@@ -1,5 +1,5 @@
 --------- beginning of main
-11-24 07:56:47.343  8697  8697 I SketcherGen: LOOK_APPLIED LookSettings(feel=PEN_PLOTTER, paper=CREAM, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=true, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
-11-24 07:57:36.595  8697  8697 I SketcherGen: GEN_DONE ms=47306 outline=99 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-24 07:57:38.397  8697  8720 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_pen_plotter
-11-24 07:57:58.233  8697  8697 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-24 08:38:40.299  8608  8608 I SketcherGen: LOOK_APPLIED LookSettings(feel=PEN_PLOTTER, paper=CREAM, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=true, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
+11-24 08:39:34.804  8608  8608 I SketcherGen: GEN_DONE ms=51880 outline=55 shading=0 fill=0 size=930x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-24 08:39:37.556  8608  8629 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/tpose_look_pen_plotter
+11-24 08:39:56.903  8608  8608 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

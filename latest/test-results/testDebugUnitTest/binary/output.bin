@@ -1,3 +1,3 @@
 PERF new: 0.00848 B/frame
-WPERF 5k strokes: old map 280 ns, 464 B/frame | new 44 ns, 0.01 B/frame (2.41766543E10)
-ARRIVAL_BAKE_MS=23
+WPERF 5k strokes: old map 290 ns, 464 B/frame | new 43 ns, 0.01 B/frame (2.41766543E10)
+ARRIVAL_BAKE_MS=22

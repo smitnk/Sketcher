@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.FlowLinesTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:42:03" hostname="runnervm0hi8g" time="0.441">
+<testsuite name="com.smitnk.sketcher.image.pipeline.FlowLinesTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-24T08:23:21" hostname="runnervm0hi8g" time="0.473">
   <properties/>
-  <testcase name="outputIsInUnitRangeAndSizeMatchesInput" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.182"/>
-  <testcase name="circleGivesContinuousRing" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.07"/>
-  <testcase name="flatInteriorAndBackgroundAreClean" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.048"/>
+  <testcase name="outputIsInUnitRangeAndSizeMatchesInput" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.229"/>
+  <testcase name="circleGivesContinuousRing" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.068"/>
+  <testcase name="flatInteriorAndBackgroundAreClean" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.042"/>
   <testcase name="detailMapsToTau" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.0"/>
-  <testcase name="largeInputIsDownscaledAndFast" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.14"/>
+  <testcase name="largeInputIsDownscaledAndFast" classname="com.smitnk.sketcher.image.pipeline.FlowLinesTest" time="0.134"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

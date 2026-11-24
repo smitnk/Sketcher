@@ -1,4 +1,4 @@
 --------- beginning of main
-11-24 08:12:39.679 11497 11497 I SketcherGen: GEN_DONE ms=24390 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-24 08:12:41.078 11497 11534 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_nnapi_gpu
-11-24 08:13:01.052 11497 11497 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-24 08:55:39.795 11516 11516 I SketcherGen: GEN_DONE ms=32550 outline=362 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-24 08:55:41.207 11516 11542 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_accel_nnapi_gpu
+11-24 08:56:01.492 11516 11516 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
