@@ -171,7 +171,7 @@ fun ExportDialog(
             )
 
             // Format cards, grouped: Image / Video / Layers / Vector
-            SectionLabel("Image")
+            SectionLabel("Still image")
             Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
                 FormatCard(
                     title = "Image",
@@ -183,7 +183,7 @@ fun ExportDialog(
                 )
                 Spacer(Modifier.weight(2f))
             }
-            SectionLabel("Video")
+            SectionLabel("Animation")
             Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
                 FormatCard(
                     title = "Video",

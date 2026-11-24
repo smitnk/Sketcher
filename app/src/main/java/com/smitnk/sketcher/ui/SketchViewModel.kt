@@ -1511,6 +1511,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 genMachine.finish(run)
                 publishGen()
                 generationCount++
+                if (sessionActions.isNotEmpty()) fireSessionActions() // CI automation (autoexport / autovideo / autosvg)
                 markDirty()
             } catch (e: GenerationAbort) {
                 // Engine busy / model closed: the run fails, the user's model selection is untouched.
@@ -2348,6 +2349,13 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     fun exportAnimation(kind: AnimExportKind) = startAnimationExport(listOf(kind))
 
     /** For CI: after generation, exports both MP4 and GIF (waits for any running export first). */
+    fun autoSvg() {
+        viewModelScope.launch {
+            snapshotFlow { exportBlockedReason }.first { it == null }
+            exportSvg()
+        }
+    }
+
     fun autoVideo() {
         viewModelScope.launch {
             snapshotFlow { exportBlockedReason }.first { it == null }

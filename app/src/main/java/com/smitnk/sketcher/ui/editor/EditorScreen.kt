@@ -170,7 +170,7 @@ fun EditorScreen(
                 is EditorEvent.ShowLayers -> overlay = EditorOverlay.Layers
                 is EditorEvent.AutoExport -> vm.autoExport()
                 is EditorEvent.AutoVideo -> vm.autoVideo()
-                is EditorEvent.AutoSvg -> vm.exportSvg()
+                is EditorEvent.AutoSvg -> vm.autoSvg()
             }
         }
     }

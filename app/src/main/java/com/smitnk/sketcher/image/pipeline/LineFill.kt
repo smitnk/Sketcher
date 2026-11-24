@@ -145,7 +145,13 @@ object LineFill {
         for (r in 0 until k) {
             hr.fill(0); hg.fill(0); hb.fill(0)
             for (j in start[r] until start[r + 1]) {
-                val c = sourceArgb[order[j]]
+                val c0 = sourceArgb[order[j]]
+                // transparent pixels (letterbox / removed background) count as white paper, not black
+                val al = c0 ushr 24
+                val c = if (al == 255) c0 else {
+                    fun ch(v: Int) = (v * al + 255 * (255 - al)) / 255
+                    (ch((c0 shr 16) and 255) shl 16) or (ch((c0 shr 8) and 255) shl 8) or ch(c0 and 255)
+                }
                 hr[(c shr 16) and 255]++; hg[(c shr 8) and 255]++; hb[c and 255]++
             }
             area[r] = start[r + 1] - start[r]
