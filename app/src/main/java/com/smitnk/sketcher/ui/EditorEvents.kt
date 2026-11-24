@@ -4,7 +4,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 
 /** CI / automation actions that run once after a generation finishes. */
-enum class EditorAutoAction { SHOW_LAYERS, AUTO_EXPORT, AUTO_VIDEO }
+enum class EditorAutoAction { SHOW_LAYERS, AUTO_EXPORT, AUTO_VIDEO, AUTO_SVG }
 
 /**
  * One-shot editor events. Each is tied to the project session ([sessionId]) that produced it;
@@ -17,6 +17,7 @@ sealed interface EditorEvent {
     data class ShowLayers(override val sessionId: Int) : EditorEvent
     data class AutoExport(override val sessionId: Int) : EditorEvent
     data class AutoVideo(override val sessionId: Int) : EditorEvent
+    data class AutoSvg(override val sessionId: Int) : EditorEvent
 }
 
 /** The single editor overlay that may be open at a time; back closes it. */

@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
 
     private fun wantsEditor(i: Intent?): Boolean = i != null && (
         i.getBooleanExtra("autodemo", false) || i.getBooleanExtra("showlayers", false) ||
-            i.getBooleanExtra("autoexport", false) || i.getBooleanExtra("autovideo", false) ||
+            i.getBooleanExtra("autoexport", false) || i.getBooleanExtra("autovideo", false) || i.getBooleanExtra("autosvg", false) ||
             i.getStringExtra("demo") != null
         )
 
@@ -59,6 +59,8 @@ class MainActivity : ComponentActivity() {
             mode = intent.getStringExtra("mode"),
             engine = intent.getStringExtra("engine"),
             cartoonModel = intent.getStringExtra("cartoonModel"),
+            autoSvg = intent.getBooleanExtra("autosvg", false),
+            fill = intent.getStringExtra("fill"),
             shading = intent.getStringExtra("shading"),
             testImage = intent.getStringExtra("testimage"),
             model = intent.getStringExtra("model"),

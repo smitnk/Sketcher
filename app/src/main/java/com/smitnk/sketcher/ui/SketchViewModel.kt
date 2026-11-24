@@ -816,6 +816,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         if (EditorAutoAction.SHOW_LAYERS in acts) emitEditorEvent(EditorEvent.ShowLayers(sid))
         if (EditorAutoAction.AUTO_EXPORT in acts) emitEditorEvent(EditorEvent.AutoExport(sid))
         if (EditorAutoAction.AUTO_VIDEO in acts) emitEditorEvent(EditorEvent.AutoVideo(sid))
+        if (EditorAutoAction.AUTO_SVG in acts) emitEditorEvent(EditorEvent.AutoSvg(sid))
     }
 
     /**
@@ -1272,7 +1273,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         pen: Boolean? = null,
         camera: Boolean? = null,
         cartoonModel: String? = null,
+        autoSvg: Boolean = false,
+        fill: String? = null,
     ) {
+        if (fill != null) pipelineSettings = pipelineSettings.copy(fillStyle = if (fill.equals("cel", true)) FillStyle.FLAT_CEL else FillStyle.STROKES)
         if (label != null) DebugDump.runLabel = label
         if (look != null) {
             intentLook = lookFromName(look)
@@ -1287,6 +1291,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             if (autoVideo) add(EditorAutoAction.AUTO_VIDEO)
             if (showLayers) add(EditorAutoAction.SHOW_LAYERS)
             if (autoExport) add(EditorAutoAction.AUTO_EXPORT)
+            if (autoSvg) add(EditorAutoAction.AUTO_SVG)
         }
         if (!autodemo && armedActions.isNotEmpty()) {
             // No new project is coming: the actions belong to the project that is open now.

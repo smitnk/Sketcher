@@ -107,6 +107,13 @@ done
 run_gen "cartoon color" cartoon_color \
   --es testimage cartoon --es engine auto --es mode color
 
+# c2) flat cel fill (trapped-ball regions) on a cartoon and on the tpose photo, then SVG export of the cel result
+dbg_run cartoon_cel_fill cartoon --es engine cartoon --es mode color --es fill cel
+dbg_run tpose_cel_fill tpose --es engine ai --es model informative --es mode color --es fill cel
+adb shell 'rm -f /sdcard/Pictures/Sketcher/*.svg' >/dev/null 2>&1
+dbg_run cartoon_cel_svg cartoon --es engine cartoon --es mode color --es fill cel --ez autosvg true
+sleep 5
+
 # d) autoexport and autovideo on the demo
 adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity --ez autodemo true --ez autoexport true
@@ -118,6 +125,27 @@ mkdir -p $OUT/files
 adb pull /sdcard/Pictures/Sketcher $OUT/files/pictures >/dev/null 2>&1
 adb pull /sdcard/Movies/Sketcher $OUT/files/movies >/dev/null 2>&1
 { adb shell ls -lR /sdcard/Movies; adb shell ls -lR /sdcard/Pictures; } > $OUT/pictures.txt 2>&1
+# SVG export check: file exists, non-empty, parses as XML with an <svg> root (a PNG fallback would fail this)
+python3 - "$OUT" > $OUT/svg_check.txt 2>&1 <<'PY'
+import glob, sys, xml.etree.ElementTree as ET
+out = sys.argv[1]
+files = glob.glob(out + "/files/pictures/**/*.svg", recursive=True)
+if not files:
+    print("SVG_CHECK FAIL: no .svg file exported"); sys.exit(0)
+f = max(files, key=lambda p: __import__("os").path.getmtime(p))
+import os
+size = os.path.getsize(f)
+if size == 0:
+    print("SVG_CHECK FAIL: empty file", f); sys.exit(0)
+try:
+    root = ET.parse(f).getroot()
+    n = sum(1 for e in root.iter() if e.tag.endswith("path"))
+    ok = root.tag.endswith("svg")
+    print(("SVG_CHECK PASS" if ok else "SVG_CHECK FAIL: root is " + root.tag), f, size, "bytes", n, "paths")
+except Exception as e:
+    print("SVG_CHECK FAIL: not XML:", e)
+PY
+cat $OUT/svg_check.txt
 adb shell pidof $PKG > $OUT/pid.txt 2>&1
 adb logcat -d -b crash > $OUT/crash.txt 2>&1
 adb logcat -d | grep -iE "sketcher|AndroidRuntime|FATAL" | tail -n 400 > $OUT/logcat.txt
