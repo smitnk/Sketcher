@@ -1,4 +1,4 @@
 --------- beginning of main
-11-24 07:27:45.914 10214 10214 I SketcherGen: GEN_DONE ms=3164 outline=183 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
-11-24 07:27:47.909 10214 10239 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_flow_pencil
-11-24 07:28:07.090 10214 10214 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-24 08:07:29.865 10638 10638 I SketcherGen: GEN_DONE ms=4028 outline=183 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=FLOW_LINES, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL)
+11-24 08:07:31.611 10638 10664 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_flow_pencil
+11-24 08:07:51.803 10638 10638 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

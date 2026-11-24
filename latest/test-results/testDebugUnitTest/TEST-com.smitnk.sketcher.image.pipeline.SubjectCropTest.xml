@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.SubjectCropTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:07:01" hostname="runnervm0hi8g" time="0.256">
+<testsuite name="com.smitnk.sketcher.image.pipeline.SubjectCropTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:42:07" hostname="runnervm0hi8g" time="0.201">
   <properties/>
-  <testcase name="whiteBackdropIsNotLetterbox" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.094"/>
-  <testcase name="noisyPhotoReturnsFullFrame" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.017"/>
-  <testcase name="findsSubjectOnGradientBackdrop" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.018"/>
-  <testcase name="letterboxBarsWithStatusGlyphsAreStripped" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.027"/>
-  <testcase name="elfOnGreyKeepsWholeFigure" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.008"/>
-  <testcase name="trueWhiteLetterboxStillStrippedWhenPerfectlyUniform" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.01"/>
-  <testcase name="alphaMaskIsUsedDirectlyAndNeverLetterboxed" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.082"/>
+  <testcase name="whiteBackdropIsNotLetterbox" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.067"/>
+  <testcase name="noisyPhotoReturnsFullFrame" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.014"/>
+  <testcase name="findsSubjectOnGradientBackdrop" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.016"/>
+  <testcase name="letterboxBarsWithStatusGlyphsAreStripped" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.023"/>
+  <testcase name="elfOnGreyKeepsWholeFigure" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.007"/>
+  <testcase name="trueWhiteLetterboxStillStrippedWhenPerfectlyUniform" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.008"/>
+  <testcase name="alphaMaskIsUsedDirectlyAndNeverLetterboxed" classname="com.smitnk.sketcher.image.pipeline.SubjectCropTest" time="0.064"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

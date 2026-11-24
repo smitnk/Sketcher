@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.HandSpeedTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:06:54" hostname="runnervm0hi8g" time="0.005">
+<testsuite name="com.smitnk.sketcher.anim.HandSpeedTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:42:00" hostname="runnervm0hi8g" time="0.005">
   <properties/>
-  <testcase name="slowStrokeTakesLongerAndOverlapShortensPauses" classname="com.smitnk.sketcher.anim.HandSpeedTest" time="0.001"/>
+  <testcase name="slowStrokeTakesLongerAndOverlapShortensPauses" classname="com.smitnk.sketcher.anim.HandSpeedTest" time="0.002"/>
   <testcase name="tightCurvesAreSlowerAndClamped" classname="com.smitnk.sketcher.anim.HandSpeedTest" time="0.001"/>
   <testcase name="plotterAndPencilIgnoreHandSpeed" classname="com.smitnk.sketcher.anim.HandSpeedTest" time="0.0"/>
   <testcase name="jitterIsSeededAndBounded" classname="com.smitnk.sketcher.anim.HandSpeedTest" time="0.002"/>

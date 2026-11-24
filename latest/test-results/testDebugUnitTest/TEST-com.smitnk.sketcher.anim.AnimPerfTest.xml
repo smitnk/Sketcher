@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.AnimPerfTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:06:53" hostname="runnervm0hi8g" time="0.179">
+<testsuite name="com.smitnk.sketcher.anim.AnimPerfTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-24T07:42:00" hostname="runnervm0hi8g" time="0.198">
   <properties/>
-  <testcase name="fillAllowancesAllocatesNothingAndReturnsTheSameInstance" classname="com.smitnk.sketcher.anim.AnimPerfTest" time="0.096"/>
-  <testcase name="legacyMapPathAllocatesPerFrameAndNewIsFaster" classname="com.smitnk.sketcher.anim.AnimPerfTest" time="0.083"/>
+  <testcase name="fillAllowancesAllocatesNothingAndReturnsTheSameInstance" classname="com.smitnk.sketcher.anim.AnimPerfTest" time="0.14"/>
+  <testcase name="legacyMapPathAllocatesPerFrameAndNewIsFaster" classname="com.smitnk.sketcher.anim.AnimPerfTest" time="0.057"/>
   <system-out><![CDATA[PERF new: 0.00848 B/frame
-PERF 5k strokes: old map 422 ns, 464 B/frame | new 80 ns, 0.01 B/frame (2.41766543E10)
+PERF 5k strokes: old map 280 ns, 464 B/frame | new 44 ns, 0.01 B/frame (2.41766543E10)
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

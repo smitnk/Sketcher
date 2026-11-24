@@ -2,7 +2,7 @@ crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=FLOW_LINES
 model=informative
 accelActive=CPU + XNNPACK fallback=null
-inferenceMs=null (wrapped=0) genMs=3319
+inferenceMs=null (wrapped=0) genMs=3551
 ink: no raw ink (non-AI source)
 strokes: outline=155 shading=0 fill=0
 look=LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=false, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
