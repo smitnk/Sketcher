@@ -1,4 +1,20 @@
 | image | who | strokes | path_len | gap_pct | stray_pct | doubled_pct | pen_travel | short_strokes_lt10px | ms |
 |---|---|---|---|---|---|---|---|---|---|
-| _mean | ours | nan | nan | nan | nan | nan | nan | nan | nan |
-| _mean | autotrace | nan | nan | nan | nan | nan | nan | nan | nan |
+| beard_informative_ai_pencil | ours | 104 | 5903 | 26.75 | 4.12 | 9.39 | 4652 | 1 | 28 |
+| beard_informative_ai_pencil | autotrace | 304 | 6676 | 13.66 | 0.71 | 16.9 | 16185 | 182 | 31 |
+| cartoon_informative_ai_pencil | ours | 50 | 5525 | 50.42 | 1.91 | 2.63 | 4202 | 0 | 38 |
+| cartoon_informative_ai_pencil | autotrace | 444 | 9244 | 12.99 | 0.46 | 30.92 | 60415 | 298 | 48 |
+| elf_informative_ai_pencil | ours | 138 | 6529 | 43.11 | 3.34 | 14.47 | 5341 | 2 | 31 |
+| elf_informative_ai_pencil | autotrace | 542 | 9308 | 11.77 | 0.62 | 30.36 | 35632 | 311 | 38 |
+| person1_informative_ai_pencil | ours | 132 | 6325 | 39.38 | 7.99 | 9.03 | 4942 | 0 | 24 |
+| person1_informative_ai_pencil | autotrace | 474 | 7555 | 12.19 | 0.73 | 23.02 | 28405 | 301 | 35 |
+| person2_informative_ai_pencil | ours | 145 | 7321 | 61.58 | 9.77 | 9.72 | 6176 | 0 | 48 |
+| person2_informative_ai_pencil | autotrace | 1141 | 13152 | 12.87 | 0.54 | 31.34 | 97265 | 777 | 53 |
+| tpose_informative_ai_pencil | ours | 13 | 3332 | 7.64 | 3.38 | 1.27 | 980 | 0 | 25 |
+| tpose_informative_ai_pencil | autotrace | 97 | 3119 | 9.86 | 1.33 | 1.27 | 10465 | 53 | 34 |
+| beard_anime_ai_pencil | ours | 69 | 4099 | 33.08 | 73.73 | 7.97 | 2234 | 0 | 26 |
+| beard_anime_ai_pencil | autotrace | 117 | 807 | 27.29 | 1.06 | 14.5 | 4515 | 92 | 18 |
+| beard_coarse_ai_pencil | ours | 112 | 5935 | 43.66 | 6.39 | 12.96 | 4639 | 1 | 32 |
+| beard_coarse_ai_pencil | autotrace | 670 | 8236 | 17.05 | 1.32 | 44.07 | 33393 | 457 | 35 |
+| _mean | ours | 95.38 | 5621.12 | 38.2 | 13.83 | 8.43 | 4145.75 | 0.5 | 31.5 |
+| _mean | autotrace | 473.62 | 7262.12 | 14.71 | 0.85 | 24.05 | 35784.38 | 308.88 | 36.5 |
