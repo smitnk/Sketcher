@@ -106,9 +106,14 @@ Ported from SSARCandy/Coherent-Line-Drawing (MIT, (c) 2019 HSU,SHU-HSUAN).
 - Licence: MIT (same terms as the MIT text below)
 - https://github.com/visioncortex/vtracer
 
+## 15. AniLines (optional download "AniLines detail", not bundled)
+
+- AniLines Anime Lineart Extractor by zhenglinpan: https://github.com/zhenglinpan/AniLines-Anime-Lineart-Extractor (detail weights, converted to ONNX fp16)
+- Licence: MIT (same terms as the MIT text below). Used by the Cartoon and AI line art engines; the download is optional.
+
 ## MIT License
 
-The text below applies to items 1, 2 and 12. The copyright lines for each are given in their sections above.
+The text below applies to items 1, 2, 12 and 15. The copyright lines for each are given in their sections above.
 
 ```
 Permission is hereby granted, free of charge, to any person obtaining a copy

@@ -67,6 +67,17 @@ class ModelSpecTest {
         }
     }
 
+    @Test fun anilinesIsTwoChannelFp16InBothEngines() {
+        val s = ModelSpecs.ANILINES
+        assertTrue(s.grayPlusSobel && s.fp16 && !s.cartoon && !s.fast)
+        assertEquals(16, s.sizeMultiple)
+        assertEquals(34_568_884L, s.sizeBytes)
+        assertEquals(64, s.sha256!!.length)
+        assertTrue(ModelSpecs.ALL.contains(s) && ModelSpecs.CARTOON.contains(s))
+        assertEquals(ModelSpecs.EVERY.size, ModelSpecs.EVERY.map { it.id }.toSet().size)
+        assertEquals(1f, s.inkFromOutput(0f), 1e-6f) // black line = ink
+    }
+
     @Test fun anime2sketchAlignsTo256AndCapsPixels() {
         val s = ModelSpecs.ANIME2SKETCH
         assertEquals(256, s.sizeMultiple)

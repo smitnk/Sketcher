@@ -335,6 +335,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     "realistic" -> "ControlNet lineart, detailed"
                     "coarse" -> "Bold simple lines, great for poses"
                     "anime" -> "Best for 3D/anime characters; large download"
+                    "anilines" -> "Clean lines, keeps small details"
                     else -> s.description
                 },
                 sizeLabel = when {
@@ -346,6 +347,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 installed = modelStateUi[s.id] == ModelState.Installed,
                 downloading = (modelStateUi[s.id] as? ModelState.Downloading)?.progress,
                 recommended = s.id == ModelSpecs.DEFAULT_ID,
+                bestFor = when (s.id) {
+                    "informative" -> "photos and general use"
+                    "realistic" -> "photos with fine detail"
+                    "coarse" -> "bold shapes, poses"
+                    "anime" -> "anime and 3D characters"
+                    "anilines" -> "3D renders"
+                    else -> null
+                },
+                licence = s.licence,
             )
         }
 
@@ -404,13 +414,16 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 subtitle = "Fast, works offline, no download",
                 sizeLabel = "Built-in",
                 installed = true,
-                recommended = true,
+                bestFor = "quick results, works offline",
             ),
         ) + ModelSpecs.CARTOON.map { s ->
             LineModelUi(
                 id = s.id,
-                name = "${s.name} (Anime2Sketch)",
-                subtitle = "Bold coloring-book lines for flat cartoons. Not for photos/3D. ${s.licence ?: "See licences"}",
+                name = if (s.id == "anime2sketch") "${s.name} (Anime2Sketch)" else s.name,
+                subtitle = if (s.id == "anime2sketch") "Bold coloring-book lines. Not for photos/3D." else "Clean lines for cartoons and renders.",
+                bestFor = if (s.id == "anime2sketch") "flat cartoons" else "flat cartoons, 3D renders",
+                licence = s.licence,
+                recommended = s.id == "anilines",
                 sizeLabel = "\u2193 ${((s.sizeBytes ?: 0L) / 1_000_000L).coerceAtLeast(1)} MB",
                 installed = modelStateUi[s.id] == ModelState.Installed,
                 downloading = (modelStateUi[s.id] as? ModelState.Downloading)?.progress,
@@ -534,6 +547,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 // Never swap models under a running generation: apply afterwards.
                 if (spec.fast) selectFastModel(id) // Fast edges models never replace the user's AI line model
                 else if (spec.cartoon) selectCartoonModel(id)
+                else if (ModelSpecs.CARTOON.any { it.id == id } && pipelineSettings.lineSource == LineSource.CARTOON) selectCartoonModel(id)
                 else if (engineBusy) pendingSelectId = id else selectLineModelNow(id)
                 toast("${spec.name} model ready")
             } catch (e: CancellationException) {
@@ -1434,6 +1448,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 val fm = if (ps.lineSource == LineSource.FAST_EDGES) fastModel().also { it.beginRun(); it.longSide = SketchPipeline.modelSide(ps.detail) } else null
                 val cm = if (ps.lineSource == LineSource.CARTOON) cartoonModelOrNull()?.also { it.beginRun(); it.longSide = SketchPipeline.CARTOON_MODEL_SIDE } else null
                 m.detail = ps.detail
+                m.cleanInk = ps.cleanInk
+                cm?.cleanInk = ps.cleanInk
                 m.longSide = SketchPipeline.modelSide(ps.detail)
                 genStartMs = genStart
                 stageStartMs = genStart

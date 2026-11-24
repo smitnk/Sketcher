@@ -387,10 +387,12 @@ class OnnxLineArtModel(
         if (closed) throw ModelClosedException()
         if (cancelRequested) throw CancellationException("cancelled")
         val tStart = System.nanoTime()
-        val (tw, th) = spec.targetSize(w, h, longSide)
+        val ani = spec.grayPlusSobel
+        val (rw, rh) = if (ani) AniLinesPrep.fitSize(w, h, longSide, spec.maxPixels) else (0 to 0)
+        val (tw, th) = if (ani) AniLinesPrep.padded(rw) to AniLinesPrep.padded(rh) else spec.targetSize(w, h, longSide)
         MlLog.i("infer start ${spec.id} ${w}x$h -> ${tw}x$th (${tw.toLong() * th} px, cap ${spec.maxPixels}) fp16=${spec.fp16}")
         val skipNnapi = spec.fp16 || spec.int8 || tw.toLong() * th > NNAPI_MAX_PIXELS
-        val fb = fillInput(argb, w, h, tw, th)
+        val fb = if (ani) aniInput(argb, w, h, rw, rh) else fillInput(argb, w, h, tw, th)
         val tPre = System.nanoTime()
         MlLog.i("infer preprocessed in ${(tPre - tStart) / 1_000_000} ms")
         val raw = FloatArray(tw * th)
@@ -399,7 +401,7 @@ class OnnxLineArtModel(
             val (env, session) = ensureSession(ep, skipNnapi)
             try {
                 MlLog.i("run begin ${spec.id} accel=$activeAccel")
-                runInto(env, session, fb, tw, th, raw)
+                runInto(env, session, fb, tw, th, raw, if (ani) 2 else 3)
                 if (ep != epoch) { // abandoned by the breaker while running: release our session, report nothing
                     try { session.close() } catch (_: Throwable) {}
                     throw CancellationException("engine reset")
@@ -423,9 +425,12 @@ class OnnxLineArtModel(
         }
         val tRun = System.nanoTime()
         inBuf = null // release the native input buffer between runs
-        val out = FloatArray(tw * th)
-        for (i in out.indices) out[i] = spec.inkFromOutput(raw[i])
-        val res = if (tw == w && th == h) out else upsample(out, tw, th, w, h)
+        val src = if (ani) AniLinesPrep.crop(raw, tw, rw, rh) else raw
+        val out = FloatArray(src.size)
+        for (i in out.indices) out[i] = spec.inkFromOutput(src[i]).let { if (ani && cleanInk) (if (it > 0.5f) 1f else 0f) else it }
+        val ow = if (ani) rw else tw
+        val oh = if (ani) rh else th
+        val res = if (ow == w && oh == h) out else upsample(out, ow, oh, w, h)
         val totalMs = (System.nanoTime() - tStart) / 1_000_000
         lastInferenceMs = totalMs
         lastRunMs = (tRun - tPre) / 1_000_000
@@ -436,14 +441,14 @@ class OnnxLineArtModel(
         return res
     }
 
-    private fun runInto(env: OrtEnvironment, session: OrtSession, fb: FloatBuffer, tw: Int, th: Int, out: FloatArray) {
+    private fun runInto(env: OrtEnvironment, session: OrtSession, fb: FloatBuffer, tw: Int, th: Int, out: FloatArray, channels: Int = 3) {
         val inputName = session.inputNames.iterator().next()
         fb.position(0)
         OrtSession.RunOptions().use { ro ->
             runOptions = ro
             if (cancelRequested) terminateRun()
             try {
-                OnnxTensor.createTensor(env, fb, longArrayOf(1, 3, th.toLong(), tw.toLong())).use { tensor ->
+                OnnxTensor.createTensor(env, fb, longArrayOf(1, channels.toLong(), th.toLong(), tw.toLong())).use { tensor ->
                     session.run(mapOf(inputName to tensor), ro).use { result ->
                         val ot = result.get(0) as OnnxTensor
                         val ofb = ot.floatBuffer
@@ -472,8 +477,9 @@ class OnnxLineArtModel(
         val m = spec.sizeMultiple
         val s = max(m, (side + m - 1) / m * m)
         val plane = s * s
-        val fb = ByteBuffer.allocateDirect(3 * plane * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        for (i in 0 until 3 * plane) fb.put(i, 0.5f)
+        val ch = if (spec.grayPlusSobel) 2 else 3
+        val fb = ByteBuffer.allocateDirect(ch * plane * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        for (i in 0 until ch * plane) fb.put(i, 0.5f)
         val out = FloatArray(plane)
         val results = LinkedHashMap<Accel, Long>()
         val candidates = when {
@@ -486,9 +492,9 @@ class OnnxLineArtModel(
             try {
                 MlLog.i("benchmark ${spec.id} $a begin")
                 buildSession(e, a).use { sess ->
-                    runInto(e, sess, fb, s, s, out)
+                    runInto(e, sess, fb, s, s, out, ch)
                     val t0 = System.nanoTime()
-                    runInto(e, sess, fb, s, s, out)
+                    runInto(e, sess, fb, s, s, out, ch)
                     val ms = (System.nanoTime() - t0) / 1_000_000
                     results[a] = ms
                     MlLog.i("benchmark ${spec.id} $a ${s}px: $ms ms")
@@ -519,6 +525,26 @@ class OnnxLineArtModel(
             MlLog.w("close: engine stuck, tripping breaker")
             tripBreaker(this)
         }
+    }
+
+    /** AniLines "Clean ink": binarise the ink map at 0.5 (only for [ModelSpec.grayPlusSobel] models). */
+    @Volatile var cleanInk: Boolean = false
+
+    /** [gray, inverted Sobel] planes, reflect-padded to x16, in a direct buffer. */
+    private fun aniInput(src: IntArray, w: Int, h: Int, rw: Int, rh: Int): FloatBuffer {
+        val p = AniLinesPrep.planes(src, w, h, rw, rh)
+        val bytes = p.size * 4
+        var bb = inBuf
+        if (bb == null || bb.capacity() < bytes) {
+            bb = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
+            inBuf = bb
+        }
+        bb.clear()
+        val fb = bb.asFloatBuffer()
+        fb.limit(p.size)
+        fb.put(p)
+        fb.position(0)
+        return fb
     }
 
     /** Bilinear resize of [src] to [tw]x[th] + NCHW split into a direct buffer (exactly the model input size). */

@@ -44,6 +44,8 @@ data class ModelSpec(
     val cartoon: Boolean = false,
     /** Licence shown next to optional downloads (null = permissive/bundled). */
     val licence: String? = null,
+    /** AniLines "detail": 2-channel input [gray, inverted Sobel], reflect-padded to x16 (see AniLinesPrep). */
+    val grayPlusSobel: Boolean = false,
 ) {
     init {
         require(sizeMultiple > 0) { "sizeMultiple" }
@@ -179,8 +181,24 @@ object ModelSpecs {
         fp16 = true, maxPixels = 768 * 768, cartoon = true, licence = "MIT (Mukosame/Anime2Sketch)",
     )
 
+    /**
+     * AniLines detail (MIT, zhenglinpan), fp16 ONNX with dynamic H/W: input [gray, inverted Sobel] 0..1 (AniLinesPrep),
+     * output 0..1 with white paper / black lines. Offered both as an AI line model and as a Cartoon-engine model.
+     */
+    val ANILINES = ModelSpec(
+        id = "anilines", name = "AniLines detail",
+        description = "Download ~35 MB. Clean line art for flat cartoons and 3D renders.",
+        fileName = "anilines_detail.onnx",
+        inputNorm = InputNorm.ZERO_ONE, outputRange = OutputRange.ZERO_ONE,
+        inkPolarity = InkPolarity.INK_IS_LOW, sizeMultiple = 16,
+        downloadUrl = "https://github.com/smitnk/Sketcher/releases/download/models-v1/anilines_detail.onnx",
+        sha256 = "726777f3335175e25679c4d8e6e3e53c5abf96afd54cad2e8e9f01f8a085077b",
+        sizeBytes = 34_568_884L,
+        fp16 = true, maxPixels = 768 * 768, licence = "MIT (zhenglinpan/AniLines)", grayPlusSobel = true,
+    )
+
     /** User-selectable AI line models. */
-    val ALL: List<ModelSpec> = listOf(INFORMATIVE, REALISTIC, COARSE, ANIME)
+    val ALL: List<ModelSpec> = listOf(INFORMATIVE, REALISTIC, COARSE, ANIME, ANILINES)
     const val DEFAULT_ID = "informative"
 
     /** Models of the Fast edges engine. */
@@ -188,11 +206,11 @@ object ModelSpecs {
     const val FAST_DEFAULT_ID = "teed"
 
     /** Optional models of the Cartoon engine. */
-    val CARTOON: List<ModelSpec> = listOf(ANIME2SKETCH)
+    val CARTOON: List<ModelSpec> = listOf(ANIME2SKETCH, ANILINES)
     const val CARTOON_BUILTIN_ID = "cartoon_builtin"
 
     /** Everything the ModelManager tracks. */
-    val EVERY: List<ModelSpec> = ALL + FAST + CARTOON
+    val EVERY: List<ModelSpec> = (ALL + FAST + CARTOON).distinctBy { it.id }
 
     fun byId(id: String): ModelSpec? = EVERY.firstOrNull { it.id == id }
 }

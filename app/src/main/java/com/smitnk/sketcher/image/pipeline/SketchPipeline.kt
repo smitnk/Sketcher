@@ -232,10 +232,13 @@ object SketchPipeline {
         }
 
         var fill: List<Stroke> = emptyList()
+        var celMap: RegionMap? = null
+        var celCols: IntArray? = null
         if (settings.colourFill) {
             progress("Colour fill", 0.80f)
             fill = if (settings.fillStyle == FillStyle.FLAT_CEL) tm.time("cel") {
                 val (map, cols) = celRegions(px, pw, ph, ink, settings.gapClosing, settings.fillColors.coerceIn(6, 16))
+                celMap = map; celCols = cols
                 LineFill.celStrokes(map, cols, settings.fillSpacing)
             } else ColorStrokeGenerator.generateFill(
                 px, pw, ph, pw, ph, settings.fillColors.coerceIn(6, 16), settings.fillSpacing,
@@ -280,7 +283,7 @@ object SketchPipeline {
         progress("Done", 1f)
         tm.ms["total"] = (System.nanoTime() - tTotal) / 1_000_000
         lastTimings = LinkedHashMap(tm.ms)
-        GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth)
+        GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth, celMap, celCols)
     }
 
     /**

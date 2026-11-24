@@ -60,6 +60,9 @@ data class GeneratedDrawing(
     val inkW: Int = 0,
     val inkH: Int = 0,
     val revealWidth: Float = 0f,
+    /** Flat-cel regions + one ARGB per region (only when the fill style was FLAT_CEL); used for SVG export. */
+    val celMap: com.smitnk.sketcher.image.pipeline.RegionMap? = null,
+    val celColours: IntArray? = null,
 )
 
 data class GeneratorSettings(

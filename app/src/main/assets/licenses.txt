@@ -109,6 +109,11 @@ Sketcher uses the components below.
    Copyright (c) 2020 Tsang Hao Fung (visioncortex)
    Licence: MIT (same terms as the text below).
 
+15. AniLines (optional download "AniLines detail", not bundled)
+   AniLines Anime Lineart Extractor by zhenglinpan (ONNX fp16 conversion of the "detail" weights)
+   https://github.com/zhenglinpan/AniLines-Anime-Lineart-Extractor
+   Licence: MIT (same terms as the text below). Used by the Cartoon and AI line art engines.
+
 ----------------------------------------------------------------------
 MIT License
 

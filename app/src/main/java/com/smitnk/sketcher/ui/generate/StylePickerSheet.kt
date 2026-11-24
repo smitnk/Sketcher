@@ -52,6 +52,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.smitnk.sketcher.image.pipeline.FillStyle
+import com.smitnk.sketcher.image.pipeline.GapClosing
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +97,9 @@ data class LineModelUi(
     val installed: Boolean,
     val downloading: Float? = null, // 0..1 while downloading
     val recommended: Boolean = false,
+    /** "Best for: ..." hint, shown on the card. */
+    val bestFor: String? = null,
+    val licence: String? = null,
 )
 
 private enum class StyleChoice { OUTLINE, SHADED, COLOUR }
@@ -344,6 +354,32 @@ fun StylePickerSheet(
                     onChange = { onSettingsChange(settings.copy(lineWidth = it)) },
                     valueText = "%.1f px".format(settings.lineWidth),
                 )
+                val aniLinesInUse = when (settings.lineSource) {
+                    LineSource.CARTOON -> selectedCartoonModelId == "anilines"
+                    LineSource.AUTO, LineSource.AI -> selectedModelId == "anilines"
+                    else -> false
+                }
+                if (aniLinesInUse) Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = SketcherTokens.minTouchTarget)
+                        .selectable(
+                            selected = settings.cleanInk,
+                            role = Role.Switch,
+                            onClick = { onSettingsChange(settings.copy(cleanInk = !settings.cleanInk)) },
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Clean ink", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Pure black lines, no grey",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = settings.cleanInk, onCheckedChange = null)
+                }
                 val pencil = settings.outlineStyle == OutlineStyle.PENCIL_REVEAL
                 // Pencil texture only applies to AI-derived lines; Classic edges never use it.
                 if (settings.lineSource != LineSource.CLASSIC) Row(
@@ -436,6 +472,36 @@ fun StylePickerSheet(
                     exit = fadeOut(tween(160)) + shrinkVertically(tween(160)),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space12)) {
+                        SectionLabel("Fill style")
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            val styles = listOf(FillStyle.STROKES to "Strokes", FillStyle.FLAT_CEL to "Flat cel (no gaps)")
+                            styles.forEachIndexed { index, (fs, name) ->
+                                SegmentedButton(
+                                    selected = settings.fillStyle == fs,
+                                    onClick = { onSettingsChange(settings.copy(fillStyle = fs)) },
+                                    shape = SegmentedButtonDefaults.itemShape(index, styles.size),
+                                    icon = {},
+                                    modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
+                                ) { Text(name, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
+                            }
+                        }
+                        if (settings.fillStyle == FillStyle.FLAT_CEL) {
+                            LabeledSlider(
+                                title = "Gap closing",
+                                startHint = "Small",
+                                endHint = "Large",
+                                value = settings.gapClosing.ordinal.toFloat(),
+                                range = 0f..2f,
+                                steps = 1,
+                                onChange = { onSettingsChange(settings.copy(gapClosing = GapClosing.values()[it.roundToInt().coerceIn(0, 2)])) },
+                                valueText = when (settings.gapClosing) {
+                                    GapClosing.SMALL -> "Small"
+                                    GapClosing.MEDIUM -> "Medium"
+                                    GapClosing.LARGE -> "Large"
+                                },
+                            )
+                            CelPreviewThumb(sourceThumbnail, settings.gapClosing, settings.fillColors)
+                        }
                         LabeledSlider(
                             title = "Fill colours",
                             startHint = "Few",
@@ -537,6 +603,16 @@ private fun LineModelCard(
                 color = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f, fill = false),
             )
+            if (model.bestFor != null) Text(
+                "Best for: ${model.bestFor}",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
+            )
+            if (model.licence != null) Text(
+                model.licence,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (selected) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(SketcherTokens.space4))
             when {
                 progress != null -> {
@@ -567,6 +643,30 @@ private fun LineModelCard(
                 )
             }
         }
+    }
+}
+
+/** Live ~128px flat-cel preview, computed off the main thread whenever the inputs change. */
+@Composable
+private fun CelPreviewThumb(source: ImageBitmap?, gap: GapClosing, colours: Int) {
+    if (source == null) return
+    val preview by produceState<ImageBitmap?>(null, source, gap, colours) {
+        value = withContext(Dispatchers.Default) {
+            val bmp = source.asAndroidBitmap()
+            val px = IntArray(bmp.width * bmp.height)
+            bmp.getPixels(px, 0, bmp.width, 0, 0, bmp.width, bmp.height)
+            val r = celPreview(px, bmp.width, bmp.height, gap, colours.coerceIn(6, 16))
+            android.graphics.Bitmap.createBitmap(r.pixels, r.width, r.height, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
+        }
+    }
+    preview?.let {
+        Image(
+            bitmap = it,
+            contentDescription = "Flat colour preview",
+            contentScale = ContentScale.Fit,
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+            modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).clip(RoundedCornerShape(10.dp)),
+        )
     }
 }
 

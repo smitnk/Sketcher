@@ -21,6 +21,7 @@ data class PipelineSettings(
     val fillSpacing: Float = 6f,
     val fillStyle: FillStyle = FillStyle.STROKES,
     val gapClosing: GapClosing = GapClosing.MEDIUM, // FLAT_CEL only: how wide line gaps the fill may bridge
+    val cleanInk: Boolean = false,        // AniLines only: binarise the ink map at 0.5
     val ignoreBackground: Boolean = true, // don't shade flat/background regions
     val maxStrokes: Int = 4000,
     val workingSize: Int = 1024,          // long side for vector output
