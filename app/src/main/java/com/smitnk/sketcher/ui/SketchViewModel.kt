@@ -25,6 +25,8 @@ import com.smitnk.sketcher.data.applySnapshot
 import com.smitnk.sketcher.data.toSnapshot
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.export.SvgExporter
+import com.smitnk.sketcher.image.pipeline.FillStyle
 import com.smitnk.sketcher.export.ExportKind
 import com.smitnk.sketcher.export.ExportResult
 import com.smitnk.sketcher.export.ExportState
@@ -1588,6 +1590,12 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             layer.animPriority = if (kind == LayerKind.AUTO_OUTLINE && ps.colourFill) -1 else 0
         }
+        celFills = run {
+            val fl = result.firstOrNull { it.kind == LayerKind.AUTO_FILL }
+            val m = drawing.celMap
+            val c = drawing.celColours
+            if (ps.colourFill && ps.fillStyle == FillStyle.FLAT_CEL && fl != null && m != null && c != null) mapOf(fl.id to SvgExporter.FillData(m, c)) else emptyMap()
+        }
         if (result.none { it.kind == LayerKind.MANUAL }) {
             result.add(project.newLayer("My Drawing"))
         }
@@ -2160,6 +2168,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun mimeFor(path: String) = when (path.substringAfterLast('.').lowercase()) {
         "mp4" -> "video/mp4"
         "gif" -> "image/gif"
+        "svg" -> "image/svg+xml"
         "jpg", "jpeg" -> "image/jpeg"
         else -> "image/png"
     }
@@ -2276,6 +2285,25 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             ImageJob(snapshotLayers(l), w, h, scale, format, format == ExportFormat.PNG, true, l.name, ow, oh)
         }
         startImageExport(ExportKind.LAYERS, "Saving layers...", jobs)
+    }
+
+    /** Flat-cel region data of the last generation, keyed by the Colour Fill layer id (used by SVG export). */
+    private var celFills: Map<Long, SvgExporter.FillData> = emptyMap()
+
+    /** Saves all visible layers as one SVG (PNG fallback with an explanation if SVG fails). */
+    fun exportSvg() {
+        exportBlockedReason?.let { toast(it); return }
+        val layers = snapshotLayers(null)
+        val w = project.width
+        val h = project.height
+        val ids = layers.map { it.id }.toSet()
+        val fills = celFills.filter { (id, f) -> id in ids && f.map.width == w && f.map.height == h }
+        startExport(ExportKind.IMAGE, "Saving SVG...") { done ->
+            val r = SvgExporter.save(app, w, h, layers, fills, "drawing")
+            done.add(
+                if (r.ok && r.path != null) ExportResult(r.kind, resolveSavedUri(r.path, mimeFor(r.path))?.toString(), r.path, true, r.error) else r,
+            )
+        }
     }
 
     fun export(scale: Int, format: ExportFormat, transparent: Boolean, selectedLayerOnly: Boolean) {

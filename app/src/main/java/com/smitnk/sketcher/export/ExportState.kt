@@ -49,5 +49,5 @@ fun ExportState.blockedReason(generating: Boolean): String? = when {
 
 /** Human readable, per-file summary for the result dialog (one line per file, honest about failures). */
 fun ExportState.Done.summary(): String = results.joinToString("\n") { r ->
-    if (r.ok) (r.path ?: "${r.kind.label} saved") else "${r.kind.label} failed: ${r.error ?: "unknown error"}"
+    if (r.ok) (r.path ?: "${r.kind.label} saved") + (r.error?.let { "\n$it" } ?: "") else "${r.kind.label} failed: ${r.error ?: "unknown error"}"
 }

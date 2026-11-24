@@ -148,6 +148,7 @@ fun EditorScreen(
                 vm.exportLayersSeparately(p.scale, ExportFormat.valueOf(p.format), p.transparent)
             PendingExportKind.IMAGE ->
                 vm.export(p.scale, ExportFormat.valueOf(p.format), p.transparent, p.layerOnly)
+            PendingExportKind.SVG -> vm.exportSvg()
             PendingExportKind.ANIMATION -> vm.exportAnimation(AnimExportKind.valueOf(p.anim))
             PendingExportKind.FRAMES ->
                 vm.exportFrames(runCatching { FramesExportKind.valueOf(p.anim) }.getOrDefault(FramesExportKind.PNG_SEQUENCE), p.scale)
@@ -597,6 +598,10 @@ fun EditorScreen(
             onExportAnimation = { kind ->
                 overlay = EditorOverlay.None
                 runWithPermission(PendingExport(PendingExportKind.ANIMATION, anim = kind.name))
+            },
+            onExportSvg = {
+                overlay = EditorOverlay.None
+                runWithPermission(PendingExport(PendingExportKind.SVG, format = ExportFormat.SVG.name))
             },
             frameCount = vm.project.frames.size,
             flipbookFps = vm.flipbookFps,

@@ -88,7 +88,7 @@ import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private enum class ExportMode { IMAGE, VIDEO, GIF, FRAMES }
+private enum class ExportMode { IMAGE, VIDEO, GIF, FRAMES, SVG }
 private enum class LayerScope { SEPARATE, SELECTED, ALL }
 
 /**
@@ -115,6 +115,8 @@ fun ExportDialog(
     frameCount: Int = 1,
     flipbookFps: Int = FrameOps.DEFAULT_FPS,
     onExportFrames: ((kind: FramesExportKind, fps: Int) -> Unit)? = null,
+    /** "SVG (vector)"; the card is hidden when null. */
+    onExportSvg: (() -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf(ExportMode.IMAGE) }
     var framesKind by remember { mutableStateOf(FramesExportKind.PNG_SEQUENCE) }
@@ -133,6 +135,7 @@ fun ExportDialog(
     }
     val exportLabel = when (mode) {
         ExportMode.IMAGE -> "Export ${format.extension.uppercase()}"
+        ExportMode.SVG -> "Export SVG"
         ExportMode.VIDEO -> "Export MP4"
         ExportMode.GIF -> "Export GIF"
         ExportMode.FRAMES -> when (framesKind) {
@@ -167,7 +170,8 @@ fun ExportDialog(
                 modifier = Modifier.semantics { heading() },
             )
 
-            // Format cards
+            // Format cards, grouped: Image / Video / Layers / Vector
+            SectionLabel("Image")
             Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
                 FormatCard(
                     title = "Image",
@@ -177,6 +181,10 @@ fun ExportDialog(
                     onClick = { mode = ExportMode.IMAGE },
                     modifier = Modifier.weight(1f),
                 )
+                Spacer(Modifier.weight(2f))
+            }
+            SectionLabel("Video")
+            Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
                 FormatCard(
                     title = "Video",
                     subtitle = "MP4",
@@ -205,7 +213,33 @@ fun ExportDialog(
                 }
             }
 
-            if (mode == ExportMode.FRAMES) {
+            if (onExportSvg != null) {
+                SectionLabel("Vector")
+                Row(horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                    FormatCard(
+                        title = "SVG (vector)",
+                        subtitle = "Scales to any size",
+                        icon = Icons.Outlined.Image,
+                        selected = mode == ExportMode.SVG,
+                        onClick = { mode = ExportMode.SVG },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.weight(2f))
+                }
+            }
+
+            if (mode == ExportMode.SVG) {
+                Text(
+                    "One SVG with a group per layer. Flat colour fills become shapes; pencil lines are embedded as pictures. " +
+                        "If SVG cannot be made, a PNG is saved and you are told why.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (mode == ExportMode.SVG) {
+                // handled above
+            } else if (mode == ExportMode.FRAMES) {
                 SectionLabel("Frames")
                 val kinds = listOf(
                     FramesExportKind.PNG_SEQUENCE to "PNGs",
@@ -394,6 +428,7 @@ fun ExportDialog(
                         ExportMode.VIDEO -> onExportAnimation(AnimExportKind.VIDEO)
                         ExportMode.GIF -> onExportAnimation(AnimExportKind.GIF)
                         ExportMode.FRAMES -> onExportFrames?.invoke(framesKind, framesFps)
+                        ExportMode.SVG -> onExportSvg?.invoke()
                     }
                 },
                 modifier = Modifier

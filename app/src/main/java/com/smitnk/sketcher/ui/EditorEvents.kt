@@ -63,7 +63,7 @@ val EditorOverlaySaver: Saver<EditorOverlay, Any> = listSaver(
 )
 
 /** Export that waits for the storage permission (pre-Q). Survives activity recreation. */
-enum class PendingExportKind { NONE, LAYERS_SEPARATELY, IMAGE, ANIMATION, FRAMES }
+enum class PendingExportKind { NONE, LAYERS_SEPARATELY, IMAGE, ANIMATION, FRAMES, SVG }
 
 data class PendingExport(
     val kind: PendingExportKind = PendingExportKind.NONE,
