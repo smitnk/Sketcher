@@ -1,0 +1,24 @@
+{
+ "_mean": {
+  "ours": {
+   "strokes": NaN,
+   "path_len": NaN,
+   "gap_pct": NaN,
+   "stray_pct": NaN,
+   "doubled_pct": NaN,
+   "pen_travel": NaN,
+   "short_strokes_lt10px": NaN,
+   "ms": NaN
+  },
+  "autotrace": {
+   "strokes": NaN,
+   "path_len": NaN,
+   "gap_pct": NaN,
+   "stray_pct": NaN,
+   "doubled_pct": NaN,
+   "pen_travel": NaN,
+   "short_strokes_lt10px": NaN,
+   "ms": NaN
+  }
+ }
+}
