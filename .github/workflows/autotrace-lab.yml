@@ -17,8 +17,11 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - name: Tools
         run: |
-          sudo apt-get update && sudo apt-get install -y autotrace
-          autotrace --version || true
+          # autotrace was dropped from Ubuntu 22.04+: build from source (PNG in, SVG out only)
+          sudo apt-get update && sudo apt-get install -y autoconf automake libtool intltool pkg-config libglib2.0-dev libpng-dev
+          git clone --depth 1 --branch 0.31.10 https://github.com/autotrace/autotrace /tmp/at || git clone --depth 1 https://github.com/autotrace/autotrace /tmp/at
+          (cd /tmp/at && ./autogen.sh && ./configure --without-magick --without-pstoedit --without-swf --without-emf --without-ming --without-libwmf && make -j4 && sudo make install && sudo ldconfig)
+          autotrace --version
           pip install numpy scipy scikit-image opencv-python-headless
           curl -fL -o /tmp/kc.zip https://github.com/JetBrains/kotlin/releases/download/v2.0.21/kotlin-compiler-2.0.21.zip
           unzip -q /tmp/kc.zip -d /tmp
