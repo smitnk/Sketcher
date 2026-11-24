@@ -30,8 +30,13 @@ jobs:
           /tmp/kotlinc/bin/kotlinc -include-runtime -d /tmp/h.jar tools/autotrace_lab/kt/Stubs.kt tools/autotrace_lab/kt/Main.kt app/src/main/java/com/smitnk/sketcher/image/pipeline/LineArtVectorizer.kt
       - name: Fetch AI ink maps from ci-results
         run: |
-          git fetch origin ci-results --depth 1
-          git worktree add /tmp/ci FETCH_HEAD
+          # newest ci-results commit that still has the AI ink dumps (later runs may not)
+          git fetch origin ci-results --depth 200
+          for c in $(git rev-list FETCH_HEAD); do
+            if git ls-tree -r --name-only $c | grep -q 'ink_raw.png'; then break; fi
+          done
+          echo "using ci-results commit $c"
+          git worktree add /tmp/ci $c
       - run: python tools/autotrace_lab/run.py /tmp/ci/latest/debug /tmp/h.jar /tmp/out
       - name: Publish
         run: |
