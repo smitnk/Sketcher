@@ -1,0 +1,38 @@
+name: aniline-lab
+on:
+  workflow_dispatch:
+  push:
+    paths: ["tools/anilines_lab/**", ".github/workflows/aniline-lab.yml"]
+permissions:
+  contents: write
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install onnx onnxscript onnxruntime onnxconverter-common pillow numpy opencv-python-headless gdown huggingface_hub
+          git clone --depth 1 https://github.com/zhenglinpan/AniLines-Anime-Lineart-Extractor.git /tmp/AL
+          git clone --depth 1 https://github.com/Mukosame/Anime2Sketch.git /tmp/A2S
+          mkdir -p /tmp/A2S/weights
+          curl -fL -o /tmp/A2S/weights/netG.pth https://huggingface.co/gyrojeff/Anime2Sketch/resolve/main/netG.pth
+          # official weights are on Google Drive (README); fall back to the author's HF space
+          gdown 14Bp8mbQAbiR1rQrEsFp-uNdOou8hoCFr -O /tmp/AL/weights/basic.pth || python -c "from huggingface_hub import hf_hub_download as d; import shutil; shutil.copy(d('aidenpan/AniLines-Anime-Lineart-Extractor','weights/basic.pth',repo_type='space'),'/tmp/AL/weights/basic.pth')"
+          gdown 12U1Mwlonoipk2Yvr12mNaFB30foy420o -O /tmp/AL/weights/detail.pth || python -c "from huggingface_hub import hf_hub_download as d; import shutil; shutil.copy(d('aidenpan/AniLines-Anime-Lineart-Extractor','weights/detail.pth',repo_type='space'),'/tmp/AL/weights/detail.pth')"
+          ls -la /tmp/AL/weights
+      - run: python tools/anilines_lab/run.py
+      - name: Publish
+        run: |
+          set -e
+          for f in out_anilines/anilines_*.onnx; do gh release upload models-v1 "$f" --repo "$GITHUB_REPOSITORY" --clobber; done
+          git config user.name ci; git config user.email ci@users.noreply.github.com
+          git fetch origin models-lab --depth 1 && git checkout -B lab FETCH_HEAD
+          mkdir -p anilines && cp out_anilines/anilines_sheet.jpg out_anilines/results.md anilines/
+          git add anilines && git commit -m "anilines lab results" && git push origin HEAD:models-lab
