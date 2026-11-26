@@ -2,7 +2,7 @@ crop: x0=62 y0=0 x1=462 y1=1024 of 516x1024 bgFraction=0.58960176
 lineSource=AI
 model=anime
 accelActive=CPU fallback=null
-inferenceMs=6491 (wrapped=6493) genMs=8923
+inferenceMs=4612 (wrapped=4617) genMs=6699
 ink: min=0.0 mean=0.013441435154795518 max=0.91338754 (300x768)
 strokes: outline=347 shading=0 fill=0
 look=LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=false, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)

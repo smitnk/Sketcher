@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.GenerationStateTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:30" hostname="runnervm0hi8g" time="0.005">
+<testsuite name="com.smitnk.sketcher.ui.GenerationStateTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:16" hostname="ip-10-0-133-199" time="0.008">
   <properties/>
   <testcase name="supersededRunCannotWriteOrFinish" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="modelStateProgressOnlyWhileDownloading" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
@@ -7,13 +7,13 @@
   <testcase name="begin_stage_finish" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="persistentBusyAbortsWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="classification" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
-  <testcase name="modelStateFailAndInstallAndScan" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
+  <testcase name="modelStateFailAndInstallAndScan" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="staleRunStopsBeforeCallingModel" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="modelFailureFallsBackOnce" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
   <testcase name="closedModelAborts" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
   <testcase name="busyIsRetriedAndNeverFallsBack" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <testcase name="lateStageAfterResetIsDropped" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
-  <testcase name="cancellationPropagatesWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.0"/>
+  <testcase name="cancellationPropagatesWithoutFallback" classname="com.smitnk.sketcher.ui.GenerationStateTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

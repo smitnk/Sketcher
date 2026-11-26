@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.data.ProjectCodecTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:25" hostname="runnervm0hi8g" time="0.002">
+<testsuite name="com.smitnk.sketcher.data.ProjectCodecTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:11" hostname="ip-10-0-133-199" time="0.002">
   <properties/>
-  <testcase name="v7FrameAndBackgroundRoundTrip" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.001"/>
-  <testcase name="v6FileLoadsWithDefaultFrameAndBackground" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
+  <testcase name="v7FrameAndBackgroundRoundTrip" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
+  <testcase name="v6FileLoadsWithDefaultFrameAndBackground" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.001"/>
   <testcase name="badMagicAndTruncation" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
   <testcase name="version1InfersKindFromName" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
-  <testcase name="roundTrip" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
+  <testcase name="roundTrip" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.001"/>
   <testcase name="inkTextureRoundTrips" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
   <testcase name="rejectsHugeCountsAndBadSize" classname="com.smitnk.sketcher.data.ProjectCodecTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

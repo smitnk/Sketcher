@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.models.ModelManagerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:26" hostname="runnervm0hi8g" time="0.068">
+<testsuite name="com.smitnk.sketcher.image.models.ModelManagerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:12" hostname="ip-10-0-133-199" time="0.048">
   <properties/>
   <testcase name="sha256KnownVector" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.005"/>
-  <testcase name="shaMatchAccepted" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.02"/>
+  <testcase name="shaMatchAccepted" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.011"/>
   <testcase name="bundledAvailableViaAssetCheck" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.0"/>
-  <testcase name="shaMismatchFailsAndLeavesNothing" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.022"/>
-  <testcase name="cancelRemovesTemp" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.003"/>
-  <testcase name="downloadWritesFileReportsProgressAndDeletes" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.018"/>
+  <testcase name="shaMismatchFailsAndLeavesNothing" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.013"/>
+  <testcase name="cancelRemovesTemp" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.002"/>
+  <testcase name="downloadWritesFileReportsProgressAndDeletes" classname="com.smitnk.sketcher.image.models.ModelManagerTest" time="0.016"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

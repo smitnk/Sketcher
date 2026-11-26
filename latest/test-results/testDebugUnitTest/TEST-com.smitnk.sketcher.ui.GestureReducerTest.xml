@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:30" hostname="runnervm0hi8g" time="0.001">
+<testsuite name="com.smitnk.sketcher.ui.GestureReducerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:16" hostname="ip-10-0-133-199" time="0.002">
   <properties/>
-  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
+  <testcase name="slopCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
   <testcase name="tapDrawsDot" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="secondPointerWhilePendingIsTransformNoStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
-  <testcase name="timeCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
+  <testcase name="timeCommitsStroke" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="transformKeepsTransformingWithOneFingerLeft" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="smallQuickMoveStaysPending" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="strokeExtendsAndEnds" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="downStartsPending" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
-  <testcase name="blockedStrokeDoesNothing" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
+  <testcase name="blockedStrokeDoesNothing" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.001"/>
   <testcase name="cancelDuringStrokeDiscards" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <testcase name="secondPointerDuringStrokeCancelsThenTransform" classname="com.smitnk.sketcher.ui.GestureReducerTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

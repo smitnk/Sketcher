@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.ArrivalMapTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:25" hostname="runnervm0hi8g" time="0.099">
+<testsuite name="com.smitnk.sketcher.anim.ArrivalMapTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:10" hostname="ip-10-0-133-199" time="0.099">
   <properties/>
-  <testcase name="coverageEqualsUnion" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.016"/>
-  <testcase name="monotonicAlongStroke" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.0"/>
+  <testcase name="coverageEqualsUnion" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.015"/>
+  <testcase name="monotonicAlongStroke" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.001"/>
   <testcase name="bakeSpeed" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.083"/>
   <testcase name="earliestWins" classname="com.smitnk.sketcher.anim.ArrivalMapTest" time="0.0"/>
-  <system-out><![CDATA[ARRIVAL_BAKE_MS=25
+  <system-out><![CDATA[ARRIVAL_BAKE_MS=30
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

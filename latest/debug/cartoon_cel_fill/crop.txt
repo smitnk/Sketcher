@@ -2,7 +2,7 @@ crop: x0=0 y0=26 x1=745 y1=958 of 745x1024 bgFraction=0.60853493
 lineSource=CARTOON
 model=informative
 accelActive=CPU fallback=null
-inferenceMs=43658 (wrapped=43660) genMs=52109
+inferenceMs=32128 (wrapped=32131) genMs=38458
 ink: min=0.0 mean=0.021881853605519943 max=0.86579657 (614x768)
 strokes: outline=289 shading=0 fill=46
 look=LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=false, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)
