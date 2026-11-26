@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.export.SvgExporterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:32" hostname="runnervm0hi8g" time="0.042">
+<testsuite name="com.smitnk.sketcher.export.SvgExporterTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:25" hostname="runnervm0hi8g" time="0.038">
   <properties/>
-  <testcase name="buildsValidXml" classname="com.smitnk.sketcher.export.SvgExporterTest" time="0.042"/>
+  <testcase name="buildsValidXml" classname="com.smitnk.sketcher.export.SvgExporterTest" time="0.038"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

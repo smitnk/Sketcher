@@ -1,4 +1,4 @@
 --------- beginning of main
-11-26 15:21:02.162 10578 10578 I SketcherGen: GEN_DONE ms=17680 outline=653 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=CLEAN_VECTOR, background=CHARACTER_ONLY, backgroundOrder=FIRST, backgroundColour=false)
-11-26 15:21:03.642 10578 10603 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_cartoon_vector
-11-26 15:21:23.065 10578 10578 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-26 15:25:44.569 11761 11761 I SketcherGen: GEN_DONE ms=21626 outline=653 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=CARTOON, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=CLEAN_VECTOR, background=CHARACTER_ONLY, backgroundOrder=FIRST, backgroundColour=false)
+11-26 15:25:46.014 11761 11784 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_cartoon_vector
+11-26 15:26:05.734 11761 11761 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

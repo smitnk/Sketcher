@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.StrokeGeneratorTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:32" hostname="runnervm0hi8g" time="0.502">
+<testsuite name="com.smitnk.sketcher.image.StrokeGeneratorTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T14:55:26" hostname="runnervm0hi8g" time="0.43">
   <properties/>
-  <testcase name="squareProducesOutlineStrokes" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.085"/>
-  <testcase name="circleIsSmooth" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.04"/>
+  <testcase name="squareProducesOutlineStrokes" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.072"/>
+  <testcase name="circleIsSmooth" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.058"/>
   <testcase name="rdpReducesCollinearPoints" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.0"/>
-  <testcase name="shadingProducedForDarkRegion" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.048"/>
-  <testcase name="noiseProducesNoOutline" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.02"/>
-  <testcase name="hatchLinesAreNotTinyAndStayInsideDarkRegion" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.029"/>
-  <testcase name="smallGapIsBridged" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.018"/>
-  <testcase name="detailSettingChangesOutline" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.051"/>
-  <testcase name="largeImageIsDownscaled" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.184"/>
-  <testcase name="thickLineGivesSingleCentreLine" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.012"/>
-  <testcase name="longStrokesComeFirst" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.014"/>
+  <testcase name="shadingProducedForDarkRegion" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.044"/>
+  <testcase name="noiseProducesNoOutline" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.018"/>
+  <testcase name="hatchLinesAreNotTinyAndStayInsideDarkRegion" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.025"/>
+  <testcase name="smallGapIsBridged" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.016"/>
+  <testcase name="detailSettingChangesOutline" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.042"/>
+  <testcase name="largeImageIsDownscaled" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.139"/>
+  <testcase name="thickLineGivesSingleCentreLine" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.008"/>
+  <testcase name="longStrokesComeFirst" classname="com.smitnk.sketcher.image.StrokeGeneratorTest" time="0.007"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
