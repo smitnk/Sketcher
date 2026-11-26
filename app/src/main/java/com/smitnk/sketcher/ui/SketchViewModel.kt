@@ -746,6 +746,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var tool by mutableStateOf(Tool.BRUSH)
     var brushColor by mutableIntStateOf(0xFF000000.toInt())
     var brushSize by mutableFloatStateOf(4f)
+    var eraserSize by mutableFloatStateOf(24f)
     var brushType by mutableStateOf(BrushType.PEN)
         private set
     var brushAlpha by mutableFloatStateOf(1f)
@@ -1982,7 +1983,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             inkBefore = layer.inkTexture?.copy(Bitmap.Config.ARGB_8888, true)
         }
-        val session = StrokeSession(layer.id, tool, brushType, brushColor, brushSize, brushAlpha, inkBefore)
+        // Eraser radius = size * 1.5 (eraseAt), so pass eraserSize / 3 to make the circle eraserSize across.
+        val session = StrokeSession(layer.id, tool, brushType, brushColor, if (tool == Tool.ERASER) eraserSize / 3f else brushSize, brushAlpha, inkBefore)
         liveSession = session
         if (session.tool == Tool.BRUSH) session.addPoint(x, y) else eraseAt(session, layer, x, y)
         liveTick++

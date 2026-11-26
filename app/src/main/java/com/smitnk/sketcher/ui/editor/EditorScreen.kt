@@ -47,7 +47,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
+import com.smitnk.sketcher.image.pipeline.InputFrame
 import com.smitnk.sketcher.image.pipeline.PipelineSettings
+import com.smitnk.sketcher.ui.adjust.AdjustPhotoScreen
 import com.smitnk.sketcher.ui.EditorEvent
 import com.smitnk.sketcher.ui.EditorOverlay
 import com.smitnk.sketcher.ui.EditorOverlaySaver
@@ -99,6 +101,7 @@ fun EditorScreen(
         overlay = EditorOverlay.Style
     }
     var showLook by remember { mutableStateOf(false) }
+    var sizeDragging by remember { mutableStateOf(false) } // size slider in use -> show size circle on canvas
     val openLayers = { overlay = EditorOverlay.Layers }
     val openMl: () -> Unit = {
         styleFromMl = overlay == EditorOverlay.Style
@@ -250,6 +253,17 @@ fun EditorScreen(
                 Modifier.fillMaxSize(),
                 insetTopPx = if (chromeVisible) topBarPx.toFloat() else 0f,
                 insetBottomPx = if (chromeVisible) bottomBasePx.toFloat() else 0f,
+                sizePreview = sizeDragging,
+            )
+        }
+
+        vm.adjustPhoto?.let { photo ->
+            AdjustPhotoScreen(
+                photo = photo,
+                onUse = { vm.confirmAdjust(it) },
+                onAuto = { vm.confirmAdjust(InputFrame(auto = true)) },
+                onSkip = { vm.skipAdjust() },
+                onDontAskChange = { vm.skipAdjustStep = it },
             )
         }
 
@@ -372,6 +386,9 @@ fun EditorScreen(
                     },
                     brushSize = vm.brushSize,
                     onBrushSizeChange = { vm.brushSize = it },
+                    eraserSize = vm.eraserSize,
+                    onEraserSizeChange = { vm.eraserSize = it },
+                    onSizeDragging = { sizeDragging = it },
                     brushAlpha = vm.brushAlpha,
                     onBrushAlphaChange = { vm.brushAlpha = it },
                     canUndo = vm.canUndo,
