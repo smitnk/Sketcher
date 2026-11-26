@@ -1,5 +1,1 @@
-BackgroundSplitTest > strokesFarFromCharacterAreKept FAILED
-CropMathTest > freeDragMovesOnlyThatCorner FAILED
-SpeedQualityTest > simplifyReducesStrokes FAILED
-> Task :app:testDebugUnitTest FAILED
-BUILD FAILED in 1m 42s
+BUILD SUCCESSFUL in 1m

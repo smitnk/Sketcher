@@ -1,0 +1,4 @@
+--------- beginning of main
+11-26 13:29:16.051  8143  8143 I SketcherGen: GEN_DONE ms=20652 outline=582 shading=0 fill=0 size=843x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL, background=CHARACTER_ONLY, backgroundOrder=FIRST, backgroundColour=false)
+11-26 13:29:17.771  8143  8176 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/person1_informative_ai_pencil
+11-26 13:29:37.279  8143  8143 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0

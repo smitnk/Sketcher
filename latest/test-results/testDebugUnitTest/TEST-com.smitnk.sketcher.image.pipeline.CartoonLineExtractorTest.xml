@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:16:39" hostname="runnervm3lb7s" time="0.921">
+<testsuite name="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:18:43" hostname="runnervm0hi8g" time="0.556">
   <properties/>
   <testcase name="tinyImagesDoNotCrash" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.001"/>
-  <testcase name="cartoonScoresHigh" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.106"/>
-  <testcase name="pupilKeptAsSolidDot" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.28"/>
-  <testcase name="speckleBlobsOnGrassDroppedButEnclosedPupilKept" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.186"/>
-  <testcase name="inkFollowsOutlineAndIgnoresTexture" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.147"/>
-  <testcase name="regionBoundaryAppearsOnlyWithHighDetail" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.082"/>
-  <testcase name="darkBlueNoisyOutlineIsInk" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.046"/>
-  <testcase name="photoScoresLow" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.053"/>
-  <testcase name="shadedRenderOnFlatBackdropIsNotCartoon" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.019"/>
+  <testcase name="cartoonScoresHigh" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.044"/>
+  <testcase name="pupilKeptAsSolidDot" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.134"/>
+  <testcase name="speckleBlobsOnGrassDroppedButEnclosedPupilKept" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.077"/>
+  <testcase name="inkFollowsOutlineAndIgnoresTexture" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.107"/>
+  <testcase name="regionBoundaryAppearsOnlyWithHighDetail" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.061"/>
+  <testcase name="darkBlueNoisyOutlineIsInk" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.088"/>
+  <testcase name="photoScoresLow" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.029"/>
+  <testcase name="shadedRenderOnFlatBackdropIsNotCartoon" classname="com.smitnk.sketcher.image.pipeline.CartoonLineExtractorTest" time="0.013"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

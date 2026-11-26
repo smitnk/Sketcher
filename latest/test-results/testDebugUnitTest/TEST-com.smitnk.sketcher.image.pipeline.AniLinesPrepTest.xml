@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:16:39" hostname="runnervm3lb7s" time="0.003">
+<testsuite name="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:18:43" hostname="runnervm0hi8g" time="0.004">
   <properties/>
-  <testcase name="reflectMirrorsWithoutRepeatingEdge" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.001"/>
-  <testcase name="sobelChannelIsDarkAtEdgesAndOneWhenFlat" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.001"/>
+  <testcase name="reflectMirrorsWithoutRepeatingEdge" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.0"/>
+  <testcase name="sobelChannelIsDarkAtEdgesAndOneWhenFlat" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.003"/>
   <testcase name="fitSizeKeepsAspectAndMultipleOf16AfterPadding" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.0"/>
   <testcase name="planesPadReflectAndCropRoundTrip" classname="com.smitnk.sketcher.image.pipeline.AniLinesPrepTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>

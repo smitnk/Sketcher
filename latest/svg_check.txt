@@ -1,0 +1,1 @@
+SVG_CHECK PASS emu/files/pictures/Sketcher_drawing_20261126_135346.svg 87353 bytes 23 paths

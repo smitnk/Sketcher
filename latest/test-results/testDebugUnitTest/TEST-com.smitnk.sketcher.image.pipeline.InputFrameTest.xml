@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.InputFrameTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:16:40" hostname="runnervm3lb7s" time="0.001">
+<testsuite name="com.smitnk.sketcher.image.pipeline.InputFrameTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:18:44" hostname="runnervm0hi8g" time="0.001">
   <properties/>
   <testcase name="slowAbove1440" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
   <testcase name="encodeDecode" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
-  <testcase name="customIsClamped" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.001"/>
+  <testcase name="customIsClamped" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
   <testcase name="fullPhotoKeepsAspect" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
   <testcase name="centredCrop" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
   <testcase name="labelForShortsCrop" classname="com.smitnk.sketcher.image.pipeline.InputFrameTest" time="0.0"/>
