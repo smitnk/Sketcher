@@ -293,6 +293,14 @@ private fun SpeedQualitySection(vm: com.smitnk.sketcher.ui.SketchViewModel = and
             }
         }
 
+        Row(Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("Ask to adjust each photo", style = MaterialTheme.typography.titleSmall)
+                Text("Show the crop and size screen when you add a photo.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Switch(checked = !vm.skipAdjustStep, onCheckedChange = { vm.skipAdjustStep = !it })
+        }
+
         val ctx = androidx.compose.ui.platform.LocalContext.current
         val size = vm.cacheBytes?.let { " (" + android.text.format.Formatter.formatShortFileSize(ctx, it) + ")" } ?: ""
         OutlinedButton(

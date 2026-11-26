@@ -3,6 +3,13 @@ package com.smitnk.sketcher.ui.adjust
 /** Normalised (0..1) crop rectangle over the photo. */
 data class CropRect(val l: Float, val t: Float, val r: Float, val b: Float)
 
+/** Move [c] by (dx, dy) (normalised), keeping its size and staying inside 0..1. */
+fun moveRect(c: CropRect, dx: Float, dy: Float): CropRect {
+    val x = (c.l + dx).coerceIn(0f, 1f - (c.r - c.l))
+    val y = (c.t + dy).coerceIn(0f, 1f - (c.b - c.t))
+    return CropRect(x, y, x + (c.r - c.l), y + (c.b - c.t))
+}
+
 enum class Corner { TL, TR, BL, BR }
 
 /**

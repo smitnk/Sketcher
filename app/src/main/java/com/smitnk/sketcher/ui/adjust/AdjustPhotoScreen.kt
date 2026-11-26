@@ -71,18 +71,31 @@ fun AdjustPhotoScreen(
     onAuto: () -> Unit,
     onSkip: () -> Unit,
     onDontAskChange: (Boolean) -> Unit,
+    initial: InputFrame,
+    onCancel: () -> Unit,
+    lockedSize: Pair<Int, Int>? = null,
 ) {
     val pw = photo.width
     val ph = photo.height
     val photoAspect = pw.toFloat() / ph
-    var aspect by remember { mutableStateOf(AspectPreset.ORIGINAL) }
-    var rect by remember { mutableStateOf(CropRect(0f, 0f, 1f, 1f)) }
-    var size by remember { mutableStateOf(SizePreset.MEDIUM) }
-    var custom by remember { mutableFloatStateOf(1080f) }
+    val lockedRatio = lockedSize?.let { it.first.toFloat() / it.second }
+    var aspect by remember { mutableStateOf(if (lockedSize != null) AspectPreset.FREE else if (initial.auto) AspectPreset.ORIGINAL else initial.aspect) }
+    var rect by remember {
+        mutableStateOf(
+            if (lockedRatio != null) {
+                val r = (initial.right - initial.left) * pw / ((initial.bottom - initial.top) * ph)
+                if (!initial.auto && kotlin.math.abs(r / lockedRatio - 1f) < 0.01f) CropRect(initial.left, initial.top, initial.right, initial.bottom)
+                else InputFrame.centredCrop(pw, ph, lockedRatio).let { CropRect(it[0], it[1], it[2], it[3]) }
+            } else if (initial.auto) CropRect(0f, 0f, 1f, 1f)
+            else CropRect(initial.left, initial.top, initial.right, initial.bottom),
+        )
+    }
+    var size by remember { mutableStateOf(if (lockedSize != null) SizePreset.CUSTOM else if (initial.auto) SizePreset.MEDIUM else initial.size) }
+    var custom by remember { mutableFloatStateOf(if (lockedSize != null) maxOf(lockedSize.first, lockedSize.second).toFloat() else initial.customLongSide.toFloat()) }
     var dontAsk by remember { mutableStateOf(false) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
-    val lock: Float? = when (aspect) {
+    val lock: Float? = lockedRatio ?: when (aspect) {
         AspectPreset.FREE -> null
         AspectPreset.ORIGINAL -> photoAspect
         else -> aspect.ratio
@@ -92,7 +105,7 @@ fun AdjustPhotoScreen(
         size = size, customLongSide = custom.roundToInt(),
     )
 
-    Dialog(onDismissRequest = onSkip, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.padding(horizontal = SketcherTokens.screenMargin, vertical = SketcherTokens.space8)) {
                 Text("Adjust photo", style = MaterialTheme.typography.titleLarge)
@@ -135,6 +148,17 @@ fun AdjustPhotoScreen(
                         drawRect(dim, Offset(r, t), androidx.compose.ui.geometry.Size((this.size.width - r).coerceAtLeast(0f), b - t))
                         drawRect(Color.White, Offset(l, t), androidx.compose.ui.geometry.Size(r - l, b - t), style = Stroke(2.dp.toPx()))
                     }
+                    Box(
+                        Modifier
+                            .offset { IntOffset((ox + rect.l * dw).roundToInt(), (oy + rect.t * dh).roundToInt()) }
+                            .size(with(density) { ((rect.r - rect.l) * dw).toDp() }, with(density) { ((rect.b - rect.t) * dh).toDp() })
+                            .pointerInput(dw, dh) {
+                                detectDragGestures { change, d ->
+                                    change.consume()
+                                    rect = moveRect(rect, d.x / dw, d.y / dh)
+                                }
+                            },
+                    )
                     for (corner in Corner.values()) {
                         val cx = ox + (if (corner == Corner.TL || corner == Corner.BL) rect.l else rect.r) * dw
                         val cy = oy + (if (corner == Corner.TL || corner == Corner.TR) rect.t else rect.b) * dh
@@ -159,6 +183,10 @@ fun AdjustPhotoScreen(
                     }
                 }
 
+                if (lockedSize != null) {
+                    Text("Frame size: ${lockedSize.first} × ${lockedSize.second} (same as other frames)", style = MaterialTheme.typography.bodyMedium)
+                    Hint("Move the box to pick the part you want.")
+                } else {
                 Text("Shape", style = MaterialTheme.typography.titleSmall)
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
@@ -210,6 +238,7 @@ fun AdjustPhotoScreen(
                     Text("Large size is slower", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 } else {
                     Hint("Bigger pictures keep more detail but take longer.")
+                }
                 }
 
                 Row(

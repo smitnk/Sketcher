@@ -74,6 +74,8 @@ fun TopBar(
     onRename: (() -> Unit)? = null,
     onProcessing: (() -> Unit)? = null,
     onLook: (() -> Unit)? = null,
+    canAdjust: Boolean = false,
+    onAdjust: (() -> Unit)? = null,
 ) {
     val colors = SketcherTokens.colors
     BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -108,7 +110,7 @@ fun TopBar(
                 TopAction(Icons.Default.Layers, "Layers", onLayers)
                 TopAction(Icons.Default.FileDownload, "Export", onExport, primary = true)
                 Spacer(Modifier.width(SketcherTokens.space2))
-                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename, onProcessing, onLook)
+                OverflowMenu(generating, onImport, onDemo, onGenerate, onSettings, onRename, onProcessing, onLook, canAdjust, onAdjust)
             }
         }
     }
@@ -149,6 +151,8 @@ private fun OverflowMenu(
     onRename: (() -> Unit)?,
     onProcessing: (() -> Unit)?,
     onLook: (() -> Unit)? = null,
+    canAdjust: Boolean = false,
+    onAdjust: (() -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     IconButton(onClick = { open = true }) {
@@ -160,6 +164,14 @@ private fun OverflowMenu(
             leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
             onClick = { open = false; onImport() },
         )
+        if (onAdjust != null) {
+            DropdownMenuItem(
+                text = { Text("Adjust photo") },
+                enabled = canAdjust,
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                onClick = { open = false; onAdjust() },
+            )
+        }
         DropdownMenuItem(
             text = { Text("Try demo image") },
             leadingIcon = { Icon(Icons.Default.Face, contentDescription = null) },
