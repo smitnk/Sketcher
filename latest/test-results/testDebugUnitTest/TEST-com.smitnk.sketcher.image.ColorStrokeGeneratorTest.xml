@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-24T08:23:19" hostname="runnervm0hi8g" time="0.42">
+<testsuite name="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:08:21" hostname="runnervm0hi8g" time="0.393">
   <properties/>
-  <testcase name="outlineTakesImageColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.005"/>
-  <testcase name="fillStaysInsideOutlineAndOffPaper" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.117"/>
-  <testcase name="fillStrokesCoverRegionsInTheirColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.047"/>
+  <testcase name="outlineTakesImageColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.004"/>
+  <testcase name="fillStaysInsideOutlineAndOffPaper" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.107"/>
+  <testcase name="fillStrokesCoverRegionsInTheirColour" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.042"/>
   <testcase name="zigZagIsContinuous" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.034"/>
-  <testcase name="gradientBecomesSmoothPerStrokeColours" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.054"/>
-  <testcase name="runsFastOnLargeImage" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.162"/>
+  <testcase name="gradientBecomesSmoothPerStrokeColours" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.05"/>
+  <testcase name="runsFastOnLargeImage" classname="com.smitnk.sketcher.image.ColorStrokeGeneratorTest" time="0.156"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

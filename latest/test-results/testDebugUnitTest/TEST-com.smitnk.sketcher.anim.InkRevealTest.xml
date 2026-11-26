@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.anim.InkRevealTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-24T08:23:18" hostname="runnervm0hi8g" time="0.358">
+<testsuite name="com.smitnk.sketcher.anim.InkRevealTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:08:20" hostname="runnervm0hi8g" time="0.369">
   <properties/>
-  <testcase name="chunkingKeepsExactLength" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.005"/>
-  <testcase name="newInkCountsEachPixelOnce" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.003"/>
-  <testcase name="layerPausesOnlyAtLayerStart" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.003"/>
-  <testcase name="noStallsWhileInkRemains" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.13"/>
+  <testcase name="chunkingKeepsExactLength" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.006"/>
+  <testcase name="newInkCountsEachPixelOnce" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.002"/>
+  <testcase name="layerPausesOnlyAtLayerStart" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.006"/>
+  <testcase name="noStallsWhileInkRemains" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.14"/>
   <testcase name="durationsSumAndRespectSpeedCap" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.0"/>
-  <testcase name="lengthPacingFailsTheSameMetric" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.111"/>
+  <testcase name="lengthPacingFailsTheSameMetric" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.109"/>
   <testcase name="visibleInkIsLinearInTime" classname="com.smitnk.sketcher.anim.InkRevealTest" time="0.104"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

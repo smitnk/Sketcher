@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-24T08:23:20" hostname="runnervm0hi8g" time="0.014">
+<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:08:22" hostname="runnervm0hi8g" time="0.013">
   <properties/>
   <testcase name="animeTanhOutputMapsToInk" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
-  <testcase name="anilinesIsTwoChannelFp16InBothEngines" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
+  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="anilinesIsTwoChannelFp16InBothEngines" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="anime2sketchAlignsTo256AndCapsPixels" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.006"/>
-  <testcase name="zeroOneInkIsLow" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="zeroOneInkIsLow" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
   <testcase name="inkIsHighKeepsValue" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="inputNormalisation" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="targetSizeMultiple8Rounds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
