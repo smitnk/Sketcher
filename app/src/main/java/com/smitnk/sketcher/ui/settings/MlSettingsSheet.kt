@@ -3,6 +3,7 @@
 package com.smitnk.sketcher.ui.settings
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -186,12 +187,7 @@ fun MlSettingsSheet(
                 }
             }
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("GPU reveal (beta)", style = MaterialTheme.typography.titleSmall)
-                    Switch(checked = com.smitnk.sketcher.look.ArrivalReveal.enabled, onCheckedChange = { com.smitnk.sketcher.look.ArrivalReveal.enabled = it })
-                }
-            }
+            SpeedQualitySection()
 
             val totalMs = stageTimings["total"]
             if (activeLabel != null || lastInferenceMs != null || totalMs != null) {
@@ -256,4 +252,63 @@ internal fun collapseNnapiResults(r: Map<String, Long?>): Map<String, Long?> {
     }
     if (seen) out[NNAPI_ID] = nn
     return out
+}
+
+/** "Speed & quality": presets, stroke simplification, GPU reveal, cache clearing. Uses the activity's SketchViewModel. */
+@Composable
+private fun SpeedQualitySection(vm: com.smitnk.sketcher.ui.SketchViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+    val scheme = MaterialTheme.colorScheme
+    var confirmClear by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.refreshCacheSize() }
+    Column(verticalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+        Text("Speed & quality", style = MaterialTheme.typography.titleMedium)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+            for (p in SpeedPreset.values()) {
+                androidx.compose.material3.FilterChip(
+                    selected = vm.speedPreset == p,
+                    onClick = { vm.selectSpeedPreset(p) },
+                    label = { Text(p.label) },
+                    modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget),
+                )
+            }
+        }
+        Text(vm.speedPreset.hint, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+
+        Text("Simplify strokes", style = MaterialTheme.typography.titleSmall)
+        androidx.compose.material3.Slider(
+            value = vm.simplifyLevel,
+            onValueChange = { vm.setSimplifyLevel(it, save = false) },
+            onValueChangeFinished = { vm.setSimplifyLevel(vm.simplifyLevel) },
+            modifier = Modifier.heightIn(min = SketcherTokens.minTouchTarget).semantics { contentDescription = "Simplify strokes" },
+        )
+        Text("Fewer points: smoother play, smaller files.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            Row(Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text("GPU reveal (beta)", style = MaterialTheme.typography.titleSmall)
+                    Text("Smoother pencil reveal on newer phones.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+                Switch(checked = com.smitnk.sketcher.look.ArrivalReveal.enabled, onCheckedChange = { com.smitnk.sketcher.look.ArrivalReveal.enabled = it })
+            }
+        }
+
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        val size = vm.cacheBytes?.let { " (" + android.text.format.Formatter.formatShortFileSize(ctx, it) + ")" } ?: ""
+        OutlinedButton(
+            onClick = { confirmClear = true },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            shape = RoundedCornerShape(14.dp),
+        ) { Text("Clear model & cache files$size", style = MaterialTheme.typography.titleSmall) }
+        Text("Your projects are kept. Models download again when needed.", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+    }
+    if (confirmClear) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Clear files?") },
+            text = { Text("This removes cache and downloaded models. Your projects are kept. Models download again when needed.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { confirmClear = false; vm.clearCacheAndModels() }) { Text("Clear") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        )
+    }
 }

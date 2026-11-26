@@ -2636,4 +2636,62 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         refreshInstalledModels()
         refreshRecent()
     }
+
+    // region speed & quality
+    var speedPreset by mutableStateOf(
+        com.smitnk.sketcher.ui.settings.SpeedPreset.values().firstOrNull { it.name == mlPrefs.getString("speed_preset", null) }
+            ?: com.smitnk.sketcher.ui.settings.SpeedPreset.BALANCED,
+    )
+        private set
+    var simplifyLevel by mutableStateOf(mlPrefs.getFloat("simplify_level", 0f))
+        private set
+    /** Bytes of cache + downloaded models; null while being measured. */
+    var cacheBytes by mutableStateOf<Long?>(null)
+        private set
+
+    private fun applySpeedQuality() {
+        val v = com.smitnk.sketcher.ui.settings.SpeedQuality.values(speedPreset, simplifyLevel)
+        com.smitnk.sketcher.ui.settings.SpeedQuality.previewMaxSide = v.previewMaxSide
+        com.smitnk.sketcher.ui.settings.SpeedQuality.bitrateFactor = v.bitrateFactor
+        updatePipelineSettings { it.copy(workingSize = v.workingSize, maxStrokes = v.maxStrokes) }
+    }
+
+    fun selectSpeedPreset(p: com.smitnk.sketcher.ui.settings.SpeedPreset) {
+        speedPreset = p
+        mlPrefs.edit().putString("speed_preset", p.name).apply()
+        applySpeedQuality()
+    }
+
+    fun setSimplifyLevel(f: Float, save: Boolean = true) {
+        simplifyLevel = f.coerceIn(0f, 1f)
+        if (save) mlPrefs.edit().putFloat("simplify_level", simplifyLevel).apply()
+        applySpeedQuality()
+    }
+
+    private fun modelsDir() = java.io.File(app.filesDir, "models") // same dir as ModelManager
+
+    fun refreshCacheSize() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val n = app.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() } +
+                modelsDir().walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            cacheBytes = n
+        }
+    }
+
+    /** Deletes cache and downloaded models (bundled models and projects are untouched); models re-download when picked. */
+    fun clearCacheAndModels() {
+        cacheBytes = null
+        viewModelScope.launch(Dispatchers.IO) {
+            app.cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+            modelsDir().deleteRecursively()
+            refreshInstalledModels()
+            refreshCacheSize()
+        }
+    }
+
+    init {
+        // Only touch pipeline settings if the user changed something; Balanced + 0 = today's defaults.
+        if (speedPreset != com.smitnk.sketcher.ui.settings.SpeedPreset.BALANCED || simplifyLevel > 0f) applySpeedQuality()
+    }
+    // endregion
 }
