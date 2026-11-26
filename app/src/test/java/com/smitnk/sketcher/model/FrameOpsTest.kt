@@ -122,4 +122,11 @@ class FrameOpsTest {
         assertEquals(0, FlipbookClock.next(0, 3, 0))
         assertEquals(2, FlipbookClock.next(0, -1, 3))
     }
+
+    @Test fun containTransformFitsWholeSourceCentred() {
+        assertArrayEquals(floatArrayOf(0.5f, 0f, 100f), FrameOps.containTransform(2000, 1000, 1000, 700), 1e-4f)
+        assertArrayEquals(floatArrayOf(1f, 250f, 0f), FrameOps.containTransform(500, 1000, 1000, 1000), 1e-4f)
+        assertArrayEquals(floatArrayOf(2f, 0f, 0f), FrameOps.containTransform(512, 512, 1024, 1024), 1e-4f)
+        assertArrayEquals(floatArrayOf(1f, 0f, 0f), FrameOps.containTransform(0, 10, 10, 10), 1e-4f)
+    }
 }

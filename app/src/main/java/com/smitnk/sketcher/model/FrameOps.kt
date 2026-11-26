@@ -60,6 +60,16 @@ object FrameOps {
         }
     }
 
+    /**
+     * "Contain" fit of [srcW] x [srcH] centred in [dstW] x [dstH]: (scale, dx, dy) so dst = src * scale + (dx, dy).
+     * The whole source stays visible; margins are left on one axis.
+     */
+    fun containTransform(srcW: Int, srcH: Int, dstW: Int, dstH: Int): FloatArray {
+        if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return floatArrayOf(1f, 0f, 0f)
+        val s = minOf(dstW.toFloat() / srcW, dstH.toFloat() / srcH)
+        return floatArrayOf(s, (dstW - srcW * s) / 2f, (dstH - srcH * s) / 2f)
+    }
+
     /** Width of the zero padding for a sequence of [count] files (at least 4 digits: frame_0001). */
     fun padWidth(count: Int): Int = maxOf(4, count.coerceAtLeast(1).toString().length)
 

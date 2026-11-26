@@ -1218,7 +1218,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     var adjustInitial by mutableStateOf(InputFrame())
         private set
 
-    /** Non-null = (project.width, project.height): crop ratio must match and the output is scaled to exactly this size. */
+    /**
+     * The current page size (project.width, project.height) when other frames already use the canvas; null otherwise.
+     * Not a lock: the crop may have any shape/size and [confirmAdjust]'s resizeProject picks what happens.
+     */
     var adjustLockedSize by mutableStateOf<Pair<Int, Int>?>(null)
         private set
 
@@ -1236,17 +1239,118 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Opens the pending photo with [frame] (crop is normalised to [adjustPhoto]); [frame] becomes the remembered choice. */
-    fun confirmAdjust(frame: InputFrame) {
+    fun confirmAdjust(frame: InputFrame) = confirmAdjust(frame, false)
+
+    /**
+     * Like [confirmAdjust]; when the crop's size differs from the page ([adjustLockedSize]): [resizeProject] false =
+     * contain-fit the crop onto the page (white margins), true = the crop size becomes the page size and every other
+     * frame is contain-fitted onto it (photos and strokes).
+     */
+    fun confirmAdjust(frame: InputFrame, resizeProject: Boolean) {
         val uri = pendingUri ?: return
         val pose = pendingPose
         val kind = pendingKind
         val locked = adjustLockedSize
+        val photo = adjustPhoto
         cancelAdjust()
         if (locked == null) {
             inputFrame = frame
             openPhoto(uri, pose, frame)
+        } else if (!frame.auto && photo != null && frame.canvasSize(photo.width, photo.height) != locked) {
+            placeSizedPhoto(uri, pose, kind == ADJUST_REOPEN, frame, resizeProject)
         } else if (kind == ADJUST_REOPEN) replaceFrameSource(uri, frame)
         else addFrameWith(uri, pose, frame)
+    }
+
+    /** [src] scaled by [t] (from [FrameOps.containTransform]) onto a new [w] x [h] bitmap filled with [fill]. */
+    private fun containOnto(src: Bitmap, w: Int, h: Int, t: FloatArray, fill: Int): Bitmap {
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(out)
+        if (fill != 0) c.drawColor(fill)
+        val m = android.graphics.Matrix().apply { setScale(t[0], t[0]); postTranslate(t[1], t[2]) }
+        c.drawBitmap(src, m, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+        return out
+    }
+
+    private fun Stroke.transformed(t: FloatArray): Stroke {
+        val p = FloatArray(points.size)
+        var i = 0
+        while (i + 1 < points.size) { p[i] = points[i] * t[0] + t[1]; p[i + 1] = points[i + 1] * t[0] + t[2]; i += 2 }
+        return copy(points = p, width = width * t[0])
+    }
+
+    /** Off-main result for one other frame: new background / source / per-layer strokes + ink (same order as layers). */
+    private class FrameRefit(val frame: Frame, val bg: Bitmap?, val src: Bitmap?, val strokes: List<List<Stroke>>, val ink: List<Bitmap?>)
+
+    /** Photo whose crop size differs from the page: fit it into the page, or make its size the page size. */
+    private fun placeSizedPhoto(uri: Uri, pose: Boolean, reopen: Boolean, frame: InputFrame, resize: Boolean) {
+        setPoseMode(pose)
+        val gen = projectGen
+        val id = project.currentFrame.id
+        val pw = project.width; val ph = project.height
+        // Snapshot on main; bitmaps/strokes are only read off-main.
+        val others = if (resize) project.frames.filter { it.id != id }.map { f ->
+            Triple(f, f.background to f.sourceBitmap, f.layers.map { it.strokes.toList() to it.inkTexture })
+        } else emptyList()
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.Default) {
+                try {
+                    val bmp = ImageLoader.load(app, uri, decodeSide(frame))?.let { applyFrame(it, frame) } ?: return@withContext null
+                    if (!resize) {
+                        val out = containOnto(bmp, pw, ph, FrameOps.containTransform(bmp.width, bmp.height, pw, ph), 0xFFFFFFFF.toInt())
+                        bmp.recycle()
+                        return@withContext out to emptyList<FrameRefit>()
+                    }
+                    val nw = bmp.width; val nh = bmp.height
+                    val t = FrameOps.containTransform(pw, ph, nw, nh)
+                    val white = 0xFFFFFFFF.toInt()
+                    bmp to others.map { (f, pics, layers) ->
+                        val (bg, src) = pics
+                        val nbg = bg?.let { containOnto(it, nw, nh, FrameOps.containTransform(it.width, it.height, nw, nh), white) }
+                        val nsrc = when {
+                            src == null -> null
+                            src === bg -> nbg
+                            else -> containOnto(src, nw, nh, FrameOps.containTransform(src.width, src.height, nw, nh), white)
+                        }
+                        FrameRefit(f, nbg, nsrc, layers.map { (st, _) -> st.map { it.transformed(t) } },
+                            layers.map { (_, ink) -> ink?.let { containOnto(it, nw, nh, t, 0) } })
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) { // incl. OutOfMemoryError
+                    null
+                }
+            }
+            if (gen != projectGen || id != project.currentFrame.id) return@launch
+            if (result == null) {
+                toast("Could not open that image")
+                if (pose) setPoseMode(false)
+                return@launch
+            }
+            if (framesBusy) { toast("Wait for the drawing to finish generating"); return@launch }
+            val (bmp, refits) = result
+            val t = FrameOps.containTransform(pw, ph, bmp.width, bmp.height)
+            for (r in refits) {
+                r.frame.background = r.bg
+                r.frame.sourceBitmap = r.src
+                for ((i, layer) in r.frame.layers.withIndex()) {
+                    val st = r.strokes.getOrNull(i) ?: continue
+                    layer.strokes.clear(); layer.strokes.addAll(st)
+                    if (layer.inkTexture != null) layer.inkTexture = r.ink[i]
+                    layer.revealWidthPx *= t[0]
+                }
+                r.frame.thumbSig = 0L
+                histories.remove(r.frame.id) // undo entries hold old-size coordinates
+            }
+            if (reopen) setSource(bmp, if (resize) frame else project.inputFrame)
+            else {
+                insertImageFrame(bmp, false, project.currentFrameIndex + 1)
+                if (resize) project.inputFrame = frame
+            }
+            frameUris[project.currentFrame.id] = uri
+            syncHistoryFlags()
+            emitEditorEvent(EditorEvent.OpenStyle(projectGen))
+        }
     }
 
     /** Opens the pending photo with the current [inputFrame]. */
