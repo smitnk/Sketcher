@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.settings.SpeedQualityTest" tests="3" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:42" hostname="runnervm0hi8g" time="0.001">
+<testsuite name="com.smitnk.sketcher.ui.settings.SpeedQualityTest" tests="3" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:44" hostname="runnervm3lb7s" time="0.005">
   <properties/>
-  <testcase name="simplifyReducesStrokes" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.001">
+  <testcase name="simplifyReducesStrokes" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.002">
     <failure message="java.lang.AssertionError: expected:&lt;1600&gt; but was:&lt;1599&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;1600&gt; but was:&lt;1599&gt;
 	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.failNotEquals(Assert.java:835)
@@ -53,7 +53,7 @@
 </failure>
   </testcase>
   <testcase name="fastIsLighterAndBestIsHeavier" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.0"/>
-  <testcase name="balancedEqualsTodaysDefaults" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.0"/>
+  <testcase name="balancedEqualsTodaysDefaults" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

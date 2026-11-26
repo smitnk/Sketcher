@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:37" hostname="runnervm0hi8g" time="0.034">
+<testsuite name="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:39" hostname="runnervm3lb7s" time="0.037">
   <properties/>
   <testcase name="subjectMaskFromCrop" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.002"/>
-  <testcase name="noBackgroundStrokeTouchesTheCharacter" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.022"/>
-  <testcase name="strokesFarFromCharacterAreKept" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.008">
+  <testcase name="noBackgroundStrokeTouchesTheCharacter" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.023"/>
+  <testcase name="strokesFarFromCharacterAreKept" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.011">
     <failure message="java.lang.AssertionError: expected: java.util.Collections$SingletonList&lt;[Stroke(points=[2.0, 2.0, 20.0, 2.0, 20.0, 10.0], color=0, width=2.0, brush=PEN, alpha=1.0)]&gt; but was: java.util.ArrayList&lt;[Stroke(points=[2.0, 2.0, 20.0, 2.0, 20.0, 10.0], color=0, width=2.0, brush=PEN, alpha=1.0)]&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected: java.util.Collections$SingletonList&lt;[Stroke(points=[2.0, 2.0, 20.0, 2.0, 20.0, 10.0], color=0, width=2.0, brush=PEN, alpha=1.0)]&gt; but was: java.util.ArrayList&lt;[Stroke(points=[2.0, 2.0, 20.0, 2.0, 20.0, 10.0], color=0, width=2.0, brush=PEN, alpha=1.0)]&gt;
 	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.failNotEquals(Assert.java:835)
@@ -54,7 +54,7 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="strokeThroughCharacterIsCutInTwo" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.002"/>
+  <testcase name="strokeThroughCharacterIsCutInTwo" classname="com.smitnk.sketcher.image.pipeline.BackgroundSplitTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

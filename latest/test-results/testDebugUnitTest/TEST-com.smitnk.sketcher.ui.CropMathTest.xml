@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.CropMathTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:42" hostname="runnervm0hi8g" time="0.005">
+<testsuite name="com.smitnk.sketcher.ui.CropMathTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-26T13:16:44" hostname="runnervm3lb7s" time="0.003">
   <properties/>
   <testcase name="ratioLockStaysInsidePhoto" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
   <testcase name="ratioLockKeepsPixelRatio" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
   <testcase name="clampsInsidePhotoAndMinSize" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
-  <testcase name="freeDragMovesOnlyThatCorner" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.005">
+  <testcase name="freeDragMovesOnlyThatCorner" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.002">
     <failure message="java.lang.AssertionError: expected:&lt;CropRect(l=0.25, t=0.4, r=1.0, b=1.0)&gt; but was:&lt;CropRect(l=0.25, t=0.39999998, r=1.0, b=1.0)&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;CropRect(l=0.25, t=0.4, r=1.0, b=1.0)&gt; but was:&lt;CropRect(l=0.25, t=0.39999998, r=1.0, b=1.0)&gt;
 	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.failNotEquals(Assert.java:835)
