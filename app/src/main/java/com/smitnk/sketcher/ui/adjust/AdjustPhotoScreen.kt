@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
@@ -67,35 +69,30 @@ import kotlin.math.roundToInt
 @Composable
 fun AdjustPhotoScreen(
     photo: Bitmap,
-    onUse: (InputFrame) -> Unit,
+    onUse: (InputFrame, Boolean) -> Unit,
     onAuto: () -> Unit,
     onSkip: () -> Unit,
     onDontAskChange: (Boolean) -> Unit,
     initial: InputFrame,
     onCancel: () -> Unit,
-    lockedSize: Pair<Int, Int>? = null,
+    pageSize: Pair<Int, Int>? = null,
 ) {
     val pw = photo.width
     val ph = photo.height
     val photoAspect = pw.toFloat() / ph
-    val lockedRatio = lockedSize?.let { it.first.toFloat() / it.second }
-    var aspect by remember { mutableStateOf(if (lockedSize != null) AspectPreset.FREE else if (initial.auto) AspectPreset.ORIGINAL else initial.aspect) }
+    var aspect by remember { mutableStateOf(if (initial.auto) AspectPreset.ORIGINAL else initial.aspect) }
     var rect by remember {
         mutableStateOf(
-            if (lockedRatio != null) {
-                val r = (initial.right - initial.left) * pw / ((initial.bottom - initial.top) * ph)
-                if (!initial.auto && kotlin.math.abs(r / lockedRatio - 1f) < 0.01f) CropRect(initial.left, initial.top, initial.right, initial.bottom)
-                else InputFrame.centredCrop(pw, ph, lockedRatio).let { CropRect(it[0], it[1], it[2], it[3]) }
-            } else if (initial.auto) CropRect(0f, 0f, 1f, 1f)
+            if (initial.auto) CropRect(0f, 0f, 1f, 1f)
             else CropRect(initial.left, initial.top, initial.right, initial.bottom),
         )
     }
-    var size by remember { mutableStateOf(if (lockedSize != null) SizePreset.CUSTOM else if (initial.auto) SizePreset.MEDIUM else initial.size) }
-    var custom by remember { mutableFloatStateOf(if (lockedSize != null) maxOf(lockedSize.first, lockedSize.second).toFloat() else initial.customLongSide.toFloat()) }
+    var size by remember { mutableStateOf(if (initial.auto) SizePreset.MEDIUM else initial.size) }
+    var custom by remember { mutableFloatStateOf(initial.customLongSide.toFloat()) }
     var dontAsk by remember { mutableStateOf(false) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
-    val lock: Float? = lockedRatio ?: when (aspect) {
+    val lock: Float? = when (aspect) {
         AspectPreset.FREE -> null
         AspectPreset.ORIGINAL -> photoAspect
         else -> aspect.ratio
@@ -104,18 +101,19 @@ fun AdjustPhotoScreen(
         auto = false, aspect = aspect, left = rect.l, top = rect.t, right = rect.r, bottom = rect.b,
         size = size, customLongSide = custom.roundToInt(),
     )
+    val differs = pageSize != null && frame.canvasSize(pw, ph) != pageSize
 
-    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = onCancel, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.padding(horizontal = SketcherTokens.screenMargin, vertical = SketcherTokens.space8)) {
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = SketcherTokens.screenMargin, vertical = SketcherTokens.space8)) {
                 Text("Adjust photo", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Pinch to zoom, drag the corners to crop.",
+                    "Pinch to zoom. Drag the box or its corners.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 BoxWithConstraints(
-                    Modifier.weight(1f).fillMaxWidth().padding(vertical = SketcherTokens.space8).clipToBounds()
+                    Modifier.weight(1.2f).heightIn(min = 160.dp).fillMaxWidth().padding(vertical = SketcherTokens.space8).clipToBounds()
                         .pointerInput(Unit) {
                             detectTransformGestures { _, p, z, _ ->
                                 zoom = (zoom * z).coerceIn(1f, 8f)
@@ -183,10 +181,10 @@ fun AdjustPhotoScreen(
                     }
                 }
 
-                if (lockedSize != null) {
-                    Text("Frame size: ${lockedSize.first} × ${lockedSize.second} (same as other frames)", style = MaterialTheme.typography.bodyMedium)
-                    Hint("Move the box to pick the part you want.")
-                } else {
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                if (pageSize != null) {
+                    Text("Page size now: ${pageSize.first} × ${pageSize.second}", style = MaterialTheme.typography.bodyMedium)
+                }
                 Text("Shape", style = MaterialTheme.typography.titleSmall)
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
@@ -239,7 +237,6 @@ fun AdjustPhotoScreen(
                 } else {
                     Hint("Bigger pictures keep more detail but take longer.")
                 }
-                }
 
                 Row(
                     Modifier
@@ -254,6 +251,7 @@ fun AdjustPhotoScreen(
                         Hint("Skip this step for new photos.")
                     }
                 }
+                }
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8, Alignment.End),
@@ -261,7 +259,19 @@ fun AdjustPhotoScreen(
                 ) {
                     TextButton(onClick = onAuto, Modifier.heightIn(min = SketcherTokens.minTouchTarget)) { Text("Auto") }
                     TextButton(onClick = onSkip, Modifier.heightIn(min = SketcherTokens.minTouchTarget)) { Text("Skip") }
-                    Button(onClick = { onUse(frame) }, Modifier.heightIn(min = SketcherTokens.minTouchTarget)) { Text("Use photo") }
+                    if (!differs) Button(onClick = { onUse(frame, false) }, Modifier.heightIn(min = SketcherTokens.minTouchTarget)) { Text("Use photo") }
+                }
+                if (differs) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(SketcherTokens.space8)) {
+                        Column(Modifier.weight(1f)) {
+                            Button(onClick = { onUse(frame, false) }, Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget)) { Text("Fit in page") }
+                            Hint("Keep this photo whole, with paper around it.")
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Button(onClick = { onUse(frame, true) }, Modifier.fillMaxWidth().heightIn(min = SketcherTokens.minTouchTarget)) { Text("Make this the page size") }
+                            Hint("All frames change to this size.")
+                        }
+                    }
                 }
             }
         }

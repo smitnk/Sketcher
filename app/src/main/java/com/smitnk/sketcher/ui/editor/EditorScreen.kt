@@ -260,12 +260,12 @@ fun EditorScreen(
         vm.adjustPhoto?.let { photo ->
             AdjustPhotoScreen(
                 photo = photo,
-                onUse = { vm.confirmAdjust(it) },
-                onAuto = { vm.confirmAdjust(InputFrame(auto = true)) },
+                onUse = { f, resize -> vm.confirmAdjust(f, resize) },
+                onAuto = { vm.confirmAdjust(InputFrame(auto = true), false) },
                 onSkip = { vm.skipAdjust() },
                 onDontAskChange = { vm.skipAdjustStep = it },
                 initial = vm.adjustInitial,
-                lockedSize = vm.adjustLockedSize,
+                pageSize = vm.adjustLockedSize,
                 onCancel = { vm.cancelAdjust() },
             )
         }
