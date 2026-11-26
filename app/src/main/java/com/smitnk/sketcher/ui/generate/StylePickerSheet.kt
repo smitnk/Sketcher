@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.smitnk.sketcher.image.pipeline.BackgroundMode
+import com.smitnk.sketcher.image.pipeline.BackgroundOrder
 import com.smitnk.sketcher.image.pipeline.FillStyle
 import com.smitnk.sketcher.image.pipeline.GapClosing
 import androidx.compose.runtime.remember
@@ -521,6 +523,53 @@ fun StylePickerSheet(
                             onChange = { onSettingsChange(settings.copy(fillSpacing = it)) },
                             valueText = "%.1f px".format(settings.fillSpacing),
                         )
+                    }
+                }
+                SectionLabel("Background")
+                ChipRow(
+                    options = listOf(
+                        BackgroundMode.CHARACTER_ONLY to "Character only",
+                        BackgroundMode.WITH_BACKGROUND to "Character + background",
+                    ),
+                    selected = settings.background,
+                    onSelect = { onSettingsChange(settings.copy(background = it)) },
+                )
+                Text(
+                    "Also draw the place behind the person on its own layers.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (settings.background == BackgroundMode.WITH_BACKGROUND) {
+                    SectionLabel("Draw background")
+                    ChipRow(
+                        options = listOf(
+                            BackgroundOrder.FIRST to "First",
+                            BackgroundOrder.LAST to "Last",
+                            BackgroundOrder.SAME_TIME to "Same time",
+                        ),
+                        selected = settings.backgroundOrder,
+                        onSelect = { onSettingsChange(settings.copy(backgroundOrder = it)) },
+                    )
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = SketcherTokens.minTouchTarget)
+                            .selectable(
+                                selected = settings.backgroundColour,
+                                role = Role.Switch,
+                                onClick = { onSettingsChange(settings.copy(backgroundColour = !settings.backgroundColour)) },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Background colour", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Paint the background with colour",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = settings.backgroundColour, onCheckedChange = null)
                     }
                 }
                 if (onLookChange != null) {

@@ -46,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import com.smitnk.sketcher.ui.canvas.BrushSizeMath
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -121,6 +122,9 @@ fun ToolDock(
     onColorSelected: (Int) -> Unit,
     brushSize: Float,
     onBrushSizeChange: (Float) -> Unit,
+    eraserSize: Float,
+    onEraserSizeChange: (Float) -> Unit,
+    onSizeDragging: (Boolean) -> Unit,
     brushAlpha: Float,
     onBrushAlphaChange: (Float) -> Unit,
     canUndo: Boolean,
@@ -214,8 +218,9 @@ fun ToolDock(
                 OptionsPanel(
                     erasing = erasing,
                     brushColor = brushColor,
-                    brushSize = brushSize,
-                    onBrushSizeChange = onBrushSizeChange,
+                    brushSize = if (erasing) eraserSize else brushSize,
+                    onBrushSizeChange = if (erasing) onEraserSizeChange else onBrushSizeChange,
+                    onSizeDragging = onSizeDragging,
                     brushAlpha = brushAlpha,
                     onBrushAlphaChange = onBrushAlphaChange,
                 )
@@ -321,6 +326,7 @@ private fun OptionsPanel(
     brushColor: Int,
     brushSize: Float,
     onBrushSizeChange: (Float) -> Unit,
+    onSizeDragging: (Boolean) -> Unit,
     brushAlpha: Float,
     onBrushAlphaChange: (Float) -> Unit,
 ) {
@@ -337,11 +343,32 @@ private fun OptionsPanel(
                     modifier = Modifier.width(60.dp),
                 )
                 Slider(
-                    value = brushSize,
-                    onValueChange = onBrushSizeChange,
-                    valueRange = 1f..40f,
+                    value = BrushSizeMath.toSlider(brushSize),
+                    onValueChange = { onSizeDragging(true); onBrushSizeChange(BrushSizeMath.toPx(it)) },
+                    onValueChangeFinished = { onSizeDragging(false) },
                     modifier = Modifier.weight(1f).semantics { stateDescription = "Size ${brushSize.roundToInt()}" },
                 )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Quick", style = MaterialTheme.typography.labelMedium, modifier = Modifier.width(60.dp))
+                listOf("Small" to 4f, "Medium" to 16f, "Large" to 60f).forEachIndexed { i, (name, px) ->
+                    val picked = brushSize.roundToInt() == px.roundToInt()
+                    Box(
+                        Modifier
+                            .size(SketcherTokens.minTouchTarget)
+                            .clickable(role = Role.Button, onClickLabel = "Size $name") { onBrushSizeChange(px) }
+                            .semantics { contentDescription = "$name size"; stateDescription = if (picked) "Selected" else "" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier
+                                .size((10 + i * 8).dp)
+                                .clip(CircleShape)
+                                .background(if (picked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                        )
+                    }
+                }
+                Text("Pixels on the page", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (!erasing) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -377,7 +404,7 @@ private fun BrushPreviewDot(erasing: Boolean, argb: Int, size: Float, alpha: Flo
             .border(1.dp, outline, MaterialTheme.shapes.small)
             .semantics { contentDescription = "Brush preview" },
     ) {
-        val d = (6.dp.toPx() + (size.coerceIn(1f, 40f) / 40f) * 42.dp.toPx())
+        val d = 6.dp.toPx() + BrushSizeMath.toSlider(size) * 42.dp.toPx()
         val c = Offset(this.size.width / 2f, this.size.height / 2f)
         if (erasing) {
             drawCircle(ring, radius = d / 2f, center = c, style = Stroke(1.5.dp.toPx()))

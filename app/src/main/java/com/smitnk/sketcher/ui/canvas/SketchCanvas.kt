@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.Stroke as DrawStroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -34,6 +35,7 @@ import com.smitnk.sketcher.look.PaperRender
 import com.smitnk.sketcher.look.applyTo
 import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.ui.SketchViewModel
+import com.smitnk.sketcher.ui.Tool
 import com.smitnk.sketcher.ui.theme.SketcherTokens
 import kotlin.math.min
 
@@ -71,9 +73,12 @@ fun SketchCanvas(
     modifier: Modifier = Modifier,
     insetTopPx: Float = 0f,
     insetBottomPx: Float = 0f,
+    /** True while a size slider is being dragged: shows the size circle at the middle of the sheet. */
+    sizePreview: Boolean = false,
 ) {
     val project = vm.project
     val vt = remember { ViewTransform() }
+    var eraseTouch by remember { mutableStateOf<Offset?>(null) } // finger position while erasing (screen px)
     vt.insetTop = insetTopPx
     vt.insetBottom = insetBottomPx
     vt.margin = with(androidx.compose.ui.platform.LocalDensity.current) { SketcherTokens.space12.toPx() }
@@ -172,6 +177,7 @@ fun SketchCanvas(
                             )
                             gesture = g
                             perform(action, pos.x, pos.y)
+                            eraseTouch = if (vm.tool == Tool.ERASER && g is Gesture.Stroke && !g.blocked && pressed == 1) pos else null
                             if (g is Gesture.Stroke && !g.blocked) primary?.consume()
                             if (g === Gesture.Transform && pressed > 0) {
                                 // pinch-zoom and pan around the finger centroid
@@ -196,6 +202,7 @@ fun SketchCanvas(
                     } finally {
                         // Cancellation (dispose, back, parent intercept) must never leave a live stroke behind.
                         session?.let { vm.cancelStroke(it) }
+                        eraseTouch = null
                     }
                 }
             },
@@ -287,6 +294,13 @@ fun SketchCanvas(
                 c.restore()
             }
             c.restore()
+        }
+        // Size circle: under the finger while erasing, or mid-sheet while a size slider moves. Radius follows zoom.
+        val ring = eraseTouch ?: if (sizePreview) Offset(size.width / 2f, vt.insetTop + (size.height - vt.insetTop - vt.insetBottom) / 2f) else null
+        if (ring != null) {
+            val r = BrushSizeMath.screenRadius(if (vm.tool == Tool.ERASER) vm.eraserSize else vm.brushSize, s).coerceAtLeast(1f)
+            drawCircle(Color.White, r, ring, style = DrawStroke(3.dp.toPx()))
+            drawCircle(Color(0xFF222222), r, ring, style = DrawStroke(1.5.dp.toPx()))
         }
     }
 }
