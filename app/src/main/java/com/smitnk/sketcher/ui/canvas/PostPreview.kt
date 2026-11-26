@@ -30,7 +30,7 @@ class PostPreviewCache {
     /** Draws the filtered sheet at device scale [s] (origin already translated). False if it could not be prepared. */
     fun draw(c: Canvas, s: Float, pw: Int, ph: Int, layers: List<Layer>, look: LookSettings): Boolean {
         if (look.post == PostFilter.NONE || pw <= 0 || ph <= 0) return false
-        val r = minOf(1f, MAX_SIDE.toFloat() / max(pw, ph))
+        val r = minOf(1f, com.smitnk.sketcher.ui.settings.SpeedQuality.previewMaxSide.toFloat() / max(pw, ph))
         val bw = ceil(pw * r).toInt().coerceAtLeast(1)
         val bh = ceil(ph * r).toInt().coerceAtLeast(1)
         val key = signature(layers, look, bw, bh)

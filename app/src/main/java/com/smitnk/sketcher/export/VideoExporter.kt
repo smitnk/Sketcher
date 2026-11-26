@@ -156,7 +156,7 @@ object VideoExporter {
         try {
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, outW, outH)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            format.setInteger(MediaFormat.KEY_BIT_RATE, (outW.toLong() * outH * 5).toInt().coerceIn(1_500_000, 12_000_000))
+            format.setInteger(MediaFormat.KEY_BIT_RATE, (outW.toLong() * outH * com.smitnk.sketcher.ui.settings.SpeedQuality.bitrateFactor).toInt().coerceIn(1_500_000, 12_000_000))
             format.setInteger(MediaFormat.KEY_FRAME_RATE, FPS)
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
 
@@ -286,7 +286,7 @@ object VideoExporter {
         try {
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, outW, outH)
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            format.setInteger(MediaFormat.KEY_BIT_RATE, (outW.toLong() * outH * 5).toInt().coerceIn(1_500_000, 12_000_000))
+            format.setInteger(MediaFormat.KEY_BIT_RATE, (outW.toLong() * outH * com.smitnk.sketcher.ui.settings.SpeedQuality.bitrateFactor).toInt().coerceIn(1_500_000, 12_000_000))
             format.setInteger(MediaFormat.KEY_FRAME_RATE, rate)
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
 
