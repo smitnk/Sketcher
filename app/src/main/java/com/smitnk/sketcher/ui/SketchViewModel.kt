@@ -27,6 +27,11 @@ import com.smitnk.sketcher.export.AnimExportKind
 import com.smitnk.sketcher.export.ExportFormat
 import com.smitnk.sketcher.export.SvgExporter
 import com.smitnk.sketcher.image.pipeline.FillStyle
+import com.smitnk.sketcher.image.pipeline.AspectPreset
+import com.smitnk.sketcher.image.pipeline.BackgroundMode
+import com.smitnk.sketcher.image.pipeline.BackgroundOrder
+import com.smitnk.sketcher.image.pipeline.InputFrame
+import com.smitnk.sketcher.image.pipeline.SizePreset
 import com.smitnk.sketcher.export.ExportKind
 import com.smitnk.sketcher.export.ExportResult
 import com.smitnk.sketcher.export.ExportState
@@ -162,6 +167,9 @@ private const val KEY_FAST_MODEL_ID = "fast_model_id"
 private const val KEY_CARTOON_MODEL_ID = "cartoon_model_id"
 private const val KEY_ACCEL_CHOICE = "accel_choice"
 private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
+private const val KEY_INPUT_FRAME = "input_frame"
+private const val KEY_SKIP_ADJUST = "skip_adjust_step"
+private const val ADJUST_PREVIEW_SIDE = 1280
 private const val PREV_JOIN_MS = 6_000L
 private const val ENGINE_RELEASE_WAIT_MS = 3_000L
 
@@ -1075,6 +1083,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             resetProject(keepLoad = true)
             val snap = loaded.snapshot
             project.applySnapshot(snap)
+            pipelineSettings = pipelineSettings.copy(background = snap.bgMode, backgroundOrder = snap.bgOrder, backgroundColour = snap.bgColour)
             if (project.layers.isEmpty()) project.layers.add(project.newLayer("Layer 1"))
             project.background = loaded.source
             sourceBitmap = loaded.source
@@ -1171,15 +1180,104 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ------------------------------------------------------------------ photo crop + size ("Adjust photo" step)
+
+    private var inputFrameState by mutableStateOf(InputFrame.decode(mlPrefs.getString(KEY_INPUT_FRAME, null)))
+
+    /** Last crop + size choice (remembered). auto = today's automatic crop/size. */
+    var inputFrame: InputFrame
+        get() = inputFrameState
+        set(v) {
+            inputFrameState = v
+            mlPrefs.edit().putString(KEY_INPUT_FRAME, v.encode()).apply()
+        }
+
+    private var skipAdjustState by mutableStateOf(mlPrefs.getBoolean(KEY_SKIP_ADJUST, false))
+
+    /** True = no "Adjust photo" step: a picked photo opens straight away with [inputFrame]. Remembered. */
+    var skipAdjustStep: Boolean
+        get() = skipAdjustState
+        set(v) {
+            skipAdjustState = v
+            mlPrefs.edit().putBoolean(KEY_SKIP_ADJUST, v).apply()
+        }
+
+    /** Preview of the picked photo (long side <= 1280) while the "Adjust photo" step is pending; null otherwise. */
+    var adjustPhoto by mutableStateOf<Bitmap?>(null)
+        private set
+    private var pendingUri: Uri? = null
+    private var pendingPose = false
+
+    /** Opens the pending photo with [frame] (crop is normalised to [adjustPhoto]); [frame] becomes the remembered choice. */
+    fun confirmAdjust(frame: InputFrame) {
+        val uri = pendingUri ?: return
+        val pose = pendingPose
+        inputFrame = frame
+        cancelAdjust()
+        openPhoto(uri, pose, frame)
+    }
+
+    /** Opens the pending photo with the current [inputFrame]. */
+    fun skipAdjust() = confirmAdjust(inputFrame)
+
+    /** Drops the pending "Adjust photo" step without opening anything. */
+    fun cancelAdjust() {
+        pendingUri = null
+        adjustPhoto = null
+    }
+
     /** [pose] is part of the request: pose mode is applied now and reset by every other load/open. */
     fun loadImage(uri: Uri, pose: Boolean = false) {
+        if (skipAdjustStep) { openPhoto(uri, pose, inputFrame); return }
+        viewModelScope.launch {
+            val preview = withContext(Dispatchers.IO) {
+                try {
+                    ImageLoader.load(app, uri, ADJUST_PREVIEW_SIDE)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (t: Throwable) { // incl. OutOfMemoryError
+                    null
+                }
+            }
+            if (preview == null) { toast("Could not open that image"); return@launch }
+            pendingUri = uri
+            pendingPose = pose
+            adjustPhoto = preview
+        }
+    }
+
+    /** Source long side to decode for [f]: today's size when automatic, else enough for the crop (max 2048). */
+    private fun decodeSide(f: InputFrame): Int {
+        if (f.auto) return settings.maxSide
+        val frac = minOf(f.right - f.left, f.bottom - f.top).coerceIn(0.05f, 1f)
+        return minOf(InputFrame.MAX_SIDE, kotlin.math.ceil(f.longSide / frac).toInt())
+    }
+
+    /** Crops [src] by [f]'s normalised rect and scales it to [InputFrame.canvasSize]; [src] itself when automatic. */
+    private fun applyFrame(src: Bitmap, f: InputFrame): Bitmap {
+        if (f.auto) return src
+        if (f.isSlow) android.util.Log.w("SketcherFrame", "LARGE_SIZE long side ${f.longSide} > ${InputFrame.SLOW_SIDE}: slower")
+        val w = src.width; val h = src.height
+        val x0 = (f.left.coerceIn(0f, 1f) * w).toInt().coerceIn(0, w - 1)
+        val y0 = (f.top.coerceIn(0f, 1f) * h).toInt().coerceIn(0, h - 1)
+        val cw = ((f.right.coerceIn(0f, 1f) * w).toInt() - x0).coerceIn(1, w - x0)
+        val ch = ((f.bottom.coerceIn(0f, 1f) * h).toInt() - y0).coerceIn(1, h - y0)
+        val (tw, th) = f.canvasSize(w, h)
+        val crop = if (x0 == 0 && y0 == 0 && cw == w && ch == h) src else Bitmap.createBitmap(src, x0, y0, cw, ch)
+        val out = if (crop.width == tw && crop.height == th) crop else Bitmap.createScaledBitmap(crop, tw, th, true)
+        if (crop !== src && crop !== out) crop.recycle()
+        if (out !== src) src.recycle()
+        return out
+    }
+
+    private fun openPhoto(uri: Uri, pose: Boolean, frame: InputFrame) {
         setPoseMode(pose)
         val armed = takeArmedActions()
         viewModelScope.launch {
             val picked = withContext(Dispatchers.IO) { displayNameOf(uri) }
             val bmp = withContext(Dispatchers.IO) {
                 try {
-                    ImageLoader.load(app, uri, settings.maxSide)
+                    ImageLoader.load(app, uri, decodeSide(frame))?.let { applyFrame(it, frame) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (t: Throwable) { // incl. OutOfMemoryError
@@ -1195,7 +1293,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             resetProject()
             sessionActions = armed
             projectName = picked ?: autoName(if (poseMode) "Pose" else "Sketch")
-            setSource(bmp)
+            setSource(bmp, frame)
             model().warmUp()
             emitEditorEvent(EditorEvent.OpenStyle(projectGen))
         }
@@ -1208,7 +1306,14 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val bmp = withContext(Dispatchers.IO) {
                 try {
-                    ImageLoader.loadAsset(app, asset, settings.maxSide)
+                    val f0 = intentFrame
+                    if (f0 == null) ImageLoader.loadAsset(app, asset, settings.maxSide)
+                    else ImageLoader.loadAsset(app, asset, InputFrame.MAX_SIDE)?.let { b ->
+                        val c = InputFrame.centredCrop(b.width, b.height, f0.aspect.ratio)
+                        val f = f0.copy(left = c[0], top = c[1], right = c[2], bottom = c[3])
+                        demoFrame = f
+                        applyFrame(b, f)
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (t: Throwable) {
@@ -1224,11 +1329,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             intentLook?.let { setLook(it) }
             sessionActions = armed
             projectName = if (recentProjects.none { it.name == "Demo" }) "Demo" else autoName("Demo")
-            setSource(bmp)
+            setSource(bmp, if (intentFrame != null) demoFrame else InputFrame())
             model().warmUp()
             generate()
         }
     }
+
+    /** CI intent `size` / `aspect`: crop + size for the next demo/test image (null = automatic, today's). */
+    private var intentFrame: InputFrame? = null
+    private var demoFrame = InputFrame()
 
     /** Starts an empty project (no photo, one blank layer). */
     fun newProject() {
@@ -1275,7 +1384,19 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         cartoonModel: String? = null,
         autoSvg: Boolean = false,
         fill: String? = null,
+        size: Int? = null,
+        aspect: String? = null,
+        background: Boolean? = null,
     ) {
+        if (size != null || aspect != null) {
+            val side = (size ?: SizePreset.MEDIUM.longSide).coerceIn(InputFrame.MIN_SIDE, InputFrame.MAX_SIDE)
+            val preset = SizePreset.values().firstOrNull { it != SizePreset.CUSTOM && it.longSide == side } ?: SizePreset.CUSTOM
+            val asp = AspectPreset.values().firstOrNull { it.label == aspect } ?: AspectPreset.ORIGINAL
+            intentFrame = InputFrame(auto = false, aspect = asp, size = preset, customLongSide = side)
+        }
+        if (background != null) pipelineSettings = pipelineSettings.copy(
+            background = if (background) BackgroundMode.WITH_BACKGROUND else BackgroundMode.CHARACTER_ONLY,
+        )
         if (fill != null) pipelineSettings = pipelineSettings.copy(fillStyle = if (fill.equals("cel", true)) FillStyle.FLAT_CEL else FillStyle.STROKES)
         if (label != null) DebugDump.runLabel = label
         if (look != null) {
@@ -1372,6 +1493,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.layers.add(project.newLayer("Layer 1"))
         project.selectedIndex = 0
         project.background = null
+        project.inputFrame = InputFrame()
         project.currentFrame.durationSec = anim.durationSec
         sourceSerial++
         autoSource = sourceSerial
@@ -1396,7 +1518,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         get() = project.currentFrame.autoSource
         set(v) { project.currentFrame.autoSource = v }
 
-    private fun setSource(bmp: Bitmap) {
+    private fun setSource(bmp: Bitmap, frame: InputFrame = InputFrame()) {
+        project.inputFrame = frame
         sourceSerial++
         sourceBitmap = bmp
         sourceThumbnail = makeThumbnail(bmp)
@@ -1477,7 +1600,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     val h = bmp.height
                     val pixels = IntArray(w * h)
                     bmp.getPixels(pixels, 0, w, 0, 0, w, h)
-                    val d = SketchPipeline.run(pixels, w, h, ps, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) }, fastModel = fm, cartoonModel = cm)
+                    // chosen size (not automatic): the canvas is the cropped photo itself, so work at its full size
+                    val runPs = if (project.inputFrame.auto) ps else ps.copy(workingSize = max(w, h))
+                    val d = SketchPipeline.run(pixels, w, h, runPs, DebugDump.wrap(app, withFallback(m, run)), { st, f -> onStage(run, st, f) }, fastModel = fm, cartoonModel = cm)
                     val bg = if (w != d.width || h != d.height) {
                         Bitmap.createScaledBitmap(bmp, d.width, d.height, true)
                     } else {
@@ -1544,6 +1669,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Stacking order of generated layers, bottom to top. */
     private fun autoRank(k: LayerKind): Int = when (k) {
+        LayerKind.AUTO_BG_FILL -> -2
+        LayerKind.AUTO_BG_OUTLINE -> -1
         LayerKind.AUTO_FILL -> 0
         LayerKind.AUTO_OUTLINE -> 1
         LayerKind.AUTO_SHADING -> 2
@@ -1559,6 +1686,10 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         project.height = drawing.height
         if (scaledBackground != null) project.background = scaledBackground
         val ps = lastAppliedSettings
+        project.bgMode = ps.background
+        project.bgOrder = ps.backgroundOrder
+        project.bgColour = ps.backgroundColour
+        val withBg = ps.background == BackgroundMode.WITH_BACKGROUND
         val previousSelected = project.selectedLayer
         // Never carry generated layers over from a different source photo.
         val result = LayerReconcile.keepForGeneration(project.layers.toList(), autoSource, sourceSerial).toMutableList()
@@ -1566,6 +1697,8 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
 
         // kind -> (default name, strokes or null when this run does not produce that kind), bottom to top.
         val wanted = listOf(
+            Triple(LayerKind.AUTO_BG_FILL, "Background colour", if (withBg && ps.backgroundColour) drawing.bgFill.takeIf { it.isNotEmpty() } else null),
+            Triple(LayerKind.AUTO_BG_OUTLINE, "Background outline", if (withBg) drawing.bgOutline.takeIf { it.isNotEmpty() } else null),
             Triple(LayerKind.AUTO_FILL, "Colour Fill", if (ps.colourFill) drawing.fill else null),
             Triple(LayerKind.AUTO_OUTLINE, "Outline", drawing.outline),
             Triple(LayerKind.AUTO_SHADING, "Shading", if (ps.shading != ShadingLevel.NONE) drawing.shading else null),
@@ -1594,7 +1727,15 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                     layer.revealWidthPx = 0f
                 }
             }
-            layer.animPriority = if (kind == LayerKind.AUTO_OUTLINE && ps.colourFill) -1 else 0
+            layer.animPriority = when {
+                kind == LayerKind.AUTO_BG_OUTLINE || kind == LayerKind.AUTO_BG_FILL -> when (ps.backgroundOrder) {
+                    BackgroundOrder.FIRST -> -10
+                    BackgroundOrder.LAST -> 10
+                    BackgroundOrder.SAME_TIME -> com.smitnk.sketcher.anim.LayerTimeline.CONCURRENT_PRIORITY
+                }
+                kind == LayerKind.AUTO_OUTLINE && ps.colourFill -> -1
+                else -> 0
+            }
         }
         celFills = run {
             val fl = result.firstOrNull { it.kind == LayerKind.AUTO_FILL }

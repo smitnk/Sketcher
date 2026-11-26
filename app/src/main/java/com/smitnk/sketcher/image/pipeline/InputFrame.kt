@@ -34,8 +34,26 @@ data class InputFrame(
     fun sizeLabel(photoW: Int, photoH: Int): String = canvasSize(photoW, photoH).let { "${it.first} × ${it.second}" }
     val isSlow: Boolean get() = longSide > SLOW_SIDE
 
+    /** Compact text form for preferences; read back with [decode]. */
+    fun encode(): String = listOf(auto, aspect.name, left, top, right, bottom, size.name, customLongSide).joinToString(",")
+
     companion object {
         const val MIN_SIDE = 512; const val MAX_SIDE = 2048; const val SLOW_SIDE = 1440
+
+        /** Inverse of [encode]; null or broken text gives the default (automatic) frame. */
+        fun decode(text: String?): InputFrame {
+            val p = text?.split(",") ?: return InputFrame()
+            if (p.size != 8) return InputFrame()
+            return try {
+                val l = p[2].toFloat(); val t = p[3].toFloat(); val r = p[4].toFloat(); val b = p[5].toFloat()
+                val ok = l in 0f..1f && t in 0f..1f && r in 0f..1f && b in 0f..1f && r > l && b > t
+                InputFrame(
+                    p[0].toBooleanStrict(), AspectPreset.valueOf(p[1]),
+                    if (ok) l else 0f, if (ok) t else 0f, if (ok) r else 1f, if (ok) b else 1f,
+                    SizePreset.valueOf(p[6]), p[7].toInt().coerceIn(MIN_SIDE, MAX_SIDE),
+                )
+            } catch (_: IllegalArgumentException) { InputFrame() }
+        }
 
         /** Largest centred crop (normalised) of a photo with [ratio] (w/h); null ratio = full photo. */
         fun centredCrop(photoW: Int, photoH: Int, ratio: Float?): FloatArray {

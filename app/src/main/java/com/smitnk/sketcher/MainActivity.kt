@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
             look = intent.getStringExtra("look"),
             pen = if (intent.hasExtra("pen")) intent.getBooleanExtra("pen", false) else null,
             camera = if (intent.hasExtra("camera")) intent.getBooleanExtra("camera", false) else null,
+            size = if (intent.hasExtra("size")) intent.getIntExtra("size", 1080) else null,
+            aspect = intent.getStringExtra("aspect"),
+            background = if (intent.hasExtra("background")) intent.getBooleanExtra("background", false) else null,
         )
     }
 }
