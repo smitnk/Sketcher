@@ -7,6 +7,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import com.smitnk.sketcher.model.LayerKind
+import com.smitnk.sketcher.image.pipeline.AspectPreset
+import com.smitnk.sketcher.image.pipeline.BackgroundMode
+import com.smitnk.sketcher.image.pipeline.BackgroundOrder
+import com.smitnk.sketcher.image.pipeline.InputFrame
+import com.smitnk.sketcher.image.pipeline.SizePreset
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.io.IOException
@@ -115,5 +120,33 @@ class ProjectCodecTest {
         try { ProjectCodec.decode(bad); fail() } catch (e: IOException) { assertTrue(true) }
         try { ProjectCodec.decode(v1Bytes(w = 0)); fail() } catch (e: IOException) { assertTrue(true) }
         try { ProjectCodec.decode(v1Bytes(h = 100_000)); fail() } catch (e: IOException) { assertTrue(true) }
+    }
+
+    private fun frameSnap(frame: InputFrame) = ProjectSnapshot.ofFrames(
+        sample().width, sample().height, sample().frames, 0, inputFrame = frame,
+        bgMode = BackgroundMode.WITH_BACKGROUND, bgOrder = BackgroundOrder.SAME_TIME, bgColour = true,
+    )
+
+    @Test fun v7FrameAndBackgroundRoundTrip() {
+        val f = InputFrame(false, AspectPreset.SHORTS, 0.1f, 0.2f, 0.7f, 0.9f, SizePreset.CUSTOM, 1600)
+        val b = ProjectCodec.decode(ProjectCodec.encode(frameSnap(f)))
+        assertEquals(f, b.inputFrame)
+        assertEquals(BackgroundMode.WITH_BACKGROUND, b.bgMode)
+        assertEquals(BackgroundOrder.SAME_TIME, b.bgOrder)
+        assertTrue(b.bgColour)
+        assertEquals(2, b.layers.size)
+        assertEquals(f, b.withSources(emptyMap()).inputFrame) // withSources keeps the v7 fields
+    }
+
+    @Test fun v6FileLoadsWithDefaultFrameAndBackground() {
+        val v7 = ProjectCodec.encode(frameSnap(InputFrame(auto = false)))
+        val v6 = v7.copyOf(v7.size - 26) // v7 block: input frame (23 bytes) + background (3 bytes)
+        v6[7] = 6
+        val b = ProjectCodec.decode(v6)
+        assertEquals(InputFrame(), b.inputFrame)
+        assertEquals(BackgroundMode.CHARACTER_ONLY, b.bgMode)
+        assertEquals(BackgroundOrder.FIRST, b.bgOrder)
+        assertFalse(b.bgColour)
+        assertEquals(2, b.layers.size)
     }
 }

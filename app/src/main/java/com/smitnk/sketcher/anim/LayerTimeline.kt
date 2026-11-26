@@ -28,7 +28,7 @@ object LayerTimeline {
         var c = 0
         for (i in 0 until n) {
             val l = layers[i]
-            if (!l.visible || !l.inAnimation) continue
+            if (!l.visible || !l.inAnimation || l.animPriority == CONCURRENT_PRIORITY) continue
             var j = c
             while (j > 0 && layers[o[j - 1]].animPriority > l.animPriority) { o[j] = o[j - 1]; j-- }
             o[j] = i
@@ -114,6 +114,9 @@ object LayerTimeline {
             len[i] = s.length
             if (hand != null) hand[i] = HandSpeed.strokeMul(l.id, i, p, s.length)
             mul[i] = when {
+                // background draws quicker than the character (shorter share of the animation)
+                l.kind == LayerKind.AUTO_BG_OUTLINE -> BG_MUL
+                l.kind == LayerKind.AUTO_BG_FILL -> 2f * BG_MUL
                 l.kind == LayerKind.AUTO_FILL -> DrawTimeline.FILL_MUL.toFloat()
                 l.kind == LayerKind.AUTO_SHADING || s.brush == BrushType.HATCH -> DrawTimeline.SHADING_MUL.toFloat()
                 else -> 1f
@@ -150,7 +153,16 @@ object LayerTimeline {
         durationSec: Float = AnimationController.DEFAULT_DURATION_SEC,
         out: Allowances = Allowances(),
     ): Allowances {
-        timelineFor(layers, look).fillAllowances(LookTiming.effectiveProgress(progress, durationSec, look), out)
+        val p = LookTiming.effectiveProgress(progress, durationSec, look)
+        timelineFor(layers, look).fillAllowances(p, out)
+        // CONCURRENT layers (background "same time") reveal evenly over the whole animation, beside the timeline.
+        for (i in 0 until layers.size) {
+            val l = layers[i]
+            if (l.animPriority != CONCURRENT_PRIORITY || !l.visible || !l.inAnimation) continue
+            var total = 0f
+            for (k in 0 until l.strokes.size) total += l.strokes[k].length
+            out.add(l.id, total * p.coerceIn(0f, 1f), total)
+        }
         return out
     }
 
@@ -174,6 +186,10 @@ object LayerTimeline {
         return out
     }
 
+    /** animPriority of a layer drawn at the same time as the rest instead of in sequence (see [allowances]). */
+    const val CONCURRENT_PRIORITY = Int.MIN_VALUE
+
+    private const val BG_MUL = 3f
     private const val SIG_REC = 9
     private val EMPTY_SIG = LongArray(0)
 }

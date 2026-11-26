@@ -12,6 +12,11 @@ import com.smitnk.sketcher.look.PenStyle
 import com.smitnk.sketcher.look.PostFilter
 import com.smitnk.sketcher.look.StrokeFeel
 import com.smitnk.sketcher.model.LayerKind
+import com.smitnk.sketcher.image.pipeline.AspectPreset
+import com.smitnk.sketcher.image.pipeline.BackgroundMode
+import com.smitnk.sketcher.image.pipeline.BackgroundOrder
+import com.smitnk.sketcher.image.pipeline.InputFrame
+import com.smitnk.sketcher.image.pipeline.SizePreset
 
 /** Pure-Kotlin mirror of a stroke (brush stored as BrushType ordinal). */
 class StrokeSnapshot(
@@ -73,6 +78,11 @@ class ProjectSnapshot(
     val currentFrameIndex: Int = 0,
     /** v5: per-project Look (default for older files). */
     val look: LookSettings = LookSettings(),
+    /** v7: photo crop + size and background option (defaults for older files). */
+    val inputFrame: InputFrame = InputFrame(),
+    val bgMode: BackgroundMode = BackgroundMode.CHARACTER_ONLY,
+    val bgOrder: BackgroundOrder = BackgroundOrder.FIRST,
+    val bgColour: Boolean = false,
 ) {
     /** Same project with the given reference photos attached (frame id -> bitmap). */
     fun withSources(sources: Map<Long, Bitmap?>): ProjectSnapshot = ofFrames(
@@ -81,17 +91,21 @@ class ProjectSnapshot(
             FrameSnapshot(f.id, f.layers, f.selectedIndex, f.backgroundVisible, f.backgroundOpacity, f.animationSeconds, sources[f.id] ?: f.source)
         },
         currentFrameIndex,
-        look,
+        look, inputFrame, bgMode, bgOrder, bgColour,
     )
 
     companion object {
-        fun ofFrames(width: Int, height: Int, frames: List<FrameSnapshot>, currentFrameIndex: Int, look: LookSettings = LookSettings()): ProjectSnapshot {
+        fun ofFrames(
+            width: Int, height: Int, frames: List<FrameSnapshot>, currentFrameIndex: Int, look: LookSettings = LookSettings(),
+            inputFrame: InputFrame = InputFrame(), bgMode: BackgroundMode = BackgroundMode.CHARACTER_ONLY,
+            bgOrder: BackgroundOrder = BackgroundOrder.FIRST, bgColour: Boolean = false,
+        ): ProjectSnapshot {
             require(frames.isNotEmpty()) { "a project needs at least one frame" }
             val ci = currentFrameIndex.coerceIn(0, frames.lastIndex)
             val c = frames[ci]
             return ProjectSnapshot(
                 width, height, c.layers, c.selectedIndex, c.backgroundVisible, c.backgroundOpacity, c.animationSeconds,
-                frames, ci, look,
+                frames, ci, look, inputFrame, bgMode, bgOrder, bgColour,
             )
         }
     }
@@ -100,10 +114,11 @@ class ProjectSnapshot(
 /**
  * Binary format: "SKCH", version int, then fields (see write/read). v2 adds a per-layer kind byte; v3 adds an
  * optional per-layer ink PNG; v4 stores a list of frames (v1-v3 files load as a single frame); v5 appends the project Look after the frames
- * (older files load with the default Look); v6 appends a Motion block after the Look (pen sprite + follow camera; older files load with both off).
+ * (older files load with the default Look); v6 appends a Motion block after the Look (pen sprite + follow camera; older files load with both off);
+ * v7 appends the photo frame (crop + size) and the background option (older files: automatic, character only).
  */
 object ProjectCodec {
-    const val VERSION = 6
+    const val VERSION = 7
     private const val MAX_INK_BYTES = 200_000_000
     private const val MAX_DIM = 8192
     private const val MIN_LAYER_BYTES = 20
@@ -134,6 +149,7 @@ object ProjectCodec {
         }
         writeLook(out, s.look)
         writeMotion(out, s.look)
+        writeFrameAndBackground(out, s)
         out.flush()
         return bos.toByteArray()
     }
@@ -152,6 +168,33 @@ object ProjectCodec {
         out.writeByte(l.penStyle.ordinal)
         out.writeBoolean(l.cameraFollow)
         out.writeFloat(l.cameraZoom)
+    }
+
+    private fun writeFrameAndBackground(out: DataOutputStream, s: ProjectSnapshot) {
+        val f = s.inputFrame
+        out.writeBoolean(f.auto)
+        out.writeByte(f.aspect.ordinal)
+        out.writeFloat(f.left); out.writeFloat(f.top); out.writeFloat(f.right); out.writeFloat(f.bottom)
+        out.writeByte(f.size.ordinal)
+        out.writeInt(f.customLongSide)
+        out.writeByte(s.bgMode.ordinal)
+        out.writeByte(s.bgOrder.ordinal)
+        out.writeBoolean(s.bgColour)
+    }
+
+    /** v7 block; unknown ordinals / broken crop fall back to defaults. */
+    private fun readFrameAndBackground(inp: DataInputStream, base: ProjectSnapshot): ProjectSnapshot {
+        val auto = inp.readBoolean()
+        val aspect = AspectPreset.values().getOrElse(inp.readUnsignedByte()) { AspectPreset.ORIGINAL }
+        val l = inp.readFloat(); val t = inp.readFloat(); val r = inp.readFloat(); val b = inp.readFloat()
+        val size = SizePreset.values().getOrElse(inp.readUnsignedByte()) { SizePreset.MEDIUM }
+        val custom = inp.readInt().coerceIn(InputFrame.MIN_SIDE, InputFrame.MAX_SIDE)
+        val mode = BackgroundMode.values().getOrElse(inp.readUnsignedByte()) { BackgroundMode.CHARACTER_ONLY }
+        val order = BackgroundOrder.values().getOrElse(inp.readUnsignedByte()) { BackgroundOrder.FIRST }
+        val colour = inp.readBoolean()
+        val cropOk = l in 0f..1f && t in 0f..1f && r in 0f..1f && b in 0f..1f && r > l && b > t
+        val frame = if (cropOk) InputFrame(auto, aspect, l, t, r, b, size, custom) else InputFrame(auto, aspect, size = size, customLongSide = custom)
+        return ProjectSnapshot.ofFrames(base.width, base.height, base.frames, base.currentFrameIndex, base.look, frame, mode, order, colour)
     }
 
     /** v6 motion block, merged into [base]. A NaN / out-of-range zoom falls back to the default. */
@@ -245,7 +288,8 @@ object ProjectCodec {
                 frames.add(FrameSnapshot(uniqueId, layers, selected, bgVisible, bgOpacity, animSeconds))
             }
             val look = if (version >= 5) readLook(inp).let { if (version >= 6) readMotion(inp, it) else it } else LookSettings()
-            return ProjectSnapshot.ofFrames(width, height, frames, current, look)
+            val snap = ProjectSnapshot.ofFrames(width, height, frames, current, look)
+            return if (version >= 7) readFrameAndBackground(inp, snap) else snap
         }
         val selected = inp.readInt()
         val bgVisible = inp.readBoolean()

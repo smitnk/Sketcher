@@ -10,6 +10,12 @@ enum class OutlineStyle { PENCIL_REVEAL, CLEAN_VECTOR }
 /** Colour fill look: STROKES = hatched colour strokes; FLAT_CEL = trapped-ball flat cel regions ([LineFill]). */
 enum class FillStyle { STROKES, FLAT_CEL }
 
+/** CHARACTER_ONLY = today's output; WITH_BACKGROUND adds "Background outline" (+ optional colour) layers below. */
+enum class BackgroundMode { CHARACTER_ONLY, WITH_BACKGROUND }
+
+/** When the background layers draw relative to the character. */
+enum class BackgroundOrder { FIRST, LAST, SAME_TIME }
+
 data class PipelineSettings(
     val lineSource: LineSource = LineSource.AUTO,
     val detail: Float = 0.5f,            // 0..1 more/less lines
@@ -26,6 +32,9 @@ data class PipelineSettings(
     val maxStrokes: Int = 4000,
     val workingSize: Int = 1024,          // long side for vector output
     val outlineStyle: OutlineStyle = OutlineStyle.PENCIL_REVEAL,
+    val background: BackgroundMode = BackgroundMode.CHARACTER_ONLY,
+    val backgroundOrder: BackgroundOrder = BackgroundOrder.FIRST,
+    val backgroundColour: Boolean = false,
 )
 
 fun interface LineArtModel {                 // B1 implements OnnxLineArtModel (android) ; tests use fakes

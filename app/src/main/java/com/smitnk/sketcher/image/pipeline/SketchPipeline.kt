@@ -280,10 +280,34 @@ object SketchPipeline {
             check()
         }
 
+        // Background layers (opt-in): edges/colour of the backdrop only, cut away from every character pixel.
+        var bgOutline: List<Stroke> = emptyList()
+        var bgFill: List<Stroke> = emptyList()
+        if (settings.background == BackgroundMode.WITH_BACKGROUND) {
+            val subject = BackgroundSplit.subjectMask(sub)
+            if (subject != null) {
+                progress("Background", 0.97f)
+                tm.time("background") {
+                    val e = edgeInk(px, pw, ph)
+                    val valid = BooleanArray(pw * ph) { !subject[it] }
+                    for (i in e.indices) if (subject[i]) e[i] = 0f
+                    normaliseInk(e, valid, pw, ph)
+                    // lighter, thinner, fewer strokes than the character
+                    val raw = LineArtVectorizer.vectorize(e, pw, ph, settings.detail * 0.6f, settings.lineWidth * 0.6f, settings.maxStrokes / 4)
+                    bgOutline = BackgroundSplit.clip(raw, subject, pw, ph).map { it.copy(alpha = it.alpha * 0.55f) }
+                    if (settings.backgroundColour) {
+                        val f = ColorStrokeGenerator.generateFill(px, pw, ph, pw, ph, settings.fillColors.coerceIn(6, 16), settings.fillSpacing)
+                        bgFill = BackgroundSplit.clip(f, subject, pw, ph)
+                    }
+                }
+                check()
+            }
+        }
+
         progress("Done", 1f)
         tm.ms["total"] = (System.nanoTime() - tTotal) / 1_000_000
         lastTimings = LinkedHashMap(tm.ms)
-        GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth, celMap, celCols)
+        GeneratedDrawing(pw, ph, outline, shading, fill, inkArgb, if (inkArgb != null) pw else 0, if (inkArgb != null) ph else 0, revealWidth, celMap, celCols, bgOutline, bgFill)
     }
 
     /**

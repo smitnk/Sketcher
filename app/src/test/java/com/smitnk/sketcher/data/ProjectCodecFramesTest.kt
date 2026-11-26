@@ -140,7 +140,9 @@ class ProjectCodecFramesTest {
         try { ProjectCodec.decode(bytes.copyOf(bytes.size - 5)); fail() } catch (e: IOException) { assertTrue(true) }
     }
 
-    @Test fun versionIsSix() = assertEquals(6, ProjectCodec.VERSION)
+    private val V7_BLOCK = 26 // input frame (23 bytes) + background (3 bytes), see ProjectCodec.writeFrameAndBackground
+
+    @Test fun versionIsSeven() = assertEquals(7, ProjectCodec.VERSION)
 
     @Test fun lookRoundTrips() {
         val look = LookSettings(StrokeFeel.PEN_PLOTTER, Paper.ENGRAVING, true, PostFilter.HALFTONE, true, 77)
@@ -151,7 +153,7 @@ class ProjectCodecFramesTest {
 
     @Test fun v4FileWithoutLookLoadsWithDefaultLook() {
         val v5 = ProjectCodec.encode(ProjectSnapshot.ofFrames(10, 10, frames(), 0))
-        val v4 = v5.copyOf(v5.size - 16) // look block (9 bytes) + motion block (7 bytes) trail the frames
+        val v4 = v5.copyOf(v5.size - 16 - V7_BLOCK) // look block (9 bytes) + motion block (7 bytes) + v7 block trail the frames
         v4[7] = 4 // version int, big endian, at offset 4..7
         val back = ProjectCodec.decode(v4)
         assertEquals(LookSettings(), back.look)
@@ -167,7 +169,7 @@ class ProjectCodecFramesTest {
     @Test fun v5FileWithoutMotionLoadsWithMotionOff() {
         val look = LookSettings(StrokeFeel.PEN_PLOTTER, Paper.ENGRAVING, true, PostFilter.HALFTONE, true, 77, showPen = true, cameraFollow = true)
         val v6 = ProjectCodec.encode(ProjectSnapshot.ofFrames(10, 10, frames(), 0, look))
-        val v5 = v6.copyOf(v6.size - 7)
+        val v5 = v6.copyOf(v6.size - 7 - V7_BLOCK)
         v5[7] = 5
         val back = ProjectCodec.decode(v5)
         assertEquals(look.copy(showPen = false, cameraFollow = false), back.look)

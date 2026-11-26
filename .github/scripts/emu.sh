@@ -92,6 +92,9 @@ for lk in whiteboard pen_plotter colored_pencil scratch_film riso dither halfton
 done
 # Motion: pen sprite + follow camera (whiteboard feel) on tpose; screenshots at t03/t07/t12/t17/end
 dbg_run "tpose_motion_pen_camera" tpose --es engine ai --es model informative --es outline pencil --es look whiteboard --ez pen true --ez camera true
+# Photo crop + size (9:16 at 720 long side) and background layers ON
+dbg_run tpose_size720_9x16 tpose --es engine ai --es model informative --es outline pencil --ei size 720 --es aspect 9:16
+dbg_run person1_background person1 --es engine ai --es model informative --es outline pencil --ez background true
 for img in tpose beard person1 cartoon; do
   dbg_run "${img}_flow_pencil" "$img" --es engine flow --es outline pencil
 done

@@ -63,6 +63,9 @@ data class GeneratedDrawing(
     /** Flat-cel regions + one ARGB per region (only when the fill style was FLAT_CEL); used for SVG export. */
     val celMap: com.smitnk.sketcher.image.pipeline.RegionMap? = null,
     val celColours: IntArray? = null,
+    /** WITH_BACKGROUND only: background strokes (never on character pixels), same coordinates as [outline]. */
+    val bgOutline: List<Stroke> = emptyList(),
+    val bgFill: List<Stroke> = emptyList(),
 )
 
 data class GeneratorSettings(

@@ -25,6 +25,16 @@ class Allowances(capacity: Int = 8) {
         size = n
     }
 
+    /** Appends one entry after [begin] was filled, growing (copying) only when needed. */
+    internal fun add(id: Long, value: Float, total: Float) {
+        if (size >= ids.size) {
+            val c = ids.size * 2
+            ids = ids.copyOf(c); values = values.copyOf(c); totals = totals.copyOf(c)
+        }
+        ids[size] = id; values[size] = value; totals[size] = total
+        size++
+    }
+
     private fun indexOf(id: Long): Int {
         val a = ids
         for (i in 0 until size) if (a[i] == id) return i
