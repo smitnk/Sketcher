@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.CropMathTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:16" hostname="ip-10-0-133-199" time="0.001">
+<testsuite name="com.smitnk.sketcher.ui.CropMathTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:46" hostname="runnervm0hi8g" time="0.0">
   <properties/>
-  <testcase name="ratioLockStaysInsidePhoto" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.001"/>
+  <testcase name="ratioLockStaysInsidePhoto" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
   <testcase name="ratioLockKeepsPixelRatio" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
   <testcase name="moveKeepsSizeAndClampsAtEdges" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>
   <testcase name="clampsInsidePhotoAndMinSize" classname="com.smitnk.sketcher.ui.CropMathTest" time="0.0"/>

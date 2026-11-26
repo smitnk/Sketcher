@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:12" hostname="ip-10-0-133-199" time="0.018">
+<testsuite name="com.smitnk.sketcher.image.models.ModelSpecTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-26T16:21:40" hostname="runnervm0hi8g" time="0.013">
   <properties/>
   <testcase name="animeTanhOutputMapsToInk" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="specNeedsExactlyOneSource" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
   <testcase name="anilinesIsTwoChannelFp16InBothEngines" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="anime2sketchAlignsTo256AndCapsPixels" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.005"/>
   <testcase name="zeroOneInkIsLow" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <testcase name="inkIsHighKeepsValue" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="inputNormalisation" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
+  <testcase name="inputNormalisation" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
   <testcase name="targetSizeMultiple8Rounds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="maxPixelsCapHolds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.008"/>
+  <testcase name="maxPixelsCapHolds" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.006"/>
   <testcase name="registryHasExpectedIdsAndOneSourceEach" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
-  <testcase name="targetSizeMultiple256RoundsUp" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.001"/>
+  <testcase name="targetSizeMultiple256RoundsUp" classname="com.smitnk.sketcher.image.models.ModelSpecTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
