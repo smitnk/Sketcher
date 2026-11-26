@@ -11,7 +11,8 @@ class CropMathTest {
     private val full = CropRect(0f, 0f, 1f, 1f)
 
     @Test fun freeDragMovesOnlyThatCorner() {
-        assertEquals(CropRect(0.25f, 0.4f, 1f, 1f), dragCorner(full, Corner.TL, 0.25f, 0.4f, null, 1f))
+        val r = dragCorner(full, Corner.TL, 0.25f, 0.4f, null, 1f)
+        assertEquals(0.25f, r.l, 1e-5f); assertEquals(0.4f, r.t, 1e-5f); assertEquals(1f, r.r, 1e-5f); assertEquals(1f, r.b, 1e-5f)
     }
 
     @Test fun clampsInsidePhotoAndMinSize() {

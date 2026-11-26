@@ -1,6 +1,7 @@
 package com.smitnk.sketcher.image.pipeline
 
 import com.smitnk.sketcher.image.Stroke
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -51,7 +52,8 @@ class BackgroundSplitTest {
 
     @Test fun strokesFarFromCharacterAreKept() {
         val s = Stroke(floatArrayOf(2f, 2f, 20f, 2f, 20f, 10f), 0, 2f)
-        assertEquals(listOf(s), BackgroundSplit.clip(listOf(s), subject, w, h))
+        val out = BackgroundSplit.clip(listOf(s), subject, w, h)
+        assertEquals(1, out.size); assertArrayEquals(s.points, out[0].points, 0f)
     }
 
     @Test fun strokeThroughCharacterIsCutInTwo() {

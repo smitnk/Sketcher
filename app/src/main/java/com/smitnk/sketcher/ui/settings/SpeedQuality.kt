@@ -1,5 +1,7 @@
 package com.smitnk.sketcher.ui.settings
 
+import kotlin.math.roundToInt
+
 /** Speed / quality presets. BALANCED must equal today's defaults (PipelineSettings, PostPreview.MAX_SIDE, VideoExporter). */
 enum class SpeedPreset(val label: String, val hint: String) {
     FAST("Fast", "Quicker and lighter. Less detail."),
@@ -24,6 +26,6 @@ object SpeedQuality {
     /** [simplify] 0..1: 0 keeps all strokes of the preset, 1 keeps 40%. */
     fun values(p: SpeedPreset, simplify: Float = 0f): SpeedValues {
         val b = base(p)
-        return b.copy(maxStrokes = (b.maxStrokes * (1f - 0.6f * simplify.coerceIn(0f, 1f))).toInt())
+        return b.copy(maxStrokes = (b.maxStrokes * (1f - 0.6f * simplify.coerceIn(0f, 1f))).roundToInt())
     }
 }
