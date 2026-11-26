@@ -1,4 +1,4 @@
 --------- beginning of main
-11-26 13:26:42.631  6688  6688 I SketcherGen: GEN_DONE ms=14818 outline=574 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL, background=CHARACTER_ONLY, backgroundOrder=FIRST, backgroundColour=false)
-11-26 13:26:44.330  6688  6712 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_coarse_ai_pencil
-11-26 13:27:04.670  6688  6688 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
+11-26 15:00:54.550  6648  6648 I SketcherGen: GEN_DONE ms=8325 outline=574 shading=0 fill=0 size=516x1024 settings=PipelineSettings(lineSource=AI, detail=0.5, lineWidth=2.2, shading=NONE, shadingStyle=HATCH, colourFill=false, fillColors=10, fillSpacing=6.0, fillStyle=STROKES, gapClosing=MEDIUM, cleanInk=false, ignoreBackground=true, maxStrokes=4000, workingSize=1024, outlineStyle=PENCIL_REVEAL, background=CHARACTER_ONLY, backgroundOrder=FIRST, backgroundColour=false)
+11-26 15:00:55.823  6648  6674 I SketcherGen: DEBUG_DUMP dir=/storage/emulated/0/Android/data/com.smitnk.sketcher/files/debug/beard_coarse_ai_pencil
+11-26 15:01:15.432  6648  6648 I SketcherGen: ANIM_END progress=1.0 revealedFraction=1.0
