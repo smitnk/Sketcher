@@ -264,6 +264,9 @@ fun EditorScreen(
                 onAuto = { vm.confirmAdjust(InputFrame(auto = true)) },
                 onSkip = { vm.skipAdjust() },
                 onDontAskChange = { vm.skipAdjustStep = it },
+                initial = vm.adjustInitial,
+                lockedSize = vm.adjustLockedSize,
+                onCancel = { vm.cancelAdjust() },
             )
         }
 
@@ -296,6 +299,8 @@ fun EditorScreen(
                 onSettings = onOpenSettings,
                 onProcessing = { openMl() },
                 onLook = { showLook = true },
+                canAdjust = vm.canReopenAdjust,
+                onAdjust = { vm.reopenAdjust() },
                 modifier = Modifier
                     .onSizeChanged { topBarPx = it.height }
                     .statusBarsPadding()

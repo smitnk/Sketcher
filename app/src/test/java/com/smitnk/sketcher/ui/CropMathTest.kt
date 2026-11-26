@@ -3,6 +3,7 @@ package com.smitnk.sketcher.ui
 import com.smitnk.sketcher.ui.adjust.Corner
 import com.smitnk.sketcher.ui.adjust.CropRect
 import com.smitnk.sketcher.ui.adjust.dragCorner
+import com.smitnk.sketcher.ui.adjust.moveRect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,6 +14,14 @@ class CropMathTest {
     @Test fun freeDragMovesOnlyThatCorner() {
         val r = dragCorner(full, Corner.TL, 0.25f, 0.4f, null, 1f)
         assertEquals(0.25f, r.l, 1e-5f); assertEquals(0.4f, r.t, 1e-5f); assertEquals(1f, r.r, 1e-5f); assertEquals(1f, r.b, 1e-5f)
+    }
+
+    @Test fun moveKeepsSizeAndClampsAtEdges() {
+        val c = CropRect(0.2f, 0.2f, 0.6f, 0.5f)
+        val m = moveRect(c, 0.1f, 0.2f)
+        assertEquals(CropRect(0.3f, 0.4f, 0.7f, 0.7f).l, m.l, 1e-5f); assertEquals(0.7f, m.r, 1e-5f); assertEquals(0.4f, m.t, 1e-5f); assertEquals(0.7f, m.b, 1e-5f)
+        val e = moveRect(c, 5f, -5f)
+        assertEquals(CropRect(0.6f, 0f, 1f, 0.3f).l, e.l, 1e-5f); assertEquals(1f, e.r, 1e-5f); assertEquals(0f, e.t, 1e-5f); assertEquals(0.3f, e.b, 1e-5f)
     }
 
     @Test fun clampsInsidePhotoAndMinSize() {
