@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -170,6 +171,9 @@ private const val KEY_NNAPI_ACK = "nnapi_warning_ack"
 private const val KEY_INPUT_FRAME = "input_frame"
 private const val KEY_SKIP_ADJUST = "skip_adjust_step"
 private const val ADJUST_PREVIEW_SIDE = 1280
+private const val ADJUST_PICK = 0
+private const val ADJUST_REOPEN = 1
+private const val ADJUST_ADD = 2
 private const val PREV_JOIN_MS = 6_000L
 private const val ENGINE_RELEASE_WAIT_MS = 3_000L
 
@@ -1208,14 +1212,41 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         private set
     private var pendingUri: Uri? = null
     private var pendingPose = false
+    private var pendingKind = ADJUST_PICK
+
+    /** What the Adjust screen starts with: the remembered choice for a pick, the project's frame on reopen, auto for a new frame. */
+    var adjustInitial by mutableStateOf(InputFrame())
+        private set
+
+    /** Non-null = (project.width, project.height): crop ratio must match and the output is scaled to exactly this size. */
+    var adjustLockedSize by mutableStateOf<Pair<Int, Int>?>(null)
+        private set
+
+    // shortcut: uris kept in memory only, lost after app restart; persist in codec if users ask
+    private val frameUris = mutableStateMapOf<Long, Uri>()
+
+    /** True when the open frame's photo is remembered and nothing is generating. */
+    val canReopenAdjust: Boolean get() = !framesBusy && frameUris.containsKey(project.currentFrame.id)
+
+    /** Shows the Adjust step again for the open frame's photo, starting from the project's crop + size. */
+    fun reopenAdjust() {
+        val uri = frameUris[project.currentFrame.id] ?: return
+        if (framesBusy) return
+        previewAdjust(uri, false, ADJUST_REOPEN, project.inputFrame, if (project.frames.size > 1) project.width to project.height else null)
+    }
 
     /** Opens the pending photo with [frame] (crop is normalised to [adjustPhoto]); [frame] becomes the remembered choice. */
     fun confirmAdjust(frame: InputFrame) {
         val uri = pendingUri ?: return
         val pose = pendingPose
-        inputFrame = frame
+        val kind = pendingKind
+        val locked = adjustLockedSize
         cancelAdjust()
-        openPhoto(uri, pose, frame)
+        if (locked == null) {
+            inputFrame = frame
+            openPhoto(uri, pose, frame)
+        } else if (kind == ADJUST_REOPEN) replaceFrameSource(uri, frame)
+        else addFrameWith(uri, pose, frame)
     }
 
     /** Opens the pending photo with the current [inputFrame]. */
@@ -1224,12 +1255,20 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Drops the pending "Adjust photo" step without opening anything. */
     fun cancelAdjust() {
         pendingUri = null
+        pendingPose = false
+        pendingKind = ADJUST_PICK
+        adjustLockedSize = null
+        adjustInitial = InputFrame()
         adjustPhoto = null
     }
 
     /** [pose] is part of the request: pose mode is applied now and reset by every other load/open. */
     fun loadImage(uri: Uri, pose: Boolean = false) {
         if (skipAdjustStep) { openPhoto(uri, pose, inputFrame); return }
+        previewAdjust(uri, pose, ADJUST_PICK, inputFrame, null)
+    }
+
+    private fun previewAdjust(uri: Uri, pose: Boolean, kind: Int, initial: InputFrame, locked: Pair<Int, Int>?) {
         viewModelScope.launch {
             val preview = withContext(Dispatchers.IO) {
                 try {
@@ -1243,6 +1282,9 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             if (preview == null) { toast("Could not open that image"); return@launch }
             pendingUri = uri
             pendingPose = pose
+            pendingKind = kind
+            adjustInitial = initial
+            adjustLockedSize = locked
             adjustPhoto = preview
         }
     }
@@ -1295,6 +1337,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             sessionActions = armed
             projectName = picked ?: autoName(if (poseMode) "Pose" else "Sketch")
             setSource(bmp, frame)
+            frameUris[project.currentFrame.id] = uri
             model().warmUp()
             emitEditorEvent(EditorEvent.OpenStyle(projectGen))
         }
@@ -1468,6 +1511,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun takeArmedActions(): Set<EditorAutoAction> = armedActions.also { armedActions = emptySet() }
 
     private fun resetProject(keepLoad: Boolean = false) {
+        frameUris.clear()
         debounceJob?.cancel()
         dirty = false
         projectGen++
@@ -1519,7 +1563,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
         get() = project.currentFrame.autoSource
         set(v) { project.currentFrame.autoSource = v }
 
-    private fun setSource(bmp: Bitmap, frame: InputFrame = InputFrame()) {
+    private fun setSource(bmp: Bitmap, frame: InputFrame) {
         project.inputFrame = frame
         sourceSerial++
         sourceBitmap = bmp
@@ -1933,11 +1977,19 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Decodes [uri]; with [fit] crops it to the canvas aspect and size so every frame stays the same size. */
-    private suspend fun loadFrameImage(uri: Uri, fit: Boolean): Bitmap? = withContext(Dispatchers.IO) {
+    private suspend fun loadFrameImage(uri: Uri, fit: Boolean, frame: InputFrame = InputFrame()): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            val bmp = ImageLoader.load(app, uri, settings.maxSide) ?: return@withContext null
+            val crop = fit && !frame.auto
+            val frac = minOf(frame.right - frame.left, frame.bottom - frame.top).coerceIn(0.05f, 1f)
+            val side = if (crop) minOf(InputFrame.MAX_SIDE, kotlin.math.ceil(maxOf(project.width, project.height) / frac).toInt()) else settings.maxSide
+            val bmp = ImageLoader.load(app, uri, side) ?: return@withContext null
             if (!fit) return@withContext bmp
-            val r = FrameOps.coverRect(bmp.width, bmp.height, project.width, project.height)
+            val r = if (!crop) FrameOps.coverRect(bmp.width, bmp.height, project.width, project.height) else {
+                val x0 = (frame.left.coerceIn(0f, 1f) * bmp.width).toInt().coerceIn(0, bmp.width - 1)
+                val y0 = (frame.top.coerceIn(0f, 1f) * bmp.height).toInt().coerceIn(0, bmp.height - 1)
+                intArrayOf(x0, y0, ((frame.right.coerceIn(0f, 1f) * bmp.width).toInt() - x0).coerceIn(1, bmp.width - x0),
+                    ((frame.bottom.coerceIn(0f, 1f) * bmp.height).toInt() - y0).coerceIn(1, bmp.height - y0))
+            }
             val cropped = Bitmap.createBitmap(bmp, r[0], r[1], r[2], r[3])
             val out = if (cropped.width == project.width && cropped.height == project.height) cropped
             else Bitmap.createScaledBitmap(cropped, project.width, project.height, true)
@@ -1952,7 +2004,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Puts [bmp] into a new frame at [at] (or into the open, still empty, first frame when [reuse]) and opens it. */
-    private fun insertImageFrame(bmp: Bitmap, reuse: Boolean, at: Int) {
+    private fun insertImageFrame(bmp: Bitmap, reuse: Boolean, at: Int, uri: Uri? = null) {
         if (!reuse) {
             flushStroke()
             stopFlipbook(restore = false)
@@ -1963,17 +2015,39 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
             project.frames.add(at, f)
             switchTo(at)
         }
-        setSource(bmp)
+        setSource(bmp, project.inputFrame) // keep the project's crop + size when frames are added
+        if (uri != null) frameUris[project.currentFrame.id] = uri
     }
 
     /** New frame from one photo (or pose render when [pose]) after the open frame; then the style sheet opens. */
     fun addFrameFromImage(uri: Uri, pose: Boolean = false) {
         if (frameBlocked()) return
+        if (!hasProject && project.frames.size == 1) { loadImage(uri, pose); return } // empty project: first photo sets the canvas
+        if (skipAdjustStep) addFrameWith(uri, pose, InputFrame())
+        else previewAdjust(uri, pose, ADJUST_ADD, InputFrame(), project.width to project.height)
+    }
+
+    /** Replaces the open frame's photo (project size stays) with [frame]'s crop scaled to it; then the style sheet opens. */
+    private fun replaceFrameSource(uri: Uri, frame: InputFrame) {
+        val gen = projectGen
+        val id = project.currentFrame.id
+        viewModelScope.launch {
+            val bmp = loadFrameImage(uri, fit = true, frame)
+            if (gen != projectGen || id != project.currentFrame.id) return@launch
+            if (bmp == null) { toast("Could not open that image"); return@launch }
+            if (framesBusy) { toast("Wait for the drawing to finish generating"); return@launch }
+            setSource(bmp, project.inputFrame)
+            frameUris[id] = uri
+            emitEditorEvent(EditorEvent.OpenStyle(projectGen))
+        }
+    }
+
+    private fun addFrameWith(uri: Uri, pose: Boolean, frame: InputFrame) {
         setPoseMode(pose)
         val gen = projectGen
         viewModelScope.launch {
-            val reuse = !hasProject && project.frames.size == 1
-            val bmp = loadFrameImage(uri, fit = !reuse)
+            val reuse = false
+            val bmp = loadFrameImage(uri, fit = true, frame)
             if (gen != projectGen) return@launch
             if (bmp == null) {
                 toast("Could not open that image")
@@ -1984,7 +2058,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                 toast("Wait for the drawing to finish generating")
                 return@launch
             }
-            insertImageFrame(bmp, reuse, project.currentFrameIndex + 1)
+            insertImageFrame(bmp, reuse, project.currentFrameIndex + 1, uri)
             emitEditorEvent(EditorEvent.OpenStyle(projectGen))
         }
     }
@@ -2015,7 +2089,7 @@ class SketchViewModel(private val app: Application) : AndroidViewModel(app) {
                         toast("Skipped image ${i + 1}: could not open it")
                         continue
                     }
-                    insertImageFrame(bmp, reuse, insertAt)
+                    insertImageFrame(bmp, reuse, insertAt, uri)
                     insertAt = project.currentFrameIndex + 1
                     generate()
                     generateJob?.join()
