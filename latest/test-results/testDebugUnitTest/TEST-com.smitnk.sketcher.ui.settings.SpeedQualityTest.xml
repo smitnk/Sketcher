@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.ui.settings.SpeedQualityTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:18:46" hostname="runnervm0hi8g" time="0.001">
+<testsuite name="com.smitnk.sketcher.ui.settings.SpeedQualityTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:19:36" hostname="runnervm0hi8g" time="0.002">
   <properties/>
   <testcase name="simplifyReducesStrokes" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.001"/>
   <testcase name="fastIsLighterAndBestIsHeavier" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.0"/>
-  <testcase name="balancedEqualsTodaysDefaults" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.0"/>
+  <testcase name="balancedEqualsTodaysDefaults" classname="com.smitnk.sketcher.ui.settings.SpeedQualityTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

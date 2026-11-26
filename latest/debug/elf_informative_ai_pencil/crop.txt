@@ -2,7 +2,7 @@ crop: x0=154 y0=190 x1=498 y1=1024 of 734x1024 bgFraction=0.82500523
 lineSource=AI
 model=informative
 accelActive=CPU + XNNPACK fallback=null
-inferenceMs=17549 (wrapped=17835) genMs=20396
+inferenceMs=29993 (wrapped=29995) genMs=33467
 ink: min=0.0 mean=0.0506171795824862 max=0.9268768 (317x768)
 strokes: outline=437 shading=0 fill=0
 look=LookSettings(feel=CLEAN, paper=PLAIN, misregisterColour=false, post=NONE, onTwos=false, seed=1, showPen=false, penStyle=PENCIL, cameraFollow=false, cameraZoom=1.6)

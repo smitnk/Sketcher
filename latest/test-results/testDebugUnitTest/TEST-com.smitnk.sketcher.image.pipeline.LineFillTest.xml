@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.smitnk.sketcher.image.pipeline.LineFillTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:18:44" hostname="runnervm0hi8g" time="0.257">
+<testsuite name="com.smitnk.sketcher.image.pipeline.LineFillTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-26T13:19:33" hostname="runnervm0hi8g" time="0.375">
   <properties/>
-  <testcase name="largeLineArtIsFast" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.211"/>
-  <testcase name="regionCountStableAcrossRunsAndGaps" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.025"/>
-  <testcase name="gapOfTwoPixelsDoesNotLeak" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.017"/>
-  <testcase name="everyPixelLabelledAndColoursAreMedians" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.003"/>
+  <testcase name="largeLineArtIsFast" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.326"/>
+  <testcase name="regionCountStableAcrossRunsAndGaps" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.02"/>
+  <testcase name="gapOfTwoPixelsDoesNotLeak" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.023"/>
+  <testcase name="everyPixelLabelledAndColoursAreMedians" classname="com.smitnk.sketcher.image.pipeline.LineFillTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
